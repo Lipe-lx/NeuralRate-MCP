@@ -460,7 +460,7 @@ const IDENTITY_REGISTRY_ABI = [
 #### MCP Server
 - [ ] Deploy do Cloudflare Worker para produção: `npx wrangler deploy`
 - [ ] Configurar secrets de produção: `npx wrangler secret put <KEY>`
-- [ ] Testar endpoint público: `https://neuralrate-worker.<ACCOUNT>.workers.dev/mcp`
+- [ ] Testar endpoint público: `https://neuralrate-worker.neuralrate.workers.dev/mcp`
 - [ ] Atualizar `agent-card.json` com endpoint de produção
 
 #### Dashboard

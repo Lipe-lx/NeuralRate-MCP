@@ -1122,7 +1122,7 @@ Live Agent Stats
 - ERC-8004 Agent: 0x4f2a...
 
 MCP Endpoint
-https://neuralrate-worker.<ACCOUNT>.workers.dev/mcp
+https://neuralrate-worker.neuralrate.workers.dev/mcp
 ```
 
 ## 14.2 Playground

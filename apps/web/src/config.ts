@@ -1,6 +1,6 @@
 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 const defaultLocalOrigin = 'http://localhost:8787';
-const defaultPublicWorkerOrigin = 'https://neuralrate-worker.<ACCOUNT>.workers.dev';
+const defaultPublicWorkerOrigin = 'https://neuralrate-worker.neuralrate.workers.dev';
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
 const publicApiBaseUrl = import.meta.env.VITE_PUBLIC_API_BASE_URL?.trim();

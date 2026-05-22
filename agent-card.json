@@ -6,7 +6,7 @@
   "services": [
     {
       "name": "NeuralRate-ModelContextProtocol",
-      "endpoint": "https://neuralrate-worker.<ACCOUNT>.workers.dev/mcp",
+      "endpoint": "https://neuralrate-worker.neuralrate.workers.dev/mcp",
       "version": "2026-01-01",
       "mcpTools": ["yield_scan", "tbill_spread", "nansen_context", "risk_assess", "optimal_allocation", "log_decision", "get_decisions"]
     }
