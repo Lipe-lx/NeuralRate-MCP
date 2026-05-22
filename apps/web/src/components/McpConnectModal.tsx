@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { SSE_URL, MCP_PROTOCOL_URL } from '../config';
 
 interface Props {
   isOpen: boolean;
@@ -16,7 +17,7 @@ const McpConnectModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
   if (!isOpen || !mounted) return null;
 
-  const mcpUrl = "http://localhost:8787/sse";
+  const mcpUrl = SSE_URL;
   const jsonConfig = `{
   "mcpServers": {
     "stablesync": {
@@ -88,7 +89,7 @@ const McpConnectModal: React.FC<Props> = ({ isOpen, onClose }) => {
         <div style={{ marginBottom: '1.5rem' }}>
           <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', marginBottom: '0.5rem', fontWeight: 600 }}>1-Click Protocol Link</div>
           <a 
-            href={`mcp+sse://localhost:8787/sse`}
+            href={MCP_PROTOCOL_URL}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
               background: 'var(--color-lime)', color: 'var(--bg-deep)', padding: '0.75rem', borderRadius: '8px', textDecoration: 'none', fontWeight: 600, fontSize: '0.9rem', transition: 'opacity 0.2s'

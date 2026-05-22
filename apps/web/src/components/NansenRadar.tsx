@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import type { Pool } from '../App';
+import { API_BASE_URL } from '../config';
 
 interface Props {
   selectedPool: Pool | null;
@@ -17,7 +18,7 @@ const NansenRadar: React.FC<Props> = ({ selectedPool }) => {
     }
     
     setLoading(true);
-    fetch(`http://localhost:8787/api/nansen/${selectedPool.symbol}`)
+    fetch(`${API_BASE_URL}/nansen/${selectedPool.symbol}`)
       .then(res => res.json())
       .then(d => {
         setData(d);

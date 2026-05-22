@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApi } from '../hooks/useApi';
+import { API_BASE_URL } from '../config';
 import { useWalletContext } from '../context/WalletContext';
 
 const DecisionLedger: React.FC = () => {
@@ -11,7 +12,7 @@ const DecisionLedger: React.FC = () => {
     setAllocating(true);
     try {
       // 1. Get optimal allocation
-      const allocRes = await fetch('http://localhost:8787/api/allocation', {
+      const allocRes = await fetch(`${API_BASE_URL}/allocation`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amountUsd: 10000, riskProfile: 'medium', horizonHours: 24 })
@@ -20,7 +21,7 @@ const DecisionLedger: React.FC = () => {
 
       // 2. Log decision
       const decisionId = '0xdec_' + Math.random().toString(36).substr(2, 9);
-      await fetch('http://localhost:8787/api/decisions', {
+      await fetch(`${API_BASE_URL}/decisions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -44,7 +45,7 @@ const DecisionLedger: React.FC = () => {
 
   const clearLedger = async () => {
     try {
-      await fetch('http://localhost:8787/api/decisions', { method: 'DELETE' });
+      await fetch(`${API_BASE_URL}/decisions`, { method: 'DELETE' });
       await fetchDecisions();
     } catch (e) {
       console.error(e);
