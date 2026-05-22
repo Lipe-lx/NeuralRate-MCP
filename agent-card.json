@@ -2,7 +2,7 @@
   "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
   "name": "NeuralRate MCP Agent",
   "description": "Verifiable RWA yield intelligence and risk-adjusted allocator on Mantle Network",
-  "image": "ipfs://QmRG4H2eWYoMPwffXiHrJQTGci8QscNnLUJyNWCyaan1eB",
+  "image": "ipfs://QmQGKMZUpYJSJjzU1kiVrpMZ9jqTTW3aPoQBsunUShcTqC",
   "services": [
     {
       "name": "NeuralRate-ModelContextProtocol",

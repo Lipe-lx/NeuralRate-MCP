@@ -252,17 +252,17 @@ const IDENTITY_REGISTRY_ABI = [
 ### ERC-8004 Agent Identity
 - [x] Criar `agent-card.json` seguindo o schema oficial
 - [x] Gerar avatar do agente (usar generate_image tool)
-- [ ] Upload agent-card.json + avatar para IPFS (Pinata free tier)
+- [x] Upload agent-card.json + avatar para IPFS (Pinata free tier)
 - [x] Escrever script `register-agent.ts` que chama `register(agentURI)` no Identity Registry
 - [x] Executar registro no Mantle Sepolia
 - [x] Salvar o `agentId` retornado no `.env`
-- [ ] Atualizar `registrations.agentId` no agent-card.json e fazer `setAgentURI()`
+- [x] Atualizar `registrations.agentId` no agent-card.json e fazer `setAgentURI()`
 
 ### Validação Sprint 2
 - [x] Contrato deployado e verificado no Mantle Sepolia Explorer
 - [x] `createDecision()` e `settleDecision()` funcionam via script
 - [x] Agente registrado no ERC-8004 — NFT visível no explorer
-- [ ] Agent card acessível via IPFS gateway
+- [x] Agent card acessível via IPFS gateway
 
 ---
 
@@ -371,16 +371,16 @@ const IDENTITY_REGISTRY_ABI = [
 
 ### IPFS Setup
 - [ ] Criar conta Pinata (free tier: 1GB, 200 uploads)
-- [ ] Upload do agent-card.json
-- [ ] Upload do avatar do agente
-- [ ] Salvar CIDs no `.env`
+- [x] Upload do agent-card.json
+- [x] Upload do avatar do agente
+- [x] Salvar CIDs no `.env`
 
 ### Validação Sprint 4
 - [ ] DefiLlama retorna pools Mantle com APY/TVL corretos
 - [ ] FRED API retorna taxa DGS3MO atualizada
 - [ ] Mock Nansen retorna dados estruturados realistas
 - [ ] Depeg detection funciona com price feeds
-- [ ] Agent card e avatar acessíveis via IPFS gateway público
+- [x] Agent card e avatar acessíveis via IPFS gateway público
 
 ---
 
@@ -460,8 +460,8 @@ const IDENTITY_REGISTRY_ABI = [
 #### MCP Server
 - [ ] Deploy do Cloudflare Worker para produção: `npx wrangler deploy`
 - [ ] Configurar secrets de produção: `npx wrangler secret put <KEY>`
-- [ ] Testar endpoint público: `https://neuralrate-worker.neuralrate.workers.dev/mcp`
-- [ ] Atualizar `agent-card.json` com endpoint de produção
+- [x] Testar endpoint público: `https://neuralrate-worker.neuralrate.workers.dev/mcp`
+- [x] Atualizar `agent-card.json` com endpoint de produção
 
 #### Dashboard
 - [ ] Build de produção: `npm run build`
