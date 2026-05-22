@@ -52,16 +52,6 @@ export function useWallet(): WalletState {
     eth.on('accountsChanged', handleAccountsChanged);
     eth.on('chainChanged', handleChainChanged);
 
-    // Check if already connected
-    eth.request({ method: 'eth_accounts' }).then((accounts: string[]) => {
-      if (accounts.length > 0) {
-        setAddress(accounts[0]);
-        eth.request({ method: 'eth_chainId' }).then((chain: string) => {
-          setChainId(parseInt(chain, 16));
-        });
-      }
-    }).catch(() => {});
-
     return () => {
       eth.removeListener('accountsChanged', handleAccountsChanged);
       eth.removeListener('chainChanged', handleChainChanged);
