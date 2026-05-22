@@ -1,4 +1,4 @@
-# Frontend Dashboard
+# Frontend Benchmark Terminal
 
 The NeuralRate Frontend is built as a highly optimized Vite React SPA leveraging advanced styling tokens, responsive layouts, and zero-dependency Web3 integrations.
 
@@ -6,7 +6,7 @@ The NeuralRate Frontend is built as a highly optimized Vite React SPA leveraging
 
 ## 🎨 Design System and Aesthetics
 
-The dashboard is built entirely with **Vanilla CSS** and customized inline layout systems, targeting premium cyber-aesthetics:
+The interface is built entirely with **Vanilla CSS** and customized inline layout systems, targeting premium cyber-aesthetics:
 * **Typography:** Integrated **Google Fonts Outfit** as the primary font family for modern, clean reading.
 * **Glassmorphism Panels (`.glass-panel`):** Utilizes `color-mix` with `oklch` dark-mode colors, combined with heavy `backdrop-filter: blur(16px)` and thin `oklch(100% 0 0 / 0.1)` borders for a premium depth effect.
 * **Responsive Layout:** Arranged in a strict 3-column grid structure (`300px 370px 1fr`) designed to fit entirely inside the viewport (`height: 100vh`, `overflow: hidden`) with internal custom-scrollbar scrolling inside panels to prevent generic body-level scrolling.

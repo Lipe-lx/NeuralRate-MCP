@@ -1,8 +1,8 @@
-# NeuralRate MCP — Yield Optimization Hub on Mantle
+# NeuralRate MCP — Verifiable RWA Yield Intelligence on Mantle
 
-NeuralRate MCP is an autonomous yield intelligence agent and high-performance DeFi dashboard designed for the **Mantle Network**. 
+NeuralRate MCP is a verifiable RWA yield intelligence layer for autonomous agents on the **Mantle Network**.
 
-It leverages real-time yields data, macroeconomic indicators, and institutional orderflow signals to assess risk deterministically using a **6-factor Risk Assessment Model** and calculate optimal allocations. Built for AI-agent interoperability, NeuralRate exposes its capabilities directly to Large Language Models (LLMs) via the **Model Context Protocol (MCP)**, and logs decisions immutably on-chain using a dedicated Solidity benchmark contract.
+It leverages real-time yields data, macroeconomic indicators, and institutional orderflow signals to assess risk deterministically using a **6-factor Risk Assessment Model** and calculate optimal allocations. Built for AI-agent interoperability, NeuralRate exposes its capabilities directly to Large Language Models (LLMs) via the **Model Context Protocol (MCP)**, includes an operator-facing benchmark terminal, and logs decisions immutably on-chain using a dedicated Solidity benchmark contract.
 
 ```mermaid
 graph TD
@@ -37,8 +37,8 @@ graph TD
 
 The project is structured as a monorepo containing the following components:
 
-* **`/apps/worker`**: The Cloudflare Worker backend. Exposes a CORS-enabled REST API for the web dashboard and runs the stateful Model Context Protocol (MCP) server over Server-Sent Events (SSE). Integrates Cloudflare KV caching and D1 SQLite storage.
-* **`/apps/web`**: The Vite React frontend dashboard, featuring dark glassmorphism styling, custom OKLCH colors, 8px rounded corners, and native EIP-1193 Web3 provider integration for the Mantle Sepolia network.
+* **`/apps/worker`**: The Cloudflare Worker backend. Exposes a CORS-enabled REST API for the operator-facing web app and runs the stateful Model Context Protocol (MCP) server over Server-Sent Events (SSE). Integrates Cloudflare KV caching and D1 SQLite storage.
+* **`/apps/web`**: The Vite React frontend benchmark terminal, featuring dark glassmorphism styling, custom OKLCH colors, 8px rounded corners, and native EIP-1193 Web3 provider integration for the Mantle Sepolia network.
 * **`/contracts`**: The Hardhat development workspace containing `NeuralRateDecisionBenchmark.sol`, a Solidity-based registry contract deployed on Mantle Sepolia to record decisions and audit prediction accuracy.
 * **`/docs`**: Comprehensive, zero-speculation technical documentation of the entire platform:
   1. [System Architecture Guide](docs/architecture.md) — Structural layout, data flow, and caching strategy.
@@ -77,7 +77,7 @@ cd apps/web
 npm install
 npm run dev
 ```
-* The frontend dashboard will open at `http://localhost:5173`.
+* The frontend app will open at `http://localhost:5173`.
 * Standardizes to Mantle Sepolia (Chain ID `5003`).
 
 ---

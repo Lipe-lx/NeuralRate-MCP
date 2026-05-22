@@ -176,7 +176,7 @@ const IDENTITY_REGISTRY_ABI = [
 ### Setup do Monorepo
 - [x] Criar estrutura de diretórios:
   ```
-  NeuralRate_MCP/
+  <repo-root>/
   ├── apps/
   │   ├── worker/          # Cloudflare Worker MCP Server
   │   │   ├── src/

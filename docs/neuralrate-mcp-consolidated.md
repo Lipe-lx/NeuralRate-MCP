@@ -1437,7 +1437,7 @@ TELEGRAM_CHAT_ID=
 # 25. Recommended Repository Layout
 
 ```txt
-neuralrate-mcp/
+<repo-root>/
 ├── apps/
 │   ├── worker/
 │   │   ├── src/

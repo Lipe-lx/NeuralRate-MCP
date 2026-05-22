@@ -1,6 +1,6 @@
 # D1 Database Schema
 
-To maintain persistent, verifiable, and historical decision-making logs for both the UI dashboard and autonomous agents, NeuralRate MCP utilizes **Cloudflare D1**, a native serverless SQLite database.
+To maintain persistent, verifiable, and historical decision-making logs for both the operator-facing benchmark terminal and autonomous agents, NeuralRate MCP utilizes **Cloudflare D1**, a native serverless SQLite database.
 
 ---
 

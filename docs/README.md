@@ -1,8 +1,8 @@
 # NeuralRate MCP Documentation Portal
 
-Welcome to the official documentation portal for **NeuralRate MCP** — an autonomous yield optimization agent and interactive dashboard built for the **Mantle Network**.
+Welcome to the official documentation portal for **NeuralRate MCP** — a verifiable RWA yield intelligence layer for autonomous agents built for the **Mantle Network**.
 
-NeuralRate MCP is a state-of-the-art Web3 platform designed for hackathons, bridging the gap between decentralized finance (DeFi), institutional-grade risk models, and Large Language Model (LLM) agents via the **Model Context Protocol (MCP)**.
+NeuralRate MCP bridges decentralized finance (DeFi), institutional-grade risk models, and Large Language Model (LLM) agents via the **Model Context Protocol (MCP)**, while providing an operator-facing benchmark terminal for human review.
 
 ---
 
@@ -30,7 +30,7 @@ Detailed specification of the Model Context Protocol (MCP) server running inside
 ### [3. Smart Contract (`docs/smart-contract.md`)](smart-contract.md)
 Technical details of the Solidity benchmark registry contract `NeuralRateDecisionBenchmark.sol` deployed on the Mantle Sepolia Network, detailing variables, modifiers, external functions, events, and performance tracking.
 
-### [4. Frontend Dashboard (`docs/frontend.md`)](frontend.md)
+### [4. Frontend Benchmark Terminal (`docs/frontend.md`)](frontend.md)
 Documentation of the Vite React user interface, details on the glassmorphism layout design system, the dynamic components (`YieldScanner`, `RiskPanel`, `NansenRadar`, `DecisionLedger`), the **EIP-1193 Mantle Sepolia wallet connection hook**, and the MCP integration modal.
 
 ### [5. D1 Database Schema (`docs/database.md`)](database.md)
