@@ -1,14 +1,14 @@
 {
   "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
-  "name": "StableSync MCP Agent",
+  "name": "NeuralRate MCP Agent",
   "description": "Verifiable RWA yield intelligence and risk-adjusted allocator on Mantle Network",
   "image": "ipfs://QmRG4H2eWYoMPwffXiHrJQTGci8QscNnLUJyNWCyaan1eB",
   "services": [
     {
-      "name": "StableSync-ModelContextProtocol",
-      "endpoint": "https://stablesync-mcp.workers.dev/mcp",
+      "name": "NeuralRate-ModelContextProtocol",
+      "endpoint": "https://neuralrate-worker.<ACCOUNT>.workers.dev/mcp",
       "version": "2026-01-01",
-      "mcpTools": ["yield_scan", "tbill_spread", "nansen_context", "risk_assess", "optimal_allocation", "settle_decision"]
+      "mcpTools": ["yield_scan", "tbill_spread", "nansen_context", "risk_assess", "optimal_allocation", "log_decision", "get_decisions"]
     }
   ],
   "registrations": [

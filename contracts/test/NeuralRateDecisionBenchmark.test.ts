@@ -1,11 +1,11 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
-describe("StableSyncDecisionBenchmark", function () {
+describe("NeuralRateDecisionBenchmark", function () {
   async function deployFixture() {
     const [agent, otherAccount] = await ethers.getSigners();
-    const StableSyncDecisionBenchmark = await ethers.getContractFactory("StableSyncDecisionBenchmark");
-    const contract = await StableSyncDecisionBenchmark.deploy();
+    const NeuralRateDecisionBenchmark = await ethers.getContractFactory("NeuralRateDecisionBenchmark");
+    const contract = await NeuralRateDecisionBenchmark.deploy();
     return { contract, agent, otherAccount };
   }
 

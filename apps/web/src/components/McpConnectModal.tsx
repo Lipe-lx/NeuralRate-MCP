@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { SSE_URL, MCP_PROTOCOL_URL } from '../config';
+import { MCP_HTTP_URL, MCP_PROTOCOL_URL, SSE_URL } from '../config';
 
 interface Props {
   isOpen: boolean;
@@ -17,10 +17,10 @@ const McpConnectModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
   if (!isOpen || !mounted) return null;
 
-  const mcpUrl = SSE_URL;
+  const mcpUrl = MCP_HTTP_URL;
   const jsonConfig = `{
   "mcpServers": {
-    "stablesync": {
+    "neuralrate": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/client-cli", "${mcpUrl}"]
     }
@@ -83,7 +83,7 @@ const McpConnectModal: React.FC<Props> = ({ isOpen, onClose }) => {
         </div>
 
         <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '1.5rem' }}>
-          StableSync operates as a fully autonomous MCP server. AI agents can connect to this endpoint to scan yields, run risk assessments, and execute logic securely.
+          NeuralRate exposes a canonical MCP endpoint at <code>{MCP_HTTP_URL}</code> and keeps <code>{SSE_URL}</code> as a transport alias for legacy SSE clients.
         </p>
 
         <div style={{ marginBottom: '1.5rem' }}>

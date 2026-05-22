@@ -1,6 +1,6 @@
 # System Architecture
 
-StableSync MCP is built using a modern, decentralized micro-architecture designed for maximum speed, security, and developer interoperability. It bridges raw blockchain opportunities, traditional macroeconomic indicators, and institutional flow data into a unified, agent-driven interface.
+NeuralRate MCP is built using a modern, decentralized micro-architecture designed for maximum speed, security, and developer interoperability. It bridges raw blockchain opportunities, traditional macroeconomic indicators, and institutional flow data into a unified, agent-driven interface.
 
 ---
 
@@ -15,7 +15,7 @@ The platform consists of four primary layers:
 ```mermaid
 graph TB
     subgraph Frontend [Client Layer: Vite React]
-        UI[StableSync Dashboard]
+        UI[NeuralRate Dashboard]
         WC[Wallet Provider: EIP-1193]
         MC[MCP Connection Modal]
     end
@@ -34,7 +34,7 @@ graph TB
     end
 
     subgraph Blockchain [Mantle Sepolia Network]
-        SC[StableSyncDecisionBenchmark.sol]
+        SC[NeuralRateDecisionBenchmark.sol]
     end
 
     %% Interactions
@@ -62,7 +62,7 @@ graph TB
 
 To achieve a clean separation of concerns:
 * **The Frontend** communicates with the Backend via standard JSON over HTTP REST endpoints (`/api/*`).
-* **AI Agents** communicate with the Backend using the **Model Context Protocol (MCP) over Server-Sent Events (SSE)** at `/mcp`. Under the hood, a Cloudflare Durable Object (`StableSyncMcpAgent`) manages stateful SSE channels.
+* **AI Agents** communicate with the Backend using the **Model Context Protocol (MCP) over Server-Sent Events (SSE)** at `/mcp`. Under the hood, a Cloudflare Durable Object (`NeuralRateMcpAgent`) manages stateful SSE channels.
 * **Smart Contracts** are triggered directly from the frontend using the user's connected Web3 wallet (MetaMask, Rabby, etc.) targeting the **Mantle Sepolia Testnet** (Chain ID `5003`).
 
 ---

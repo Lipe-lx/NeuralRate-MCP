@@ -18,7 +18,7 @@ const Header: React.FC = () => {
           borderRadius: '12px',
           boxShadow: '0 0 15px var(--color-lime-glow)'
         }} />
-        <h1 className="text-gradient" style={{ fontSize: '1.5rem', margin: 0, fontWeight: 700 }}>StableSync</h1>
+        <h1 className="text-gradient" style={{ fontSize: '1.5rem', margin: 0, fontWeight: 700 }}>NeuralRate</h1>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>

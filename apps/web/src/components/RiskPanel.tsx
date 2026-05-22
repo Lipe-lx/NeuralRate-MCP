@@ -142,7 +142,7 @@ const RiskPanel: React.FC<Props> = ({ selectedPool }) => {
             {/* Scrollable content */}
             <div style={{ overflowY: 'auto', flex: 1, paddingRight: '0.5rem' }}>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '1.5rem', lineHeight: 1.6 }}>
-                StableSync uses a 6-factor deterministic model with continuous scoring curves. Each factor is weighted by its impact on capital safety.
+                NeuralRate uses a 6-factor deterministic model with continuous scoring curves. Each factor is weighted by its impact on capital safety.
               </p>
 
               {/* Factor 1: TVL Depth */}

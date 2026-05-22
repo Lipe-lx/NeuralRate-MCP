@@ -13,3 +13,6 @@ typechain-types/
 
 # Cloudflare
 .wrangler/
+apps/worker/.dev.vars
+apps/worker/.dev.vars.*
+!apps/worker/.dev.vars.example

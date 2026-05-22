@@ -1,5 +1,6 @@
 import { ethers } from "hardhat";
 import * as dotenv from "dotenv";
+import { readFileSync, writeFileSync } from "fs";
 import path from "path";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
@@ -11,7 +12,10 @@ async function main() {
     throw new Error("Missing ERC8004_IDENTITY_REGISTRY_TESTNET or ERC8004_AGENT_ID in .env");
   }
 
-  const agentURI = "ipfs://QmNopELMAq1iiyXXWuktDat34w4tFjbK7HHwFNcs2NZvpV";
+  const agentURI = process.env.AGENT_CARD_URI;
+  if (!agentURI) {
+    throw new Error("Missing AGENT_CARD_URI in .env");
+  }
 
   console.log(`Setting Agent URI for Agent ID ${AGENT_ID} at Registry ${IDENTITY_REGISTRY}`);
 
@@ -30,6 +34,13 @@ async function main() {
     console.log("Transaction hash:", tx.hash);
     console.log("Waiting for confirmation...");
     await tx.wait();
+    const manifestPath = path.resolve(__dirname, "../../deployments/mantle-sepolia.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    manifest.agentId = AGENT_ID;
+    manifest.agentURI = agentURI;
+    manifest.updatedAt = new Date().toISOString();
+    writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+    console.log(`Deployment manifest updated: ${manifestPath}`);
     console.log("\n✅ Agent URI successfully updated!");
   } catch (error) {
     console.log("Failed to set Agent URI (possibly because the contract does not implement setAgentURI or requires different permissions).");

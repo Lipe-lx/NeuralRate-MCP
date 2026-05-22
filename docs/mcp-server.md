@@ -1,6 +1,6 @@
 # Model Context Protocol (MCP) Server
 
-The StableSync MCP Server runs inside a Cloudflare Worker and exposes a stateful Model Context Protocol interface at `/mcp` over Server-Sent Events (SSE) using a Cloudflare Durable Object (`StableSyncMcpAgent`). 
+The NeuralRate MCP Server runs inside a Cloudflare Worker and exposes a stateful Model Context Protocol interface at `/mcp` over Server-Sent Events (SSE) using a Cloudflare Durable Object (`NeuralRateMcpAgent`). 
 
 It also houses the core quantitative logic of our **6-factor Risk Assessment Model** and **Optimal Allocation Strategy**.
 

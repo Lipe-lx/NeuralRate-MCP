@@ -1,5 +1,6 @@
 import { ethers } from "hardhat";
 import * as dotenv from "dotenv";
+import { readFileSync, writeFileSync } from "fs";
 import path from "path";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
@@ -10,8 +11,12 @@ async function main() {
     throw new Error("Missing ERC8004_IDENTITY_REGISTRY_TESTNET in .env");
   }
 
-  // In a real scenario, this URI points to the IPFS CID of the agent-card.json
-  const agentURI = "ipfs://QmPlaceholderAgentCard";
+  const agentURI = process.env.AGENT_CARD_URI;
+  if (!agentURI) {
+    throw new Error("Missing AGENT_CARD_URI in .env");
+  }
+
+  const manifestPath = path.resolve(__dirname, "../../deployments/mantle-sepolia.json");
 
   console.log("Registering agent to ERC-8004 Identity Registry at:", IDENTITY_REGISTRY);
 
@@ -46,6 +51,12 @@ async function main() {
     console.log(`\n✅ Agent successfully registered!`);
     console.log(`Agent ID: ${parsed?.args[0].toString()}`);
     console.log(`Owner: ${parsed?.args[1]}`);
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    manifest.agentId = parsed?.args[0].toString();
+    manifest.agentURI = agentURI;
+    manifest.updatedAt = new Date().toISOString();
+    writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+    console.log(`Deployment manifest updated: ${manifestPath}`);
     console.log(`\nUpdate your .env ERC8004_AGENT_ID with this Agent ID`);
   } else {
     console.log("Registration complete, but AgentRegistered event not found in receipt.");

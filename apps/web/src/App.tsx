@@ -73,7 +73,7 @@ function AppContent() {
         </main>
 
         <footer style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '0.75rem', borderTop: '1px solid var(--border-subtle)', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-          Powered by StableSync AI • Autonomous Web3 Agent • Mantle Network
+          Powered by NeuralRate AI • Autonomous Web3 Agent • Mantle Network
         </footer>
       </div>
     </div>

@@ -1,8 +1,11 @@
-name = "stablesync-worker"
+name = "neuralrate-worker"
 main = "src/index.ts"
 compatibility_date = "2026-05-03"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
+
+[vars]
+NEURALRATE_BENCHMARK_CONTRACT = "0xf86028159465c48caCaCC3D7AbfB061008Abf46B"
 
 
 
@@ -12,14 +15,18 @@ id = "ce850408cc594b1caba33e1640926d68"
 
 [[d1_databases]]
 binding = "DECISIONS_DB"
-database_name = "stablesync-decisions"
+database_name = "neuralrate-decisions"
 database_id = "c3d9cd58-a80f-4c3c-a220-a3ba26619e77"
 migrations_dir = "migrations"
 
 [[durable_objects.bindings]]
 name = "MCP_OBJECT"
-class_name = "StableSyncMcpAgent"
+class_name = "NeuralRateMcpAgent"
 
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["StableSyncMcpAgent"]
+
+[[migrations]]
+tag = "v2"
+renamed_classes = [{ from = "StableSyncMcpAgent", to = "NeuralRateMcpAgent" }]

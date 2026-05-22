@@ -1,6 +1,6 @@
 # D1 Database Schema
 
-To maintain persistent, verifiable, and historical decision-making logs for both the UI dashboard and autonomous agents, StableSync MCP utilizes **Cloudflare D1**, a native serverless SQLite database.
+To maintain persistent, verifiable, and historical decision-making logs for both the UI dashboard and autonomous agents, NeuralRate MCP utilizes **Cloudflare D1**, a native serverless SQLite database.
 
 ---
 
@@ -8,7 +8,7 @@ To maintain persistent, verifiable, and historical decision-making logs for both
 
 * **Binding Name:** `DECISIONS_DB`
 * **Local Location:** `.wrangler/state/v3/d1`
-* **Database Name:** `stablesync-decisions`
+* **Database Name:** `neuralrate-decisions`
 * **Table Name:** `decisions`
 
 ---

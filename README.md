@@ -1,8 +1,8 @@
-# StableSync MCP — Yield Optimization Hub on Mantle
+# NeuralRate MCP — Yield Optimization Hub on Mantle
 
-StableSync MCP is an autonomous yield intelligence agent and high-performance DeFi dashboard designed for the **Mantle Network**. 
+NeuralRate MCP is an autonomous yield intelligence agent and high-performance DeFi dashboard designed for the **Mantle Network**. 
 
-It leverages real-time yields data, macroeconomic indicators, and institutional orderflow signals to assess risk deterministically using a **6-factor Risk Assessment Model** and calculate optimal allocations. Built for AI-agent interoperability, StableSync exposes its capabilities directly to Large Language Models (LLMs) via the **Model Context Protocol (MCP)**, and logs decisions immutably on-chain using a dedicated Solidity benchmark contract.
+It leverages real-time yields data, macroeconomic indicators, and institutional orderflow signals to assess risk deterministically using a **6-factor Risk Assessment Model** and calculate optimal allocations. Built for AI-agent interoperability, NeuralRate exposes its capabilities directly to Large Language Models (LLMs) via the **Model Context Protocol (MCP)**, and logs decisions immutably on-chain using a dedicated Solidity benchmark contract.
 
 ```mermaid
 graph TD
@@ -17,7 +17,7 @@ graph TD
         D1[(D1 Database)]
     end
     subgraph Chain [Mantle Sepolia Network]
-        SC[StableSyncDecisionBenchmark.sol]
+        SC[NeuralRateDecisionBenchmark.sol]
     end
 
     D -->|REST Requests| API
@@ -39,13 +39,13 @@ The project is structured as a monorepo containing the following components:
 
 * **`/apps/worker`**: The Cloudflare Worker backend. Exposes a CORS-enabled REST API for the web dashboard and runs the stateful Model Context Protocol (MCP) server over Server-Sent Events (SSE). Integrates Cloudflare KV caching and D1 SQLite storage.
 * **`/apps/web`**: The Vite React frontend dashboard, featuring dark glassmorphism styling, custom OKLCH colors, 8px rounded corners, and native EIP-1193 Web3 provider integration for the Mantle Sepolia network.
-* **`/contracts`**: The Hardhat development workspace containing `StableSyncDecisionBenchmark.sol`, a Solidity-based registry contract deployed on Mantle Sepolia to record decisions and audit prediction accuracy.
+* **`/contracts`**: The Hardhat development workspace containing `NeuralRateDecisionBenchmark.sol`, a Solidity-based registry contract deployed on Mantle Sepolia to record decisions and audit prediction accuracy.
 * **`/docs`**: Comprehensive, zero-speculation technical documentation of the entire platform:
-  1. [System Architecture Guide](file:///home/lulipe/Documentos/StableSync_MCP/docs/architecture.md) — Structural layout, data flow, and caching strategy.
-  2. [MCP Server Specifications](file:///home/lulipe/Documentos/StableSync_MCP/docs/mcp-server.md) — 7 tools definitions and the complete formulas for the 6-factor Risk Model.
-  3. [Smart Contract Documentation](file:///home/lulipe/Documentos/StableSync_MCP/docs/smart-contract.md) — Functions, modifiers, variables, and events.
-  4. [Frontend UI Reference](file:///home/lulipe/Documentos/StableSync_MCP/docs/frontend.md) — Component architecture, EIP-1193 Mantle Sepolia hook, and glassmorphism styling.
-  5. [Database Schema](file:///home/lulipe/Documentos/StableSync_MCP/docs/database.md) — SQLite Cloudflare D1 schema columns and tables representation.
+  1. [System Architecture Guide](docs/architecture.md) — Structural layout, data flow, and caching strategy.
+  2. [MCP Server Specifications](docs/mcp-server.md) — 7 tools definitions and the complete formulas for the 6-factor Risk Model.
+  3. [Smart Contract Documentation](docs/smart-contract.md) — Functions, modifiers, variables, and events.
+  4. [Frontend UI Reference](docs/frontend.md) — Component architecture, EIP-1193 Mantle Sepolia hook, and glassmorphism styling.
+  5. [Database Schema](docs/database.md) — SQLite Cloudflare D1 schema columns and tables representation.
 
 ---
 

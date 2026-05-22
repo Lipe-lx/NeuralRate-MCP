@@ -20,12 +20,15 @@ export interface Env {
   MCP_OBJECT: DurableObjectNamespace;
   FRED_API_KEY: string;
   NANSEN_API_KEY: string;
-  STABLESYNC_BENCHMARK_CONTRACT: string;
+  NEURALRATE_BENCHMARK_CONTRACT: string;
 }
 
-export class StableSyncMcpAgent extends McpAgent<Env, Record<string, never>> {
+const MCP_CANONICAL_ROUTE = "/mcp";
+const MCP_SSE_ALIAS_ROUTE = "/sse";
+
+export class NeuralRateMcpAgent extends McpAgent<Env, Record<string, never>> {
   server = new McpServer({
-    name: "stablesync-mcp",
+    name: "neuralrate-mcp",
     version: "1.0.0"
   });
 
@@ -186,9 +189,18 @@ export default {
       }
     }
 
-    // Pass MCP requests to the durable object
-    if (url.pathname.startsWith("/mcp")) {
-      const mcpResponse = await (StableSyncMcpAgent as any).serve("/mcp").fetch(request, env, ctx);
+    // Accept /mcp as canonical and /sse as a transport alias for existing clients.
+    if (url.pathname.startsWith(MCP_CANONICAL_ROUTE) || url.pathname.startsWith(MCP_SSE_ALIAS_ROUTE)) {
+      const targetUrl = new URL(request.url);
+      if (targetUrl.pathname.startsWith(MCP_SSE_ALIAS_ROUTE)) {
+        targetUrl.pathname = targetUrl.pathname.replace(MCP_SSE_ALIAS_ROUTE, MCP_CANONICAL_ROUTE);
+      }
+
+      const mcpRequest = targetUrl.toString() === request.url
+        ? request
+        : new Request(targetUrl.toString(), request);
+
+      const mcpResponse = await (NeuralRateMcpAgent as any).serve(MCP_CANONICAL_ROUTE).fetch(mcpRequest, env, ctx);
       // We must add CORS headers to the SSE response if the frontend tries to connect via EventSource
       const newHeaders = new Headers(mcpResponse.headers);
       newHeaders.set("Access-Control-Allow-Origin", "*");

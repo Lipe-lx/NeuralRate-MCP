@@ -1,0 +1,10 @@
+{
+  "network": "mantleSepolia",
+  "chainId": 5003,
+  "contractName": "NeuralRateDecisionBenchmark",
+  "address": "0xf86028159465c48caCaCC3D7AbfB061008Abf46B",
+  "txHash": "0x6d39eb0488c8b94507cf43750d419a450ea5cdf01bad2a9ee19abf06c9265a75",
+  "agentId": "",
+  "agentURI": "",
+  "updatedAt": "2026-05-22T16:54:13.974Z"
+}

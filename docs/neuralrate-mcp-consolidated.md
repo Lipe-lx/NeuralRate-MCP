@@ -1,4 +1,4 @@
-# StableSync MCP
+# NeuralRate MCP
 ### Mantle Turing Test Hackathon 2026 — Phase 2: AI Awakening
 
 **Primary Track:** AI x RWA  
@@ -56,7 +56,7 @@ The consolidated version uses:
 
 Yield-bearing stablecoins and RWA-backed assets on Mantle create a strong opportunity for autonomous agents: they can monitor liquidity, yield spreads, depeg signals, smart money movement, protocol-level risk and Treasury benchmark spreads faster than human users or static dashboards.
 
-However, the hackathon space is saturated with generic “AI yield optimizer” concepts. **StableSync MCP** is intentionally positioned differently: it is not just a frontend that recommends the highest APY. It is a **Model Context Protocol server that gives autonomous agents a verifiable yield reasoning layer**.
+However, the hackathon space is saturated with generic “AI yield optimizer” concepts. **NeuralRate MCP** is intentionally positioned differently: it is not just a frontend that recommends the highest APY. It is a **Model Context Protocol server that gives autonomous agents a verifiable yield reasoning layer**.
 
 The server exposes callable MCP tools for:
 
@@ -72,7 +72,7 @@ The core idea:
 
 > Agents should not only make financial recommendations. They should make recommendations that can be audited, benchmarked and scored over time.
 
-StableSync MCP focuses on three pillars:
+NeuralRate MCP focuses on three pillars:
 
 1. **Agent-native composability** — any MCP-compatible agent can call the tools.
 2. **Nansen-enhanced intelligence** — wallet labels, smart money movement, holder behavior, flow anomalies and protocol/entity context enrich the raw on-chain data.
@@ -100,7 +100,7 @@ A serious autonomous agent needs to evaluate:
 - Spread against risk-free or near-risk-free benchmarks.
 - Historical realized performance versus recommendation.
 
-Most dashboards show the first one or two signals. StableSync MCP turns the full decision context into an agent-callable primitive.
+Most dashboards show the first one or two signals. NeuralRate MCP turns the full decision context into an agent-callable primitive.
 
 ---
 
@@ -110,7 +110,7 @@ Most hackathon submissions in this category will likely be framed as:
 
 > “An AI agent that optimizes yield.”
 
-StableSync MCP is framed as:
+NeuralRate MCP is framed as:
 
 > “A verifiable RWA yield intelligence layer for autonomous agents on Mantle.”
 
@@ -139,7 +139,7 @@ This difference matters. The project is not competing only on APY selection. It 
                                │ MCP over SSE / HTTP
                                ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    STABLESYNC MCP SERVER                    │
+│                    NEURALRATE MCP SERVER                    │
 │                         Cloudflare Worker                           │
 │                                                                     │
 │  ┌────────────────┐  ┌──────────────────┐  ┌─────────────────────┐ │
@@ -150,8 +150,8 @@ This difference matters. The project is not competing only on APY selection. It 
 │  │ nansen_context │  │ LLM synthesis     │  │ DecisionSettled log  │ │
 │  │ risk_assess    │  │ Explanation only  │  │ Agent reputation     │ │
 │  │ optimal_alloc  │  │ No black-box risk │  │ Optional caller addr │ │
-│  │ settle_decision│  │                  │  │                     │ │
-│  │ monitor        │  │                  │  │                     │ │
+│  │ log_decision   │  │                  │  │                     │ │
+│  │ get_decisions  │  │                  │  │                     │ │
 │  └────────────────┘  └──────────────────┘  └─────────────────────┘ │
 │                                                                     │
 │  ┌────────────────────────────────────────────────────────────────┐ │
@@ -198,7 +198,7 @@ Nansen is not treated as a decorative sponsor API. It is used as an intelligence
 
 Raw on-chain data can show what happened. Nansen can help explain **who** is moving, **how meaningful** the movement is and whether the signal looks like ordinary activity or a higher-quality market signal.
 
-StableSync MCP uses Nansen for:
+NeuralRate MCP uses Nansen for:
 
 | Signal | Why it matters for yield decisions |
 |---|---|
@@ -518,83 +518,41 @@ Produces a risk-adjusted allocation recommendation.
 
 ---
 
-## 6.6 `settle_decision(decision_id)`
+## 6.6 `log_decision(...)`
 
-Settles a previous recommendation against realized outcome data.
+Persists a recommendation and its benchmark metadata in D1 after the allocation step.
 
-**Purpose:** This is the key differentiator. The agent is not only making recommendations; it is building a verifiable performance history.
+**Purpose:** Store an auditable local record that can be correlated with `DecisionCreated` and `DecisionSettled` events on-chain.
 
-**Input:**
-
-```json
-{
-  "decision_id": "0xdec_20260521_000142"
-}
-```
-
-**Output:**
-
-```json
-{
-  "decision_id": "0xdec_20260521_000142",
-  "settled_at": "2026-05-22T18:31:00Z",
-  "horizon_hours": 24,
-  "predicted_blended_apy": 5.16,
-  "realized_blended_apy": 5.04,
-  "prediction_error_bps": 12,
-  "benchmark": {
-    "name": "DGS3MO",
-    "rate": 3.65
-  },
-  "outperformance_vs_tbill_bps": 139,
-  "risk_events": [
-    {
-      "type": "liquidity_change",
-      "severity": "LOW",
-      "detail": "Liquidity depth changed by -4.2%, below alert threshold."
-    }
-  ],
-  "agent_score_delta": 2,
-  "onchain": {
-    "decision_settled_tx": "0xdef456..."
-  }
-}
-```
+**Typical fields:** `decisionId`, `agentAddress`, `predictedApyBps`, `riskProfile`, `allocationJson`, `dataSnapshotHash`, `txHash`.
 
 ---
 
-## 6.7 `position_monitor(protocol, asset, thresholds, webhook_url)`
+## 6.7 `get_decisions(limit)`
 
-Registers alerts for APY, liquidity, depeg or Nansen-flow changes.
+Retrieves the latest logged recommendations for the dashboard and agent consumers.
 
 **Input:**
 
 ```json
 {
-  "protocol": "Agni Finance",
-  "asset": "mUSD",
-  "thresholds": {
-    "apy_change_bps": 50,
-    "liquidity_drop_pct": 15,
-    "depeg_bps": 25,
-    "smart_money_outflow_usd": 500000
-  },
-  "webhook_url": "https://example.com/webhook"
+  "limit": 25
 }
 ```
 
 **Output:**
 
 ```json
-{
-  "monitor_id": "mon_8f91",
-  "status": "active",
-  "checks": ["apy", "liquidity", "depeg", "nansen_flow"],
-  "next_check_at": "2026-05-21T18:35:00Z"
-}
+[
+  {
+    "decision_id": "0xdec_20260521_000142",
+    "predicted_apy_bps": 516,
+    "risk_profile": "medium",
+    "is_settled": false,
+    "tx_hash": "0xabc123..."
+  }
+]
 ```
-
-Demo consumer: Telegram bot receives alerts from the monitor.
 
 ---
 
@@ -627,7 +585,7 @@ This creates the strongest hackathon story:
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-contract StableSyncDecisionBenchmark {
+contract NeuralRateDecisionBenchmark {
     struct DecisionMeta {
         address agent;
         address requestedBy;
@@ -749,7 +707,7 @@ This is much more aligned with the hackathon's on-chain benchmarking narrative.
 
 # 8. ERC-8004 Agent Identity
 
-StableSync MCP uses ERC-8004 as the server's agent identity layer.
+NeuralRate MCP uses ERC-8004 as the server's agent identity layer.
 
 The server has its own agent identity and every decision is associated with that identity. Consumers may call the MCP server without having their own on-chain identity, but identity-aware callers can pass an address or ERC-8004 agent address to start building their own usage history.
 
@@ -759,12 +717,12 @@ The server has its own agent identity and every decision is associated with that
 Tier 1 — API-key caller
 - Caller uses X-API-Key.
 - requestedBy = address(0).
-- Decision is logged under StableSync MCP agent identity.
+- Decision is logged under NeuralRate MCP agent identity.
 
 Tier 2 — Identity-aware caller
 - Caller uses X-API-Key.
 - Caller passes X-Agent-Address.
-- Decision is logged under StableSync MCP agent identity.
+- Decision is logged under NeuralRate MCP agent identity.
 - requestedBy = caller agent address.
 - Caller begins accumulating visible usage history.
 ```
@@ -1149,7 +1107,7 @@ The frontend should not look like a normal DeFi yield dashboard. It should look 
 ## 14.1 Landing page
 
 ```txt
-STABLESYNC MCP
+NEURALRATE MCP
 Verifiable RWA yield intelligence for autonomous agents on Mantle.
 
 [Open Agent Playground] [Read MCP Docs] [View On-Chain Benchmark]
@@ -1164,7 +1122,7 @@ Live Agent Stats
 - ERC-8004 Agent: 0x4f2a...
 
 MCP Endpoint
-https://stablesync-mcp.workers.dev/sse
+https://neuralrate-worker.<ACCOUNT>.workers.dev/mcp
 ```
 
 ## 14.2 Playground
@@ -1220,7 +1178,7 @@ This dashboard is central to the pitch. It proves the project understands agent 
 
 # 15. Differentiators vs Saturated Competitors
 
-| Dimension | Typical AI Yield App | StableSync MCP |
+| Dimension | Typical AI Yield App | NeuralRate MCP |
 |---|---|---|
 | Main interface | Human dashboard | MCP primitive for agents |
 | Main output | Highest APY recommendation | Risk-adjusted, benchmarked decision |
@@ -1310,7 +1268,7 @@ Possible only if the benchmark dashboard and tool execution stream feel polished
 - `optimal_allocation()`.
 - LLM synthesis layer.
 - Data snapshot hash model.
-- `StableSyncDecisionBenchmark` contract.
+- `NeuralRateDecisionBenchmark` contract.
 - `DecisionCreated` event.
 - `DecisionSettled` event.
 - ERC-8004 agent identity.
@@ -1349,7 +1307,7 @@ The submission can be strong with the following minimum:
 5. At least one `DecisionSettled` example.
 6. Playground showing tool calls.
 7. Benchmark dashboard showing predicted vs realized outcome.
-8. Telegram alert from `position_monitor`.
+8. Dashboard/agent consumers retrieving recent history via `get_decisions`.
 
 ---
 
@@ -1373,7 +1331,7 @@ The submission can be strong with the following minimum:
 
 ## 20.1 Short pitch
 
-> StableSync MCP is a verifiable RWA yield reasoning layer for autonomous agents on Mantle. It scans Mantle yield venues, compares returns against Treasury benchmarks, enriches risk analysis with Nansen on-chain intelligence, and produces risk-adjusted allocation recommendations through MCP. Every recommendation is committed on-chain under an ERC-8004 agent identity and later settled against realized outcomes, turning agent decisions into a measurable performance record.
+> NeuralRate MCP is a verifiable RWA yield reasoning layer for autonomous agents on Mantle. It scans Mantle yield venues, compares returns against Treasury benchmarks, enriches risk analysis with Nansen on-chain intelligence, and produces risk-adjusted allocation recommendations through MCP. Every recommendation is committed on-chain under an ERC-8004 agent identity and later settled against realized outcomes, turning agent decisions into a measurable performance record.
 
 ## 20.2 Tagline
 
@@ -1385,13 +1343,13 @@ The submission can be strong with the following minimum:
 
 ## 20.4 One-liner
 
-> StableSync MCP helps autonomous agents reason about Mantle RWA yield opportunities using live market data, Nansen intelligence and verifiable on-chain performance history.
+> NeuralRate MCP helps autonomous agents reason about Mantle RWA yield opportunities using live market data, Nansen intelligence and verifiable on-chain performance history.
 
 ---
 
 # 21. Final Positioning
 
-StableSync MCP should not be described as a DeFi dashboard.
+NeuralRate MCP should not be described as a DeFi dashboard.
 
 It should be described as:
 
@@ -1422,7 +1380,7 @@ These should be resolved during Week 1.
 
 For GitHub, use this order:
 
-1. What is StableSync MCP?
+1. What is NeuralRate MCP?
 2. Why it matters.
 3. Architecture.
 4. MCP tools.
@@ -1479,7 +1437,7 @@ TELEGRAM_CHAT_ID=
 # 25. Recommended Repository Layout
 
 ```txt
-stablesync-mcp/
+neuralrate-mcp/
 ├── apps/
 │   ├── worker/
 │   │   ├── src/
@@ -1527,7 +1485,7 @@ stablesync-mcp/
 │           └── BenchmarkTable.tsx
 │
 ├── contracts/
-│   ├── StableSyncDecisionBenchmark.sol
+│   ├── NeuralRateDecisionBenchmark.sol
 │   └── scripts/
 │       └── deploy.ts
 │

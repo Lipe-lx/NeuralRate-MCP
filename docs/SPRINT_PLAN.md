@@ -1,4 +1,4 @@
-# StableSync MCP — Master Sprint Document
+# NeuralRate MCP — Master Sprint Document
 ### Mantle Turing Test Hackathon 2026 · Phase 2: AI Awakening
 
 > **Objetivo:** Construir um servidor MCP de inteligência de yield verificável para agentes autônomos na Mantle Network, com benchmarking on-chain e identidade ERC-8004.
@@ -109,7 +109,7 @@ const IDENTITY_REGISTRY_ABI = [
                        │ Streamable HTTP (/mcp)
                        ▼
 ┌─────────────────────────────────────────────────────────┐
-│              STABLESYNC MCP SERVER                        │
+│              NEURALRATE MCP SERVER                        │
 │              Cloudflare Worker (McpAgent)                 │
 │                                                         │
 │  Tools: yield_scan · tbill_spread · nansen_context      │
@@ -127,7 +127,7 @@ const IDENTITY_REGISTRY_ABI = [
    ┌────────────┐ ┌──────────┐  ┌───────────────┐
    │ Data APIs  │ │ On-Chain  │  │ Smart Contract│
    │            │ │ Data      │  │               │
-   │ DefiLlama │ │ Pyth      │  │ StableSync    │
+   │ DefiLlama │ │ Pyth      │  │ NeuralRate    │
    │ FRED API  │ │ Mantle RPC│  │ Benchmark.sol │
    │ Nansen    │ │           │  │ ERC-8004      │
    └────────────┘ └──────────┘  └───────────────┘
@@ -176,7 +176,7 @@ const IDENTITY_REGISTRY_ABI = [
 ### Setup do Monorepo
 - [x] Criar estrutura de diretórios:
   ```
-  StableSync_MCP/
+  NeuralRate_MCP/
   ├── apps/
   │   ├── worker/          # Cloudflare Worker MCP Server
   │   │   ├── src/
@@ -194,7 +194,7 @@ const IDENTITY_REGISTRY_ABI = [
   │       └── vite.config.ts
   ├── contracts/           # Hardhat Smart Contracts
   │   ├── contracts/
-  │   │   └── StableSyncDecisionBenchmark.sol
+  │   │   └── NeuralRateDecisionBenchmark.sol
   │   ├── scripts/
   │   │   ├── deploy.ts
   │   │   └── register-agent.ts
@@ -228,7 +228,7 @@ const IDENTITY_REGISTRY_ABI = [
 ## Sprint 2 — Smart Contracts & ERC-8004 (Dias 2-3)
 > **Meta:** Contrato de benchmark deployado e verificado, agente registrado no ERC-8004.
 
-### StableSyncDecisionBenchmark.sol
+### NeuralRateDecisionBenchmark.sol
 - [x] Escrever o contrato completo com:
   - `struct DecisionMeta` (agent, requestedBy, dataSnapshotHash, predictedApyBps, etc.)
   - `createDecision()` → emite `DecisionCreated` event
@@ -319,17 +319,15 @@ const IDENTITY_REGISTRY_ABI = [
 - [ ] Se `log_onchain: true`, chamar `createDecision()` no contrato
 - [ ] Retornar `decision_id` e `data_snapshot_hash`
 
-#### Tool 6: `settle_decision`
-- [ ] Buscar dados atualizados de yield para o período do horizonte
-- [ ] Calcular `realized_blended_apy` vs `predicted_blended_apy`
-- [ ] Calcular `prediction_error_bps` e `outperformance_vs_tbill_bps`
-- [ ] Chamar `settleDecision()` no contrato
-- [ ] Retornar resultado completo com tx hash
+#### Tool 6: `log_decision`
+- [ ] Persistir decisão, risk profile, allocation JSON e hashes no D1
+- [ ] Associar tx hash on-chain quando `createDecision()` for usado
+- [ ] Retornar confirmação com `decision_id`, `created_at` e status
 
-#### Tool 7 (Stretch): `position_monitor`
-- [ ] Registrar alertas para mudanças de APY, liquidez, depeg
-- [ ] Armazenar configuração de monitor no KV
-- [ ] Webhook notification (ou Telegram bot como demo consumer)
+#### Tool 7: `get_decisions`
+- [ ] Buscar histórico recente com paginação simples por `limit`
+- [ ] Retornar estado de settlement, métricas previstas e tx hashes
+- [ ] Ordenar do mais recente para o mais antigo
 
 ### Validação Sprint 3
 - [ ] Cada tool responde com dados válidos em `npx wrangler dev`
@@ -398,7 +396,7 @@ const IDENTITY_REGISTRY_ABI = [
 ### Componentes da Dashboard
 
 #### Header & Navigation
-- [ ] Logo StableSync MCP + status de conexão ao MCP server
+- [ ] Logo NeuralRate MCP + status de conexão ao MCP server
 - [ ] Badge do ERC-8004 Agent ID (link para explorer)
 - [ ] Indicador de modo: Core / Enhanced (Nansen) / Demo
 
@@ -455,14 +453,14 @@ const IDENTITY_REGISTRY_ABI = [
 ### Deploy Final
 
 #### Contratos
-- [ ] Re-deploy `StableSyncDecisionBenchmark.sol` na **Mantle Mainnet** (se possível) ou confirmar deploy Sepolia
+- [ ] Re-deploy `NeuralRateDecisionBenchmark.sol` na **Mantle Mainnet** (se possível) ou confirmar deploy Sepolia
 - [ ] Verificar contrato no Mantlescan
 - [ ] Registrar agente no ERC-8004 (Mainnet ou Sepolia conforme target)
 
 #### MCP Server
 - [ ] Deploy do Cloudflare Worker para produção: `npx wrangler deploy`
 - [ ] Configurar secrets de produção: `npx wrangler secret put <KEY>`
-- [ ] Testar endpoint público: `https://stablesync-mcp.<ACCOUNT>.workers.dev/mcp`
+- [ ] Testar endpoint público: `https://neuralrate-worker.<ACCOUNT>.workers.dev/mcp`
 - [ ] Atualizar `agent-card.json` com endpoint de produção
 
 #### Dashboard
@@ -484,20 +482,20 @@ const IDENTITY_REGISTRY_ABI = [
 - [ ] Integrações (DefiLlama, FRED, Nansen, Mantle RPC)
 
 #### Vídeo Demo (mín 2 min)
-- [ ] Pitch (15-20s): O que é StableSync MCP
+- [ ] Pitch (15-20s): O que é NeuralRate MCP
 - [ ] Problema: Por que agentes precisam de yield intelligence verificável
 - [ ] Solução: Demo ao vivo mostrando:
   - Chamada de `yield_scan` via MCP
   - `optimal_allocation` criando decisão on-chain
   - Dashboard mostrando a decisão no ledger
-  - `settle_decision` com resultado verificável
+  - settlement on-chain via `settleDecision()` com resultado verificável
 - [ ] Integração ERC-8004: mostrar agent identity no explorer
 - [ ] Diferencial: deterministic scoring + benchmarking on-chain
 - [ ] Gravar em 1080p, hospedar no YouTube/Google Drive
 
 ### Submissão DoraHacks
 - [ ] Criar BUIDL no DoraHacks
-- [ ] Pitch de uma linha: *"StableSync MCP: A verifiable RWA yield intelligence layer for autonomous agents on Mantle — every recommendation becomes a benchmarkable, on-chain prediction."*
+- [ ] Pitch de uma linha: *"NeuralRate MCP: A verifiable RWA yield intelligence layer for autonomous agents on Mantle — every recommendation becomes a benchmarkable, on-chain prediction."*
 - [ ] Preencher campos: GitHub link, demo link, vídeo link, contrato deployado
 - [ ] Nomear tracks: **AI × RWA** (principal) + **Agentic Wallets** (secundário)
 - [ ] Submeter antes de **15 de Junho, 2026**

@@ -4,7 +4,11 @@
   "private": true,
   "scripts": {
     "compile": "hardhat compile",
-    "test": "hardhat test"
+    "test": "hardhat test",
+    "deploy:sepolia": "hardhat run scripts/deploy.ts --network mantleSepolia",
+    "verify:sepolia": "hardhat verify --network mantleSepolia",
+    "register-agent:sepolia": "hardhat run scripts/register-agent.ts --network mantleSepolia",
+    "set-agent-uri:sepolia": "hardhat run scripts/set-agent-uri.ts --network mantleSepolia"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.1.2",

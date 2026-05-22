@@ -1,6 +1,6 @@
 # Frontend Dashboard
 
-The StableSync Frontend is built as a highly optimized Vite React SPA leveraging advanced styling tokens, responsive layouts, and zero-dependency Web3 integrations.
+The NeuralRate Frontend is built as a highly optimized Vite React SPA leveraging advanced styling tokens, responsive layouts, and zero-dependency Web3 integrations.
 
 ---
 
@@ -15,7 +15,7 @@ The dashboard is built entirely with **Vanilla CSS** and customized inline layou
 
 ## 🔌 Zero-Dependency Web3 Wallet Integration
 
-Located in `useWallet.ts` and `WalletContext.tsx`, StableSync implements a native, zero-dependency **EIP-1193 Web3 provider bridge** that connects to browser wallets (MetaMask, Rabby, Coinbase, etc.):
+Located in `useWallet.ts` and `WalletContext.tsx`, NeuralRate implements a native, zero-dependency **EIP-1193 Web3 provider bridge** that connects to browser wallets (MetaMask, Rabby, Coinbase, etc.):
 
 * **Target Network:** **Mantle Sepolia Testnet**
   * Chain ID: `5003` (`0x138b` hex)

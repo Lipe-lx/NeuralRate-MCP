@@ -1,6 +1,6 @@
 # Smart Contract
 
-To enforce trust and transparency, StableSync MCP logs decisions on-chain using a Solidity smart contract deployed on the **Mantle Sepolia Testnet** (Chain ID `5003`). 
+To enforce trust and transparency, NeuralRate MCP logs decisions on-chain using a Solidity smart contract deployed on the **Mantle Sepolia Testnet** (Chain ID `5003`). 
 
 The contract acts as an immutable registry for decisions and performance benchmarks.
 
@@ -8,7 +8,7 @@ The contract acts as an immutable registry for decisions and performance benchma
 
 ## 📄 Contract Specifications
 
-* **Contract File:** `StableSyncDecisionBenchmark.sol`
+* **Contract File:** `NeuralRateDecisionBenchmark.sol`
 * **Solidity Compiler Version:** `^0.8.20`
 * **License:** `MIT`
 
