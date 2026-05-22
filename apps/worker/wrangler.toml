@@ -2,6 +2,9 @@ name = "stablesync-worker"
 main = "src/index.ts"
 compatibility_date = "2026-05-03"
 compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+
 
 [[kv_namespaces]]
 binding = "CACHE_KV"
