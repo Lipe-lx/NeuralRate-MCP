@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS decisions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  decision_id TEXT UNIQUE NOT NULL,
+  agent_address TEXT NOT NULL,
+  requested_by TEXT DEFAULT '0x0',
+  data_snapshot_hash TEXT,
+  predicted_apy_bps INTEGER NOT NULL,
+  risk_adjusted_apy_bps INTEGER,
+  benchmark_rate_bps INTEGER,
+  risk_profile TEXT DEFAULT 'conservative',
+  allocation_json TEXT,
+  settlement_horizon_hours INTEGER DEFAULT 24,
+  settlement_due_at TEXT,
+  realized_apy_bps INTEGER,
+  prediction_error_bps INTEGER,
+  outperformance_bps INTEGER,
+  is_settled INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  settled_at TEXT,
+  tx_hash TEXT,
+  settlement_tx_hash TEXT
+);

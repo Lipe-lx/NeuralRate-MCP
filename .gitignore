@@ -1,0 +1,15 @@
+node_modules/
+.env
+.env.*
+!.env.example
+dist/
+build/
+coverage/
+
+# Hardhat
+artifacts/
+cache/
+typechain-types/
+
+# Cloudflare
+.wrangler/

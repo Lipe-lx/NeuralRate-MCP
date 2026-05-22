@@ -1,0 +1,22 @@
+{
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+  "name": "StableSync MCP Agent",
+  "description": "Verifiable RWA yield intelligence and risk-adjusted allocator on Mantle Network",
+  "image": "ipfs://QmRG4H2eWYoMPwffXiHrJQTGci8QscNnLUJyNWCyaan1eB",
+  "services": [
+    {
+      "name": "StableSync-ModelContextProtocol",
+      "endpoint": "https://stablesync-mcp.workers.dev/mcp",
+      "version": "2026-01-01",
+      "mcpTools": ["yield_scan", "tbill_spread", "nansen_context", "risk_assess", "optimal_allocation", "settle_decision"]
+    }
+  ],
+  "registrations": [
+    {
+      "agentRegistry": "eip155:5003:0x8004A818BFB912233c491871b3d84c89A494BD9e",
+      "agentId": "49"
+    }
+  ],
+  "supportedTrust": ["reputation", "crypto-economic"],
+  "x402Support": false
+}
