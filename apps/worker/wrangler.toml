@@ -5,12 +5,12 @@ compatibility_flags = ["nodejs_compat"]
 
 [[kv_namespaces]]
 binding = "CACHE_KV"
-id = "cache_kv_placeholder"
+id = "ce850408cc594b1caba33e1640926d68"
 
 [[d1_databases]]
 binding = "DECISIONS_DB"
 database_name = "stablesync-decisions"
-database_id = "d1_placeholder"
+database_id = "c3d9cd58-a80f-4c3c-a220-a3ba26619e77"
 migrations_dir = "migrations"
 
 [[durable_objects.bindings]]
