@@ -1,10 +1,14 @@
 # Smart Contract
 
-To enforce trust and transparency, NeuralRate MCP supports benchmark registration on-chain using a Solidity smart contract deployed on the **Mantle Sepolia Testnet** (Chain ID `5003`).
+To enforce trust and transparency, NeuralRate MCP supports benchmark registration on-chain using a Solidity smart contract deployed on the **Mantle Sepolia Testnet** (Chain ID `5003`):
+
+*   **Canonical Contract Address:** `0xc51560a5512d2A5756435d87319aeaE1bA480165`
+*   **Mantle Sepolia Explorer Link:** [0xc51560a5512d2A5756435d87319aeaE1bA480165](https://sepolia.mantlescan.xyz/address/0xc51560a5512d2A5756435d87319aeaE1bA480165)
 
 The contract acts as an immutable registry for benchmark decisions and performance outcomes. The public ERC-8004 agent identity is tracked separately in the Mantle identity registry; this contract does **not** embed `agentId` in each event.
 
-The repository contract has already been upgraded to a configurable `benchmarkWriter` model for the NeuralRate agent smart wallet. If the public Mantle Sepolia deployment still points to the older single-writer version, it should be redeployed before demoing the autonomous path as fully live.
+The contract is configured with the **Turnkey Smart Wallet** (`0xc57130F28f3d670cA75AD9a78784966B767E55e3`) as the canonical `benchmarkWriter`, enforcing that only the autonomous agent can post performance benchmark metrics.
+
 
 ---
 

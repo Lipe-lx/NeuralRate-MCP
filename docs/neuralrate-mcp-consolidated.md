@@ -587,112 +587,107 @@ This creates the strongest hackathon story:
 pragma solidity ^0.8.20;
 
 contract NeuralRateDecisionBenchmark {
+    address public owner;
+    address public benchmarkWriter;
+    
     struct DecisionMeta {
-        address agent;
+        uint256 decisionId;
         address requestedBy;
-        bytes32 dataSnapshotHash;
-        uint256 predictedApyBps;
-        uint256 predictedRiskAdjustedApyBps;
-        uint256 benchmarkRateBps;
+        string dataSnapshotHash;
+        int256 predictedApyBps;
+        uint256 settlementHorizonHours;
         uint256 createdAt;
-        uint256 settlementDueAt;
-        bool settled;
+        bool isSettled;
     }
-
-    address public immutable agentIdentity;
-    uint256 public nextDecisionId;
-
+    
     mapping(uint256 => DecisionMeta) public decisions;
-
+    uint256 public nextDecisionId = 1;
+    
     event DecisionCreated(
         uint256 indexed decisionId,
-        address indexed agent,
         address indexed requestedBy,
-        bytes32 dataSnapshotHash,
-        uint256 predictedApyBps,
-        uint256 predictedRiskAdjustedApyBps,
-        uint256 benchmarkRateBps,
-        uint256 settlementDueAt,
-        string recommendationURI
+        string dataSnapshotHash,
+        int256 predictedApyBps,
+        uint256 settlementHorizonHours
     );
-
+    
     event DecisionSettled(
         uint256 indexed decisionId,
-        address indexed agent,
-        uint256 realizedApyBps,
+        int256 realizedApyBps,
         int256 predictionErrorBps,
-        int256 outperformanceVsBenchmarkBps,
-        uint256 settledAt,
-        string settlementURI
+        int256 outperformanceBps
     );
 
+    event BenchmarkWriterUpdated(address indexed previousWriter, address indexed newWriter);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this");
+        _;
+    }
+
     modifier onlyBenchmarkWriter() {
-        require(msg.sender == benchmarkWriter, "Only benchmark writer");
+        require(msg.sender == benchmarkWriter, "Only benchmark writer can call this");
         _;
     }
 
     constructor(address initialBenchmarkWriter) {
+        require(initialBenchmarkWriter != address(0), "Invalid benchmark writer");
+        owner = msg.sender;
         benchmarkWriter = initialBenchmarkWriter;
+
+        emit BenchmarkWriterUpdated(address(0), initialBenchmarkWriter);
+    }
+
+    function agent() external view returns (address) {
+        return benchmarkWriter;
+    }
+
+    function setBenchmarkWriter(address newBenchmarkWriter) external onlyOwner {
+        require(newBenchmarkWriter != address(0), "Invalid benchmark writer");
+        address previousWriter = benchmarkWriter;
+        benchmarkWriter = newBenchmarkWriter;
+
+        emit BenchmarkWriterUpdated(previousWriter, newBenchmarkWriter);
     }
 
     function createDecision(
-        address requestedBy,
-        bytes32 dataSnapshotHash,
-        uint256 predictedApyBps,
-        uint256 predictedRiskAdjustedApyBps,
-        uint256 benchmarkRateBps,
-        uint256 settlementDueAt,
-        string calldata recommendationURI
-    ) external onlyBenchmarkWriter returns (uint256 decisionId) {
-        decisionId = nextDecisionId++;
-
-        decisions[decisionId] = DecisionMeta({
-            agent: agentIdentity,
-            requestedBy: requestedBy,
-            dataSnapshotHash: dataSnapshotHash,
-            predictedApyBps: predictedApyBps,
-            predictedRiskAdjustedApyBps: predictedRiskAdjustedApyBps,
-            benchmarkRateBps: benchmarkRateBps,
+        address _requestedBy,
+        string calldata _dataSnapshotHash,
+        int256 _predictedApyBps,
+        uint256 _settlementHorizonHours
+    ) external onlyBenchmarkWriter returns (uint256) {
+        uint256 id = nextDecisionId++;
+        
+        decisions[id] = DecisionMeta({
+            decisionId: id,
+            requestedBy: _requestedBy,
+            dataSnapshotHash: _dataSnapshotHash,
+            predictedApyBps: _predictedApyBps,
+            settlementHorizonHours: _settlementHorizonHours,
             createdAt: block.timestamp,
-            settlementDueAt: settlementDueAt,
-            settled: false
+            isSettled: false
         });
-
-        emit DecisionCreated(
-            decisionId,
-            agentIdentity,
-            requestedBy,
-            dataSnapshotHash,
-            predictedApyBps,
-            predictedRiskAdjustedApyBps,
-            benchmarkRateBps,
-            settlementDueAt,
-            recommendationURI
-        );
+        
+        emit DecisionCreated(id, _requestedBy, _dataSnapshotHash, _predictedApyBps, _settlementHorizonHours);
+        
+        return id;
     }
 
     function settleDecision(
-        uint256 decisionId,
-        uint256 realizedApyBps,
-        int256 predictionErrorBps,
-        int256 outperformanceVsBenchmarkBps,
-        string calldata settlementURI
+        uint256 _decisionId,
+        int256 _realizedApyBps,
+        int256 _tbillApyBps
     ) external onlyBenchmarkWriter {
-        DecisionMeta storage decision = decisions[decisionId];
-        require(decision.agent != address(0), "Invalid decision");
-        require(!decision.settled, "Already settled");
+        DecisionMeta storage decision = decisions[_decisionId];
+        require(decision.decisionId == _decisionId, "Decision does not exist");
+        require(!decision.isSettled, "Decision already settled");
+        
+        decision.isSettled = true;
 
-        decision.settled = true;
+        int256 predictionErrorBps = _realizedApyBps - decision.predictedApyBps;
+        int256 outperformanceBps = _realizedApyBps - _tbillApyBps;
 
-        emit DecisionSettled(
-            decisionId,
-            agentIdentity,
-            realizedApyBps,
-            predictionErrorBps,
-            outperformanceVsBenchmarkBps,
-            block.timestamp,
-            settlementURI
-        );
+        emit DecisionSettled(_decisionId, _realizedApyBps, predictionErrorBps, outperformanceBps);
     }
 }
 ```
