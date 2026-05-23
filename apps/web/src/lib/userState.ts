@@ -77,6 +77,7 @@ export interface UserVault {
   balance_usd: string;
   deposit_address: string | null;
   last_funding_intent: Record<string, unknown> | null;
+  ownership_acknowledged_at: string | null;
 }
 
 export interface VaultPermission {

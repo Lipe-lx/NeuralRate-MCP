@@ -85,6 +85,7 @@ export type UserVaultInput = {
   balanceUsd?: string | null;
   depositAddress?: string | null;
   lastFundingIntent?: Record<string, unknown> | null;
+  ownershipAcknowledgedAt?: string | null;
 };
 
 export type VaultFundingIntentInput = {
@@ -434,8 +435,8 @@ export class AutomationStore {
         INSERT INTO user_vaults (
           vault_id, user_id, owner_eoa, vault_address, vault_kind, vault_provider, agent_scope_wallet, chain_id,
           status, funding_status, automation_status, balance_usd, deposit_address, last_funding_intent_json,
-          safe_deployment_status, safe_salt_nonce, provider_vault_ref, safe_vault_address
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          safe_deployment_status, safe_salt_nonce, provider_vault_ref, safe_vault_address, ownership_acknowledged_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(vault_id) DO UPDATE SET
           user_id = excluded.user_id,
           owner_eoa = excluded.owner_eoa,
@@ -454,6 +455,7 @@ export class AutomationStore {
           safe_salt_nonce = excluded.safe_salt_nonce,
           provider_vault_ref = excluded.provider_vault_ref,
           safe_vault_address = excluded.safe_vault_address,
+          ownership_acknowledged_at = COALESCE(excluded.ownership_acknowledged_at, user_vaults.ownership_acknowledged_at),
           updated_at = datetime('now')
       `)
       .bind(
@@ -474,7 +476,8 @@ export class AutomationStore {
         input.safeDeploymentStatus ?? (normalizedVaultAddress ? "predicted" : "pending"),
         input.safeSaltNonce ?? "49",
         input.providerVaultRef ?? (normalizedVaultAddress ? `safe:${normalizedVaultAddress}` : null),
-        normalizedVaultAddress
+        normalizedVaultAddress,
+        input.ownershipAcknowledgedAt ?? null
       )
       .run();
 
@@ -522,6 +525,29 @@ export class AutomationStore {
       .run();
 
     return this.getVault(input.ownerEoa);
+  }
+
+  async acknowledgeVaultOwnership(input: {
+    ownerEoa: string;
+    vaultId?: string | null;
+    userId?: string | null;
+  }) {
+    const identity = await this.resolveIdentity(input.ownerEoa, input.userId, input.vaultId);
+    if (!identity.vaultId) {
+      throw new Error("Vault not found for owner.");
+    }
+
+    const acknowledgedAt = new Date().toISOString();
+    await this.db
+      .prepare(`
+        UPDATE user_vaults
+        SET ownership_acknowledged_at = COALESCE(ownership_acknowledged_at, ?), updated_at = datetime('now')
+        WHERE vault_id = ?
+      `)
+      .bind(acknowledgedAt, identity.vaultId)
+      .run();
+
+    return this.getAutomationState(identity.ownerEoa);
   }
 
   async upsertAgentConfig(input: UserAgentConfigInput) {

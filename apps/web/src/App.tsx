@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 // Components
 import Header from './components/Header';
@@ -8,6 +8,7 @@ import NansenRadar from './components/NansenRadar';
 import DecisionLedger from './components/DecisionLedger';
 import VaultPanel from './components/VaultPanel';
 import AgentSettingsPanel from './components/AgentSettingsPanel';
+import WalletOwnershipModal from './components/WalletOwnershipModal';
 import { useApi } from './hooks/useApi';
 import { WalletProvider } from './context/WalletContext';
 import { useWalletContext } from './context/WalletContext';
@@ -36,10 +37,10 @@ export interface Pool {
 }
 
 function AppContent() {
-  const [mounted, setMounted] = useState(false);
   const { data, loading } = useApi<{ pools: Pool[] }>('/yields');
-  const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
+  const [selectedPoolId, setSelectedPoolId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'principal' | 'vault' | 'settings' | 'history'>('principal');
+  const [isOwnershipModalOpen, setIsOwnershipModalOpen] = useState(false);
   const wallet = useWalletContext();
   const { address, isConnected, isCorrectChain, connect, switchToMantle } = wallet;
   const neuralRateUser = useNeuralRateUser({
@@ -54,20 +55,35 @@ function AppContent() {
     signMessage: wallet.signMessage,
   });
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const selectedPool =
+    (selectedPoolId ? data?.pools?.find((pool) => pool.pool === selectedPoolId) ?? null : null) ??
+    data?.pools?.[0] ??
+    null;
 
-  useEffect(() => {
-    if (data?.pools?.length && !selectedPool) {
-      setSelectedPool(data.pools[0]);
+  const controlWalletAddress = wallet.embeddedWalletAddress ?? wallet.address;
+  const controlWalletLabel = wallet.embeddedWalletAddress
+    ? 'Control Wallet (Embedded)'
+    : wallet.address
+      ? 'Control Wallet'
+      : 'Control Wallet';
+
+  const handleBootstrap = async () => {
+    const nextState = await neuralRateUser.bootstrap();
+    if (nextState?.vault?.vault_address && !nextState.vault.ownership_acknowledged_at) {
+      setIsOwnershipModalOpen(true);
     }
-  }, [data, selectedPool]);
+    return nextState;
+  };
+
+  const handleAcknowledgeOwnership = async () => {
+    await neuralRateUser.acknowledgeOwnership();
+    setIsOwnershipModalOpen(false);
+  };
 
   return (
     <div className="container" style={{ height: '100vh', display: 'flex', flexDirection: 'row', gap: '1.5rem', overflow: 'hidden', padding: '1rem' }}>
       {/* Floating Sidebar Navigation */}
-      <aside className={`transition-opacity duration-500 ${mounted ? 'opacity-100' : 'opacity-0'}`} style={{ width: '240px', flexShrink: 0, height: '100%' }}>
+      <aside className="opacity-100" style={{ width: '240px', flexShrink: 0, height: '100%' }}>
         <div className="sidebar-floating">
           <div className="sidebar-brand">
             <div style={{
@@ -124,7 +140,7 @@ function AppContent() {
       </aside>
 
       {/* Main Workspace Area */}
-      <div className={`transition-opacity duration-500 ${mounted ? 'opacity-100' : 'opacity-0'}`} style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: '100%', maxWidth: '1380px', margin: '0 auto' }}>
+      <div className="opacity-100" style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: '100%', maxWidth: '1380px', margin: '0 auto' }}>
         <Header />
 
         <main style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
@@ -142,7 +158,7 @@ function AppContent() {
                 <YieldScanner 
                   pools={data?.pools || []} 
                   loading={loading} 
-                  onSelectPool={setSelectedPool} 
+                  onSelectPool={(pool) => setSelectedPoolId(pool?.pool ?? null)} 
                   selectedPool={selectedPool} 
                 />
               </div>
@@ -161,10 +177,12 @@ function AppContent() {
                   isCorrectChain={isCorrectChain}
                   onConnect={connect}
                   onSwitchChain={switchToMantle}
-                  onBootstrap={neuralRateUser.bootstrap}
+                  onBootstrap={handleBootstrap}
                   onFundingIntent={neuralRateUser.createFundingIntent}
                   onEnableAutomation={neuralRateUser.enableAutomation}
                   onRevokeAutomation={neuralRateUser.revokeAutomation}
+                  onReviewOwnership={() => setIsOwnershipModalOpen(true)}
+                  controlWalletLabel={controlWalletLabel}
                 />
               </div>
             </div>
@@ -199,6 +217,25 @@ function AppContent() {
           NeuralRate MCP • Per-User Vault Automation + Benchmark Terminal • Mantle Sepolia
         </footer>
       </div>
+
+      {isOwnershipModalOpen && (
+        <WalletOwnershipModal
+          isOpen={isOwnershipModalOpen}
+          busy={neuralRateUser.busy}
+          vaultAddress={neuralRateUser.state?.vault?.vault_address ?? null}
+          controlWalletAddress={controlWalletAddress}
+          controlWalletLabel={controlWalletLabel}
+          walletProvider={wallet.walletProvider}
+          canExportEmbeddedWallet={wallet.canExportEmbeddedWallet}
+          embeddedWalletRecoveryMethod={wallet.embeddedWalletRecoveryMethod}
+          alreadyAcknowledged={Boolean(neuralRateUser.state?.vault?.ownership_acknowledged_at)}
+          acknowledgedAt={neuralRateUser.state?.vault?.ownership_acknowledged_at ?? null}
+          onClose={() => setIsOwnershipModalOpen(false)}
+          onExportEmbeddedWallet={wallet.exportEmbeddedWallet}
+          onSetEmbeddedWalletRecovery={wallet.setEmbeddedWalletRecovery}
+          onAcknowledge={handleAcknowledgeOwnership}
+        />
+      )}
     </div>
   );
 }

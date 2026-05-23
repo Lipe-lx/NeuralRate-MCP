@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { usePrivy, useWallets } from '@privy-io/react-auth';
+import { useExportWallet, usePrivy, useSetWalletRecovery, useWallets } from '@privy-io/react-auth';
 import type { EIP1193Provider } from 'viem';
 
 const MANTLE_SEPOLIA_CHAIN_ID = 5003;
@@ -30,6 +30,7 @@ export type PrivyWalletState = {
   address: string | null;
   externalWalletAddress: string | null;
   embeddedWalletAddress: string | null;
+  embeddedWalletRecoveryMethod: string | null;
   providerUserId: string | null;
   authStrategy: string;
   walletProvider: 'privy';
@@ -43,12 +44,17 @@ export type PrivyWalletState = {
   switchToMantle: () => Promise<void>;
   getEthereumProvider: () => Promise<EIP1193Provider>;
   signMessage: (message: string) => Promise<string>;
+  canExportEmbeddedWallet: boolean;
+  exportEmbeddedWallet: () => Promise<void>;
+  setEmbeddedWalletRecovery: () => Promise<void>;
   shortAddress: string;
 };
 
 export function usePrivyWallet(): PrivyWalletState {
   const { ready, authenticated, user, connectOrCreateWallet, logout } = usePrivy();
   const { wallets, ready: walletsReady } = useWallets();
+  const { exportWallet } = useExportWallet();
+  const { setWalletRecovery } = useSetWalletRecovery();
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,11 +77,14 @@ export function usePrivyWallet(): PrivyWalletState {
 
   const address = primaryWallet?.address?.toLowerCase() ?? null;
   const embeddedWalletAddress = embeddedWallet?.address?.toLowerCase() ?? null;
+  const embeddedWalletRecoveryMethod =
+    (embeddedWallet as (typeof embeddedWallet & { recoveryMethod?: string }) | null)?.recoveryMethod ?? null;
   const externalWalletAddress = externalWallet?.address?.toLowerCase() ?? null;
   const isConnected = Boolean(address) && authenticated;
   const isCorrectChain = chainId === MANTLE_SEPOLIA_CHAIN_ID;
   const shortAddress = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '';
   const authStrategy = embeddedWalletAddress ? 'privy-passkey-embedded' : 'privy-external-wallet';
+  const canExportEmbeddedWallet = Boolean(embeddedWalletAddress);
 
   const connect = useCallback(async () => {
     setIsConnecting(true);
@@ -128,10 +137,43 @@ export function usePrivyWallet(): PrivyWalletState {
     return primaryWallet.sign(message);
   }, [primaryWallet]);
 
+  const exportEmbeddedWallet = useCallback(async () => {
+    if (!embeddedWalletAddress) {
+      throw new Error('No Privy embedded wallet is available for export.');
+    }
+
+    setError(null);
+
+    try {
+      await exportWallet({ address: embeddedWalletAddress });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to open embedded wallet export.';
+      setError(message);
+      throw err;
+    }
+  }, [embeddedWalletAddress, exportWallet]);
+
+  const configureEmbeddedWalletRecovery = useCallback(async () => {
+    if (!embeddedWalletAddress) {
+      throw new Error('No Privy embedded wallet is available for recovery setup.');
+    }
+
+    setError(null);
+
+    try {
+      await setWalletRecovery();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to open embedded wallet recovery.';
+      setError(message);
+      throw err;
+    }
+  }, [embeddedWalletAddress, setWalletRecovery]);
+
   return {
     address,
     externalWalletAddress,
     embeddedWalletAddress,
+    embeddedWalletRecoveryMethod,
     providerUserId: user?.id ?? null,
     authStrategy,
     walletProvider: 'privy',
@@ -145,6 +187,9 @@ export function usePrivyWallet(): PrivyWalletState {
     switchToMantle,
     getEthereumProvider,
     signMessage,
+    canExportEmbeddedWallet,
+    exportEmbeddedWallet,
+    setEmbeddedWalletRecovery: configureEmbeddedWalletRecovery,
     shortAddress,
   };
 }

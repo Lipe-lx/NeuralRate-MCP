@@ -290,6 +290,17 @@ export default {
           return new Response(JSON.stringify({ success: true, vault }), { headers: corsHeaders });
         }
 
+        if (url.pathname === "/api/vault/ownership-ack" && request.method === "POST") {
+          const body = await request.json() as any;
+          const state = await automation.acknowledgeVaultOwnership({
+            ownerEoa: body.ownerEoa,
+            vaultId: body.vaultId,
+            userId: body.userId,
+          });
+
+          return new Response(JSON.stringify({ success: true, state }), { headers: corsHeaders });
+        }
+
         if (url.pathname === "/api/decisions" && request.method === "GET") {
           const requestedLimit = Number.parseInt(url.searchParams.get("limit") || "", 10);
           const ownerEoa = url.searchParams.get("ownerEoa") || undefined;

@@ -14,6 +14,7 @@ export interface InjectedWalletState {
   address: string | null;
   externalWalletAddress: string | null;
   embeddedWalletAddress: string | null;
+  embeddedWalletRecoveryMethod: string | null;
   providerUserId: string | null;
   authStrategy: string;
   walletProvider: 'injected';
@@ -27,6 +28,9 @@ export interface InjectedWalletState {
   switchToMantle: () => Promise<void>;
   getEthereumProvider: () => Promise<EIP1193Provider>;
   signMessage: (message: string) => Promise<string>;
+  canExportEmbeddedWallet: boolean;
+  exportEmbeddedWallet: () => Promise<void>;
+  setEmbeddedWalletRecovery: () => Promise<void>;
   shortAddress: string;
 }
 
@@ -165,6 +169,7 @@ export function useInjectedWallet(): InjectedWalletState {
     address,
     externalWalletAddress: address,
     embeddedWalletAddress: null,
+    embeddedWalletRecoveryMethod: null,
     providerUserId: null,
     authStrategy: 'external-wallet',
     walletProvider: 'injected',
@@ -178,6 +183,13 @@ export function useInjectedWallet(): InjectedWalletState {
     switchToMantle,
     getEthereumProvider,
     signMessage,
+    canExportEmbeddedWallet: false,
+    exportEmbeddedWallet: async () => {
+      throw new Error('Embedded wallet export is only available for Privy-managed wallets.');
+    },
+    setEmbeddedWalletRecovery: async () => {
+      throw new Error('Embedded wallet recovery is only available for Privy-managed wallets.');
+    },
     shortAddress
   };
 }

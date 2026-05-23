@@ -20,6 +20,8 @@ type Props = {
   onFundingIntent: (amountUsd: number) => Promise<void>;
   onEnableAutomation: () => Promise<void>;
   onRevokeAutomation: () => Promise<void>;
+  onReviewOwnership: () => void;
+  controlWalletLabel: string;
 };
 
 const ActionButton: React.FC<{
@@ -87,9 +89,13 @@ const VaultPanel: React.FC<Props> = ({
   onFundingIntent,
   onEnableAutomation,
   onRevokeAutomation,
+  onReviewOwnership,
+  controlWalletLabel,
 }) => {
   const vault = state?.vault;
   const session = state?.activeSession;
+  const ownershipAcknowledged = Boolean(vault?.ownership_acknowledged_at);
+  const isActionGated = Boolean(vault) && !ownershipAcknowledged;
 
   return (
     <section className="glass-panel animate-enter" style={{ display: "flex", flexDirection: "column", gap: "0.9rem" }}>
@@ -145,8 +151,32 @@ const VaultPanel: React.FC<Props> = ({
         <strong style={{ color: "var(--text-primary)" }}>{session?.session_status ?? vault?.automation_status ?? "inactive"}</strong>
       </div>
       <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
-        Your external wallet approves and revokes. The agent only operates inside this vault and within the policy bound to it.
+        Your {controlWalletLabel.toLowerCase()} approves and revokes. The agent only operates inside this vault and within the policy bound to it.
       </div>
+
+      {vault && !ownershipAcknowledged && (
+        <div
+          style={{
+            border: "1px solid rgba(255, 184, 77, 0.22)",
+            background: "rgba(255, 184, 77, 0.08)",
+            borderRadius: "12px",
+            padding: "0.85rem 0.95rem",
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.65rem",
+          }}
+        >
+          <div style={{ fontSize: "0.82rem", color: "var(--text-primary)", fontWeight: 700 }}>
+            Review vault ownership before funding or enabling automation
+          </div>
+          <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", lineHeight: 1.6 }}>
+            This Safe vault can already receive funds, but funding and automation stay locked until you confirm you understand how the control wallet and export flow work.
+          </div>
+          <div>
+            <ActionButton label="Review Wallet Ownership" onClick={onReviewOwnership} />
+          </div>
+        </div>
+      )}
 
       {vault?.deposit_address && (
         <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
@@ -164,13 +194,13 @@ const VaultPanel: React.FC<Props> = ({
           <ActionButton label={busy ? "Bootstrapping..." : "Create User Vault"} tone="primary" onClick={onBootstrap} disabled={busy} />
         ) : (
           <>
-            <ActionButton label="Funding Intent" onClick={() => onFundingIntent(1000)} disabled={busy} />
+            <ActionButton label="Funding Intent" onClick={() => onFundingIntent(1000)} disabled={busy || isActionGated} />
             {!session || session.session_status === "revoked" ? (
               <ActionButton
                 label={busy ? "Enabling..." : "Enable Automation"}
                 tone="primary"
                 onClick={onEnableAutomation}
-                disabled={busy || !vault.vault_address}
+                disabled={busy || !vault.vault_address || isActionGated}
               />
             ) : (
               <ActionButton
@@ -183,6 +213,14 @@ const VaultPanel: React.FC<Props> = ({
           </>
         )}
       </div>
+
+      {vault && (
+        <ActionButton
+          label="Review Wallet Ownership"
+          onClick={onReviewOwnership}
+          disabled={busy}
+        />
+      )}
 
       {notice && <div style={{ fontSize: "0.78rem", color: "var(--color-lime)" }}>{notice}</div>}
       {error && <div style={{ fontSize: "0.78rem", color: "var(--color-danger)" }}>{error}</div>}

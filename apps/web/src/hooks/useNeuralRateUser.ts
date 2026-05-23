@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import type { EIP1193Provider } from "viem";
 import {
   API_BASE_URL,
   EXECUTOR_BASE_URL,
@@ -29,7 +30,7 @@ type WalletSessionContext = {
   authStrategy: string;
   walletProvider: string;
   canPredictVault: boolean;
-  getEthereumProvider: () => Promise<unknown>;
+  getEthereumProvider: () => Promise<EIP1193Provider>;
   signMessage: (message: string) => Promise<string>;
 };
 
@@ -50,9 +51,8 @@ export const useNeuralRateUser = ({
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = async (targetOwner = ownerEoa) => {
+  const refresh = useCallback(async (targetOwner = ownerEoa) => {
     if (!targetOwner) {
-      setState(null);
       return null;
     }
 
@@ -69,15 +69,19 @@ export const useNeuralRateUser = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [ownerEoa]);
 
   useEffect(() => {
     if (!ownerEoa) {
-      setState(null);
       return;
     }
-    void refresh(ownerEoa).catch(() => {});
-  }, [ownerEoa]);
+
+    const timeoutId = window.setTimeout(() => {
+      void refresh(ownerEoa).catch(() => {});
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [ownerEoa, refresh]);
 
   const bootstrap = async () => {
     if (!ownerEoa) {
@@ -91,7 +95,7 @@ export const useNeuralRateUser = ({
       let vaultAddress: string | null = null;
       if (canPredictVault) {
         const predicted = await resolveUserSafeVault(ownerEoa, {
-          getEthereumProvider: async () => getEthereumProvider() as Promise<any>,
+          getEthereumProvider,
           signMessage,
         });
         vaultAddress = predicted.safeAddress.toLowerCase();
@@ -189,6 +193,36 @@ export const useNeuralRateUser = ({
     }
   };
 
+  const acknowledgeOwnership = async () => {
+    if (!ownerEoa || !state?.vault?.vault_id) {
+      throw new Error("Bootstrap your user vault before acknowledging wallet ownership.");
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetchJson<{ success: boolean; state: AutomationState }>(`${API_BASE_URL}/vault/ownership-ack`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ownerEoa,
+          userId: state.userId,
+          vaultId: state.vault.vault_id,
+        }),
+      });
+
+      setState(response.state);
+      setNotice("Wallet ownership acknowledged. Funding and automation are now unlocked for this vault.");
+      return response.state;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to acknowledge wallet ownership.";
+      setError(message);
+      throw err;
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const enableAutomation = async () => {
     if (!ownerEoa) {
       throw new Error("Connect a wallet before enabling automation.");
@@ -244,7 +278,7 @@ export const useNeuralRateUser = ({
           executionPolicy: prepared.executionPolicy,
         },
         wallet: {
-          getEthereumProvider: async () => getEthereumProvider() as Promise<any>,
+          getEthereumProvider,
           signMessage,
         },
         providerUserId,
@@ -318,7 +352,7 @@ export const useNeuralRateUser = ({
   };
 
   return {
-    state,
+    state: ownerEoa ? state : null,
     loading,
     busy,
     notice,
@@ -329,6 +363,7 @@ export const useNeuralRateUser = ({
     bootstrap,
     saveConfig,
     createFundingIntent,
+    acknowledgeOwnership,
     enableAutomation,
     revokeAutomation,
   };
