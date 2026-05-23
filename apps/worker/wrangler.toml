@@ -16,7 +16,7 @@ id = "ce850408cc594b1caba33e1640926d68"
 [[d1_databases]]
 binding = "DECISIONS_DB"
 database_name = "neuralrate-decisions"
-database_id = "c3d9cd58-a80f-4c3c-a220-a3ba26619e77"
+database_id = "759b6330-f219-474a-b696-e2ca4f7e143a"
 migrations_dir = "migrations"
 
 [[durable_objects.bindings]]
