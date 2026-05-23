@@ -93,14 +93,14 @@ export const ApySparkline: React.FC<Props> = ({ poolId }) => {
 
   if (loading) {
     return (
-      <div className="sparkline-container" style={{ width: '120px', height: '40px', display: 'flex', alignItems: 'center', padding: '0 10px' }}>
+      <div className="sparkline-container" style={{ width: '100%', maxWidth: '240px', height: '40px', display: 'flex', alignItems: 'center', padding: '0 10px' }}>
          <div className="sparkline-skeleton" style={{ width: '100%', height: '2px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px' }}></div>
       </div>
     );
   }
 
   if (!data || data.length === 0) {
-    return <div className="sparkline-container" style={{ width: '120px', height: '40px' }} />;
+    return <div className="sparkline-container" style={{ width: '100%', maxWidth: '240px', height: '40px' }} />;
   }
 
   const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x},${p.y}`).join(' ');
@@ -111,7 +111,7 @@ export const ApySparkline: React.FC<Props> = ({ poolId }) => {
   const hoverPoint = hoverIndex !== null ? points[hoverIndex] : null;
 
   return (
-    <div className="sparkline-container" style={{ position: 'relative', width: '120px', height: '40px', display: 'flex', alignItems: 'center' }}>
+    <div className="sparkline-container" style={{ position: 'relative', width: '100%', maxWidth: '240px', height: '40px', display: 'flex', alignItems: 'center' }}>
       
       {/* Trend Indicator (Small arrow) */}
       <div style={{ 

@@ -38,7 +38,7 @@ const YieldScanner: React.FC<Props> = ({ pools, loading, onSelectPool, selectedP
             return (
               <div key={idx} style={{ 
                 display: 'grid', 
-                gridTemplateColumns: 'minmax(120px, 1.5fr) auto minmax(120px, 1fr)',
+                gridTemplateColumns: 'minmax(120px, 1fr) 2fr minmax(120px, 1fr)',
                 gap: '1rem',
                 alignItems: 'center', 
                 padding: '1.25rem 0.5rem', 
@@ -79,7 +79,7 @@ const YieldScanner: React.FC<Props> = ({ pools, loading, onSelectPool, selectedP
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{p.project}</span>
                 </div>
                 
-                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', width: '100%', padding: '0 1rem' }}>
                   <ApySparkline poolId={p.pool} />
                 </div>
 
