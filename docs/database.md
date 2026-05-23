@@ -1,6 +1,6 @@
 # D1 Database Schema
 
-To maintain persistent, verifiable, and historical decision-making logs for both the operator-facing benchmark terminal and autonomous agents, NeuralRate MCP utilizes **Cloudflare D1**, a native serverless SQLite database.
+To maintain persistent, verifiable, and historical decision-making logs for both the operator-facing benchmark terminal and autonomous agents, NeuralRate MCP utilizes **Cloudflare D1**, a native serverless SQLite database. D1 stores the local recommendation record first, then tracks which **user vault** and **policy version** produced that record, and finally records whether it has been benchmarked on Mantle Sepolia.
 
 ---
 
@@ -9,7 +9,7 @@ To maintain persistent, verifiable, and historical decision-making logs for both
 * **Binding Name:** `DECISIONS_DB`
 * **Local Location:** `.wrangler/state/v3/d1`
 * **Database Name:** `neuralrate-decisions`
-* **Table Name:** `decisions`
+* **Primary Tables:** `decisions`, `user_profiles`, `user_agent_configs`, `user_vaults`, `vault_permissions`, `user_accounts`, `automation_policies`, `automation_sessions`, `automation_jobs`, `benchmark_jobs`
 
 ---
 
@@ -20,7 +20,7 @@ The `decisions` table maps all fields required to perform auditing and tracking 
 | Column Name | SQL Data Type | Attributes | Description |
 | :--- | :--- | :--- | :--- |
 | `id` | `INTEGER` | `PRIMARY KEY AUTOINCREMENT` | Auto-incrementing internal unique sequence ID. |
-| `decision_id` | `TEXT` | `UNIQUE NOT NULL` | Structured unique hex decision hash (e.g. `0xdec_...`). |
+| `decision_id` | `TEXT` | `UNIQUE NOT NULL` | Structured unique decision identifier (e.g. `dec_<uuid>`). |
 | `agent_address` | `TEXT` | `NOT NULL` | The public address of the AI Agent node committing the decision. |
 | `requested_by` | `TEXT` | `DEFAULT '0x0'` | The public address of the end user or smart contract requesting the allocation. |
 | `data_snapshot_hash` | `TEXT` | - | IPFS or content hash of the yields data snapshot used for evaluation. |
@@ -37,14 +37,25 @@ The `decisions` table maps all fields required to perform auditing and tracking 
 | `is_settled` | `INTEGER` | `DEFAULT 0` | SQLite Boolean Flag (`0` for false/open, `1` for true/settled). |
 | `created_at` | `TEXT` | `DEFAULT (datetime('now'))` | Auto-generated UTC timestamp of record creation. |
 | `settled_at` | `TEXT` | - | UTC timestamp when the decision was finalized. |
+| `benchmark_status` | `TEXT` | `DEFAULT 'local'` | Current benchmark state: `"local"`, `"pending"`, or `"onchain"`. |
 | `tx_hash` | `TEXT` | - | EVM transaction hash of the on-chain creation event. |
+| `onchain_decision_id` | `TEXT` | - | Decision ID emitted by `DecisionCreated` when the benchmark registration confirms on-chain. |
 | `settlement_tx_hash` | `TEXT` | - | EVM transaction hash of the on-chain settlement event. |
+| `automation_session_id` | `TEXT` | - | Associated smart-session identifier when the benchmark was queued through delegated automation. |
+| `benchmark_job_id` | `TEXT` | - | Executor-managed job identifier for autonomous benchmark routing. |
+| `user_id` | `TEXT` | - | Internal user identifier tying the decision to the user profile. |
+| `vault_id` | `TEXT` | - | Dedicated vault identifier used for isolation and executor scoping. |
+| `policy_version` | `TEXT` | - | Version of the user’s active vault policy when the decision was generated. |
+| `objective` | `TEXT` | `DEFAULT 'income'` | High-level recommendation objective: preserve, income, or growth. |
+| `automation_mode` | `TEXT` | `DEFAULT 'recommend-only'` | Whether the decision was advisory-only or eligible for automation. |
+| `applied_constraints_json` | `TEXT` | - | Serialized user-specific constraints, limits, allowlists, and caps. |
+| `rationale_json` | `TEXT` | - | Serialized explanation of why the recommendation was selected. |
 
 ---
 
 ## 📁 Migration SQL Definition
 
-The database was initialized via Wrangler migration `0001_initial.sql` using the following exact SQL statement:
+The current schema reflects the combined result of Wrangler migrations `0001_initial.sql`, `0002_benchmark_status.sql`, `0003_automation_foundation.sql`, and `0004_user_vault_personalization.sql`.
 
 ```sql
 CREATE TABLE IF NOT EXISTS decisions (
@@ -66,7 +77,25 @@ CREATE TABLE IF NOT EXISTS decisions (
   is_settled INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now')),
   settled_at TEXT,
+  benchmark_status TEXT DEFAULT 'local',
   tx_hash TEXT,
-  settlement_tx_hash TEXT
+  onchain_decision_id TEXT,
+  settlement_tx_hash TEXT,
+  automation_session_id TEXT,
+  benchmark_job_id TEXT
 );
 ```
+
+## 🧠 Automation Tables
+
+NeuralRate now persists delegated automation separately from benchmark decisions:
+
+* **`user_profiles`** stores the user identity layer and onboarding model.
+* **`user_agent_configs`** stores personalized objectives, presets, allowlists, limits, and automation preferences.
+* **`user_vaults`** stores the dedicated vault for each user, including funding and automation status.
+* **`vault_permissions`** stores the human-readable and machine-readable execution boundaries for that vault.
+* **`user_accounts`** remains as a compatibility mapping between the user's EOA and the resolved smart account address.
+* **`automation_policies`** stores executor-facing policy records, mirrored into `vault_permissions`.
+* **`automation_sessions`** stores activation state, grant / revoke transaction hashes, permission IDs, and raw session details returned during consent.
+* **`automation_jobs`** stores delegated execution jobs scoped to a specific `user_id` and `vault_id`.
+* **`benchmark_jobs`** stores benchmark-specific jobs executed by the NeuralRate agent smart wallet so benchmark identity remains isolated from user fund execution.

@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import type { EIP1193Provider } from 'viem';
 
 // Mantle Sepolia network config
 const MANTLE_SEPOLIA = {
@@ -9,8 +10,13 @@ const MANTLE_SEPOLIA = {
   blockExplorerUrls: ['https://sepolia.mantlescan.xyz']
 };
 
-interface WalletState {
+export interface InjectedWalletState {
   address: string | null;
+  externalWalletAddress: string | null;
+  embeddedWalletAddress: string | null;
+  providerUserId: string | null;
+  authStrategy: string;
+  walletProvider: 'injected';
   chainId: number | null;
   isConnected: boolean;
   isCorrectChain: boolean;
@@ -19,10 +25,12 @@ interface WalletState {
   connect: () => Promise<void>;
   disconnect: () => void;
   switchToMantle: () => Promise<void>;
+  getEthereumProvider: () => Promise<EIP1193Provider>;
+  signMessage: (message: string) => Promise<string>;
   shortAddress: string;
 }
 
-export function useWallet(): WalletState {
+export function useInjectedWallet(): InjectedWalletState {
   const [address, setAddress] = useState<string | null>(null);
   const [chainId, setChainId] = useState<number | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -131,8 +139,35 @@ export function useWallet(): WalletState {
     }
   }, []);
 
+  const getEthereumProvider = useCallback(async () => {
+    const eth = (window as Window & { ethereum?: EIP1193Provider }).ethereum;
+    if (!eth) {
+      throw new Error('No wallet detected. Install MetaMask or a compatible wallet.');
+    }
+    return eth;
+  }, []);
+
+  const signMessage = useCallback(async (message: string) => {
+    const eth = await getEthereumProvider();
+    if (!address) {
+      throw new Error('Connect a wallet before signing.');
+    }
+
+    const signature = await eth.request({
+      method: 'personal_sign',
+      params: [message, address],
+    });
+
+    return String(signature);
+  }, [address, getEthereumProvider]);
+
   return {
     address,
+    externalWalletAddress: address,
+    embeddedWalletAddress: null,
+    providerUserId: null,
+    authStrategy: 'external-wallet',
+    walletProvider: 'injected',
     chainId,
     isConnected,
     isCorrectChain,
@@ -141,6 +176,8 @@ export function useWallet(): WalletState {
     connect,
     disconnect,
     switchToMantle,
+    getEthereumProvider,
+    signMessage,
     shortAddress
   };
 }

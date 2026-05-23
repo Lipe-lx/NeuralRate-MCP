@@ -1,13 +1,13 @@
 {
   "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
   "name": "NeuralRate MCP Agent",
-  "description": "Verifiable RWA yield intelligence and risk-adjusted allocator on Mantle Network",
+  "description": "Verifiable RWA yield intelligence, global benchmark identity, and per-user isolated vault automation on Mantle Sepolia",
   "image": "ipfs://QmQGKMZUpYJSJjzU1kiVrpMZ9jqTTW3aPoQBsunUShcTqC",
   "services": [
     {
       "name": "NeuralRate-ModelContextProtocol",
       "endpoint": "https://neuralrate-worker.neuralrate.workers.dev/mcp",
-      "version": "2026-01-01",
+      "version": "2026-05-22",
       "mcpTools": ["yield_scan", "tbill_spread", "nansen_context", "risk_assess", "optimal_allocation", "log_decision", "get_decisions"]
     }
   ],

@@ -20,7 +20,7 @@ const YieldScanner: React.FC<Props> = ({ pools, loading, onSelectPool, selectedP
           Yield Scanner
         </h2>
         <div style={{ fontSize: '0.875rem', color: 'var(--color-lime)', background: 'var(--color-lime-glow)', padding: '0.2rem 0.6rem', borderRadius: '4px' }}>
-          Live on Mantle
+          Live on Mantle Sepolia
         </div>
       </div>
 

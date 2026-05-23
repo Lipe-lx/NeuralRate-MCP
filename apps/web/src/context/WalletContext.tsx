@@ -1,13 +1,28 @@
 import React, { createContext, useContext } from 'react';
-import { useWallet } from '../hooks/useWallet';
+import { PRIVY_ENABLED } from '../config';
+import { usePrivyWallet } from '../hooks/usePrivyWallet';
+import { useInjectedWallet } from '../hooks/useWallet';
 
-type WalletContextType = ReturnType<typeof useWallet>;
+type WalletContextType = ReturnType<typeof usePrivyWallet> | ReturnType<typeof useInjectedWallet>;
 
 const WalletContext = createContext<WalletContextType | null>(null);
 
-export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const wallet = useWallet();
+const PrivyWalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const wallet = usePrivyWallet();
   return <WalletContext.Provider value={wallet}>{children}</WalletContext.Provider>;
+};
+
+const InjectedWalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const wallet = useInjectedWallet();
+  return <WalletContext.Provider value={wallet}>{children}</WalletContext.Provider>;
+};
+
+export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  return PRIVY_ENABLED ? (
+    <PrivyWalletContextProvider>{children}</PrivyWalletContextProvider>
+  ) : (
+    <InjectedWalletContextProvider>{children}</InjectedWalletContextProvider>
+  );
 };
 
 export const useWalletContext = () => {

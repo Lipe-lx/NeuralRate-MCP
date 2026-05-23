@@ -18,7 +18,12 @@ const Header: React.FC = () => {
           borderRadius: '12px',
           boxShadow: '0 0 15px var(--color-lime-glow)'
         }} />
-        <h1 className="text-gradient" style={{ fontSize: '1.5rem', margin: 0, fontWeight: 700 }}>NeuralRate</h1>
+        <div>
+          <h1 className="text-gradient" style={{ fontSize: '1.5rem', margin: 0, fontWeight: 700 }}>NeuralRate MCP</h1>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
+            Per-user vault benchmark terminal on Mantle Sepolia
+          </div>
+        </div>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>

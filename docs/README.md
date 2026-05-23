@@ -2,7 +2,7 @@
 
 Welcome to the official documentation portal for **NeuralRate MCP** — a verifiable RWA yield intelligence layer for autonomous agents built for the **Mantle Network**.
 
-NeuralRate MCP bridges decentralized finance (DeFi), institutional-grade risk models, and Large Language Model (LLM) agents via the **Model Context Protocol (MCP)**, while providing an operator-facing benchmark terminal for human review.
+NeuralRate MCP bridges decentralized finance (DeFi), institutional-grade risk models, and Large Language Model (LLM) agents via the **Model Context Protocol (MCP)**, while providing an operator-facing benchmark terminal and a non-custodial **per-user vault automation path** on Mantle Sepolia.
 
 ---
 
@@ -22,7 +22,7 @@ graph TD
 ```
 
 ### [1. System Architecture (`docs/architecture.md`)](architecture.md)
-Comprehensive outline of the micro-architecture, describing the connection between the Vite React frontend, the Cloudflare Worker backend, the D1 SQLite Database, and the Mantle Sepolia smart contract.
+Comprehensive outline of the micro-architecture, describing the connection between the Vite React frontend, the Cloudflare Worker backend, the executor service, the D1 SQLite Database, and the Mantle Sepolia smart contract.
 
 ### [2. Cloudflare Worker & MCP Server (`docs/mcp-server.md`)](mcp-server.md)
 Detailed specification of the Model Context Protocol (MCP) server running inside the Worker. Documents the 7 active MCP tools, their JSON schemas, parameters, caching strategy, the **6-factor Risk Assessment Model**, and the **Optimal Allocation Algorithm**.
@@ -31,7 +31,7 @@ Detailed specification of the Model Context Protocol (MCP) server running inside
 Technical details of the Solidity benchmark registry contract `NeuralRateDecisionBenchmark.sol` deployed on the Mantle Sepolia Network, detailing variables, modifiers, external functions, events, and performance tracking.
 
 ### [4. Frontend Benchmark Terminal (`docs/frontend.md`)](frontend.md)
-Documentation of the Vite React user interface, details on the glassmorphism layout design system, the dynamic components (`YieldScanner`, `RiskPanel`, `NansenRadar`, `DecisionLedger`), the **EIP-1193 Mantle Sepolia wallet connection hook**, and the MCP integration modal.
+Documentation of the Vite React user interface, details on the glassmorphism layout design system, the dynamic components (`YieldScanner`, `RiskPanel`, `NansenRadar`, `VaultPanel`, `AgentSettingsPanel`, `DecisionLedger`), the **EIP-1193 Mantle Sepolia wallet connection hook**, the dedicated vault flow, and the MCP integration modal.
 
 ### [5. D1 Database Schema (`docs/database.md`)](database.md)
 Database schema definition for the SQLite Cloudflare D1 instance. Focuses on the structural layout of logged decisions, historical yield metrics, and settlement details.
@@ -42,6 +42,7 @@ Database schema definition for the SQLite Cloudflare D1 instance. Focuses on the
 
 * **Backend / MCP Server:** Cloudflare Workers, TypeScript, `@modelcontextprotocol/sdk`
 * **Database & Cache:** Cloudflare D1 (SQLite), Cloudflare KV Namespace
-* **Frontend:** Vite, React, TypeScript, Vanilla CSS (OKLCH, Glassmorphism)
+* **Executor / Automation:** Node.js, TypeScript, vault-scoped policy orchestration, managed signer adapter
+* **Frontend:** Vite, React, TypeScript, Vanilla CSS (OKLCH, Glassmorphism), EIP-1193, Biconomy AbstractJS
 * **Smart Contracts:** Solidity `^0.8.20`, Hardhat, Ethers, Mantle Sepolia Testnet (Chain ID 5003)
 * **DeFi Integrations:** DefiLlama Yields API, FRED (Federal Reserve Economic Data) API, Nansen Smart Money API

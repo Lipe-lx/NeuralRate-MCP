@@ -48,23 +48,31 @@ Performs a deterministic, quantitative 6-factor risk assessment on a given pool.
 * **Output:** Returns a total risk score `totalScore` (0-100), risk `classification` (`"LOW"`, `"MEDIUM"`, `"HIGH"`, `"CRITICAL"`), and details for each factor.
 
 ### 5. `optimal_allocation`
-Calculates an optimal distribution of capital across Mantle pools based on the investor's risk profile.
+Calculates an optimal distribution of capital across Mantle pools based on the investor's risk profile and the user's vault policy.
 * **Input Schema:**
+  * `ownerEoa` *(string, optional)*: Resolves the saved user policy and vault configuration from D1.
   * `amountUsd` *(number, required)*: Total amount to allocate in USD.
+  * `objective` *(enum: `"preserve"`, `"income"`, `"growth"`, optional)*: High-level portfolio objective.
   * `riskProfile` *(enum: `"low"`, `"medium"`, `"high"`, required)*: Risk profile.
   * `horizonHours` *(number, optional, default: 24)*: Investment horizon.
-* **Output:** Returns allocated amounts, target pools, blended APY, and T-Bill spread.
+  * `allowedAssets[]`, `allowedProtocols[]` *(optional)*: User allowlists.
+  * `maxProtocolWeightBps`, `maxAssetWeightBps`, `maxActionUsd` *(optional)*: Concentration and action caps.
+  * `stableOnly` *(boolean, optional)* and `restrictionPreset` *(optional)*: User-facing restriction controls.
+  * `minSpreadOverTbillBps` *(optional)*: Minimum yield premium over the 3M T-Bill.
+  * `automationMode` *(optional)*: `recommend-only` or `auto-within-limits`.
+* **Output:** Returns allocated amounts, target pools, blended APY, T-Bill spread, applied constraints, rationale, and whether the recommendation fits the user's automation limits.
 
 ### 6. `log_decision`
 Logs a decision/recommendation to the persistent database.
 * **Input Schema:**
-  * `decisionId` *(string, required)*, `agentAddress` *(string, required)*, `predictedApyBps` *(number, required)*, `riskProfile` *(string)*, `allocationJson` *(string)*, etc.
-* **Output:** JSON signaling success or failure.
+  * `decisionId` *(string, required)*, `agentAddress` *(string, required)*, `predictedApyBps` *(number, required)*, `riskProfile` *(string)*, `allocationJson` *(string)*, `userId` *(optional)*, `vaultId` *(optional)*, `policyVersion` *(optional)*, `objective` *(optional)*, `automationMode` *(optional)*, etc.
+* **Output:** JSON signaling success or failure. This persists the **local benchmark record** in D1; optional on-chain benchmark registration is handled separately by the frontend.
 
 ### 7. `get_decisions`
 Fetches historical logged decisions.
 * **Input Schema:**
   * `limit` *(number, optional, default: 50)*: Maximum number of records to retrieve.
+  * `ownerEoa` *(string, optional)*: Scope historical decisions to a single user vault journey.
 * **Output:** An array of historical decision objects.
 
 ---

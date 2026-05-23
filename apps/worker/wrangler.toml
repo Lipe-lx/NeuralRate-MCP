@@ -5,7 +5,7 @@ compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
 [vars]
-NEURALRATE_BENCHMARK_CONTRACT = "0xf86028159465c48caCaCC3D7AbfB061008Abf46B"
+NEURALRATE_BENCHMARK_CONTRACT = "0xc51560a5512d2A5756435d87319aeaE1bA480165"
 
 
 

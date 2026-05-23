@@ -2,9 +2,11 @@
   "network": "mantleSepolia",
   "chainId": 5003,
   "contractName": "NeuralRateDecisionBenchmark",
-  "address": "0xf86028159465c48caCaCC3D7AbfB061008Abf46B",
-  "txHash": "0x6d39eb0488c8b94507cf43750d419a450ea5cdf01bad2a9ee19abf06c9265a75",
+  "address": "0xc51560a5512d2A5756435d87319aeaE1bA480165",
+  "txHash": "0x3e2b51bc4e549c75b2e3d612139393714fdbcb78d14b975eed7bfd3840c533fd",
+  "benchmarkWriter": "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
+  "deploymentMode": "agent-smart-wallet",
   "agentId": "49",
-  "agentURI": "ipfs://QmVZSNz7A4Aha4yE1uiMhN6GCQ4FwGUoDjRKwXaosi3sMV",
-  "updatedAt": "2026-05-22T19:41:20.496Z"
+  "agentURI": "ipfs://QmYDnGppSXsgAiBHFMqmgRraTekqyY5myTvgDZxVxKBNvG",
+  "updatedAt": "2026-05-23T00:27:28.233Z"
 }

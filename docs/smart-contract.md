@@ -1,8 +1,10 @@
 # Smart Contract
 
-To enforce trust and transparency, NeuralRate MCP logs decisions on-chain using a Solidity smart contract deployed on the **Mantle Sepolia Testnet** (Chain ID `5003`). 
+To enforce trust and transparency, NeuralRate MCP supports benchmark registration on-chain using a Solidity smart contract deployed on the **Mantle Sepolia Testnet** (Chain ID `5003`).
 
-The contract acts as an immutable registry for decisions and performance benchmarks.
+The contract acts as an immutable registry for benchmark decisions and performance outcomes. The public ERC-8004 agent identity is tracked separately in the Mantle identity registry; this contract does **not** embed `agentId` in each event.
+
+The repository contract has already been upgraded to a configurable `benchmarkWriter` model for the NeuralRate agent smart wallet. If the public Mantle Sepolia deployment still points to the older single-writer version, it should be redeployed before demoing the autonomous path as fully live.
 
 ---
 
@@ -17,11 +19,13 @@ The contract acts as an immutable registry for decisions and performance benchma
 ## 💾 State Variables and Structs
 
 ### State Variables
-1. **`address public agent`**
-   Stores the authorized account allowed to write decision data and settle outcomes. Initialized to `msg.sender` in the constructor.
-2. **`uint256 public nextDecisionId = 1`**
+1. **`address public owner`**
+   Administrative owner allowed to rotate the benchmark writer.
+2. **`address public benchmarkWriter`**
+   Stores the authorized account allowed to write decision data and settle outcomes. This is designed for the NeuralRate agent smart wallet rather than a fixed user EOA.
+3. **`uint256 public nextDecisionId = 1`**
    An auto-incrementing ID assigned to newly created decision records.
-3. **`mapping(uint256 => DecisionMeta) public decisions`**
+4. **`mapping(uint256 => DecisionMeta) public decisions`**
    Maps an integer ID to its respective metadata record on-chain.
 
 ### Struct `DecisionMeta`
@@ -42,11 +46,20 @@ struct DecisionMeta {
 
 ## 🔒 Modifiers
 
-### `onlyAgent()`
-Restricts function execution exclusively to the authorized agent address.
+### `onlyOwner()`
+Restricts function execution exclusively to the contract owner.
 ```solidity
-modifier onlyAgent() {
-    require(msg.sender == agent, "Only registered agent can call this");
+modifier onlyOwner() {
+    require(msg.sender == owner, "Only owner can call this");
+    _;
+}
+```
+
+### `onlyBenchmarkWriter()`
+Restricts function execution exclusively to the configured benchmark writer.
+```solidity
+modifier onlyBenchmarkWriter() {
+    require(msg.sender == benchmarkWriter, "Only benchmark writer can call this");
     _;
 }
 ```
@@ -54,6 +67,15 @@ modifier onlyAgent() {
 ---
 
 ## 📢 Events
+
+### `BenchmarkWriterUpdated`
+Fired when the owner rotates the benchmark writer.
+```solidity
+event BenchmarkWriterUpdated(
+    address indexed previousWriter,
+    address indexed newWriter
+);
+```
 
 ### `DecisionCreated`
 Fired when a new yield allocation recommendation is registered on-chain.
@@ -82,15 +104,33 @@ event DecisionSettled(
 
 ## ⚙️ External Functions
 
+### `constructor`
+Initializes the owner and sets the first benchmark writer.
+```solidity
+constructor(address initialBenchmarkWriter)
+```
+
+### `agent()`
+Compatibility getter that returns the current benchmark writer.
+```solidity
+function agent() external view returns (address)
+```
+
+### `setBenchmarkWriter`
+Allows the owner to rotate the benchmark writer to a new smart wallet.
+```solidity
+function setBenchmarkWriter(address newBenchmarkWriter) external onlyOwner
+```
+
 ### `createDecision`
-Logs an autonomous decision on-chain. Only executable by the registered agent.
+Logs a benchmark decision on-chain. Only executable by the configured benchmark writer.
 ```solidity
 function createDecision(
     address _requestedBy,
     string calldata _dataSnapshotHash,
     int256 _predictedApyBps,
     uint256 _settlementHorizonHours
-) external onlyAgent returns (uint256)
+) external onlyBenchmarkWriter returns (uint256)
 ```
 * **Logic:**
   1. Captures the auto-incremented ID: `id = nextDecisionId++`.
@@ -99,13 +139,13 @@ function createDecision(
   4. Returns the decision ID.
 
 ### `settleDecision`
-Flags a decision as completed, evaluating the accuracy of the prediction and outperformance compared to risk-free US Treasury Rates. Only executable by the registered agent.
+Flags a decision as completed, evaluating the accuracy of the prediction and outperformance compared to risk-free US Treasury Rates. Only executable by the configured benchmark writer.
 ```solidity
 function settleDecision(
     uint256 _decisionId,
     int256 _realizedApyBps,
     int256 _tbillApyBps
-) external onlyAgent
+) external onlyBenchmarkWriter
 ```
 * **Logic:**
   1. Fetches the mapped decision from storage.

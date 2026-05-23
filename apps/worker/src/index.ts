@@ -3,6 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { DefiLlamaService } from "./services/defillama";
 import { FredService } from "./services/fred";
 import { NansenService } from "./services/nansen";
+import { AutomationStore } from "./automation";
 import {
   McpToolHandlers,
   yieldScanSchema,
@@ -100,7 +101,7 @@ export default {
       return new Response(null, {
         headers: {
           "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+          "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
           "Access-Control-Allow-Headers": "Content-Type",
         },
       });
@@ -118,6 +119,7 @@ export default {
         const fred = new FredService(env.CACHE_KV, env.FRED_API_KEY);
         const nansen = new NansenService(env.CACHE_KV, env.NANSEN_API_KEY);
         const handlers = new McpToolHandlers(defillama, fred, nansen, env.DECISIONS_DB);
+        const automation = new AutomationStore(env.DECISIONS_DB);
 
         if (url.pathname === "/api/yields" && request.method === "GET") {
           const res = await handlers.handleYieldScan({ minTvlUsd: 100000, chainFilter: "Mantle" });
@@ -159,15 +161,119 @@ export default {
         if (url.pathname === "/api/allocation" && request.method === "POST") {
           const body = await request.json() as any;
           const res = await handlers.handleOptimalAllocation({
+            ownerEoa: body.ownerEoa,
             amountUsd: body.amountUsd || 10000,
+            objective: body.objective || "income",
             riskProfile: body.riskProfile || "medium",
-            horizonHours: body.horizonHours || 24
+            horizonHours: body.horizonHours || 24,
+            allowedAssets: body.allowedAssets || [],
+            deniedAssets: body.deniedAssets || [],
+            allowedProtocols: body.allowedProtocols || [],
+            deniedProtocols: body.deniedProtocols || [],
+            maxProtocolWeightBps: body.maxProtocolWeightBps,
+            maxAssetWeightBps: body.maxAssetWeightBps,
+            maxActionUsd: body.maxActionUsd,
+            stableOnly: body.stableOnly,
+            minSpreadOverTbillBps: body.minSpreadOverTbillBps,
+            automationMode: body.automationMode || "recommend-only",
+            restrictionPreset: body.restrictionPreset || "blue-chip-defi",
           });
           return new Response(res.content[0].text, { headers: corsHeaders });
         }
 
+        if (url.pathname === "/api/users/bootstrap" && request.method === "POST") {
+          const body = await request.json() as any;
+          const state = await automation.bootstrapUser({
+            ownerEoa: body.ownerEoa,
+            externalWallet: body.externalWallet,
+            embeddedWallet: body.embeddedWallet,
+            authStrategy: body.authStrategy,
+            displayName: body.displayName,
+            privyUserId: body.privyUserId,
+            providerUserRef: body.providerUserRef,
+            walletProvider: body.walletProvider,
+            vaultAddress: body.vaultAddress,
+            vaultProvider: body.vaultProvider,
+            vaultKind: body.vaultKind,
+            vaultStatus: body.vaultStatus,
+            safeDeploymentStatus: body.safeDeploymentStatus,
+            safeSaltNonce: body.safeSaltNonce,
+            chainId: body.chainId,
+          });
+
+          return new Response(JSON.stringify({ success: true, state }), { headers: corsHeaders });
+        }
+
+        if (url.pathname === "/api/agent-config" && request.method === "GET") {
+          const ownerEoa = url.searchParams.get("ownerEoa");
+          if (!ownerEoa) {
+            return new Response(JSON.stringify({ error: "ownerEoa is required" }), { status: 400, headers: corsHeaders });
+          }
+
+          const config = await automation.getAgentConfig(ownerEoa);
+          return new Response(JSON.stringify({ success: true, config }), { headers: corsHeaders });
+        }
+
+        if (url.pathname === "/api/agent-config" && request.method === "PATCH") {
+          const body = await request.json() as any;
+          const config = await automation.upsertAgentConfig({
+            ownerEoa: body.ownerEoa,
+            userId: body.userId,
+            vaultId: body.vaultId,
+            objective: body.objective,
+            riskProfile: body.riskProfile,
+            horizonHours: body.horizonHours,
+            automationMode: body.automationMode,
+            restrictionPreset: body.restrictionPreset,
+            allowedAssets: body.allowedAssets,
+            deniedAssets: body.deniedAssets,
+            allowedProtocols: body.allowedProtocols,
+            deniedProtocols: body.deniedProtocols,
+            maxProtocolWeightBps: body.maxProtocolWeightBps,
+            maxAssetWeightBps: body.maxAssetWeightBps,
+            maxActionUsd: body.maxActionUsd,
+            maxDailyUsd: body.maxDailyUsd,
+            maxAutomationUsd: body.maxAutomationUsd,
+            maxSlippageBps: body.maxSlippageBps,
+            rebalanceCadenceHours: body.rebalanceCadenceHours,
+            minApyBps: body.minApyBps,
+            minSpreadOverTbillBps: body.minSpreadOverTbillBps,
+            requireManualAboveUsd: body.requireManualAboveUsd,
+            pauseOnRiskEvent: body.pauseOnRiskEvent,
+            policyVersion: body.policyVersion,
+          });
+
+          return new Response(JSON.stringify({ success: true, config }), { headers: corsHeaders });
+        }
+
+        if (url.pathname === "/api/vault" && request.method === "GET") {
+          const ownerEoa = url.searchParams.get("ownerEoa");
+          if (!ownerEoa) {
+            return new Response(JSON.stringify({ error: "ownerEoa is required" }), { status: 400, headers: corsHeaders });
+          }
+
+          const vault = await automation.getVault(ownerEoa);
+          return new Response(JSON.stringify({ success: true, vault }), { headers: corsHeaders });
+        }
+
+        if (url.pathname === "/api/vault/funding-intent" && request.method === "POST") {
+          const body = await request.json() as any;
+          const vault = await automation.createFundingIntent({
+            ownerEoa: body.ownerEoa,
+            amountUsd: body.amountUsd,
+            source: body.source,
+          });
+
+          return new Response(JSON.stringify({ success: true, vault }), { headers: corsHeaders });
+        }
+
         if (url.pathname === "/api/decisions" && request.method === "GET") {
-          const res = await handlers.handleGetDecisions({ limit: 50 });
+          const requestedLimit = Number.parseInt(url.searchParams.get("limit") || "", 10);
+          const ownerEoa = url.searchParams.get("ownerEoa") || undefined;
+          const res = await handlers.handleGetDecisions({
+            limit: Number.isFinite(requestedLimit) && requestedLimit > 0 ? requestedLimit : 50,
+            ownerEoa,
+          });
           return new Response(res.content[0].text, { headers: corsHeaders });
         }
 
@@ -177,10 +283,284 @@ export default {
           return new Response(res.content[0].text, { headers: corsHeaders });
         }
 
+        const benchmarkMatch = url.pathname.match(/^\/api\/decisions\/([^/]+)\/benchmark$/);
+        if (benchmarkMatch && request.method === "PATCH") {
+          const body = await request.json() as any;
+          const res = await handlers.handleUpdateDecisionBenchmark({
+            decisionId: decodeURIComponent(benchmarkMatch[1]),
+            benchmarkStatus: body.benchmarkStatus,
+            txHash: body.txHash,
+            onchainDecisionId: body.onchainDecisionId,
+            requestedBy: body.requestedBy,
+            dataSnapshotHash: body.dataSnapshotHash,
+            agentAddress: body.agentAddress,
+            userId: body.userId,
+            vaultId: body.vaultId,
+            policyVersion: body.policyVersion,
+          });
+          return new Response(res.content[0].text, { headers: corsHeaders });
+        }
+
+        if (url.pathname === "/api/benchmark/history" && request.method === "GET") {
+          const ownerEoa = url.searchParams.get("ownerEoa");
+          if (!ownerEoa) {
+            return new Response(JSON.stringify({ error: "ownerEoa is required" }), { status: 400, headers: corsHeaders });
+          }
+
+          const requestedLimit = Number.parseInt(url.searchParams.get("limit") || "", 10);
+          const decisions = await automation.listBenchmarkHistory(
+            ownerEoa,
+            Number.isFinite(requestedLimit) && requestedLimit > 0 ? requestedLimit : 50
+          );
+          return new Response(JSON.stringify({ success: true, decisions }), { headers: corsHeaders });
+        }
+
         if (url.pathname === "/api/decisions" && request.method === "DELETE") {
           if (!env.DECISIONS_DB) throw new Error("DB not configured");
           await env.DECISIONS_DB.prepare("DELETE FROM decisions").run();
           return new Response(JSON.stringify({ success: true, message: "Ledger cleared" }), { headers: corsHeaders });
+        }
+
+        if (url.pathname === "/api/automation/state" && request.method === "GET") {
+          const ownerEoa = url.searchParams.get("ownerEoa");
+          if (!ownerEoa) {
+            return new Response(JSON.stringify({ error: "ownerEoa is required" }), { status: 400, headers: corsHeaders });
+          }
+
+          const state = await automation.getAutomationState(ownerEoa);
+          return new Response(JSON.stringify(state), { headers: corsHeaders });
+        }
+
+        if (url.pathname === "/api/automation/accounts" && request.method === "POST") {
+          const body = await request.json() as any;
+          const account = await automation.upsertAccount({
+            ownerEoa: body.ownerEoa,
+            userSmartAccount: body.userSmartAccount,
+            chainId: body.chainId,
+            accountProvider: body.accountProvider,
+            accountKind: body.accountKind,
+            deploymentStatus: body.deploymentStatus,
+            userId: body.userId,
+            vaultId: body.vaultId,
+          });
+
+          return new Response(JSON.stringify({ success: true, account }), { headers: corsHeaders });
+        }
+
+        if (url.pathname === "/api/automation/policies" && request.method === "POST") {
+          const body = await request.json() as any;
+          const policy = await automation.upsertPolicy({
+            policyId: body.policyId,
+            ownerEoa: body.ownerEoa,
+            userSmartAccount: body.userSmartAccount,
+            chainId: body.chainId,
+            policyVersion: body.policyVersion,
+            domain: body.domain,
+            status: body.status,
+            allowedContracts: body.allowedContracts,
+            allowedSelectors: body.allowedSelectors,
+            allowedAssets: body.allowedAssets,
+            allowedProtocols: body.allowedProtocols,
+            spendToken: body.spendToken,
+            spendLimitPerUse: body.spendLimitPerUse,
+            spendLimitDaily: body.spendLimitDaily,
+            spendLimitTotal: body.spendLimitTotal,
+            usageLimit: body.usageLimit,
+            validAfter: body.validAfter,
+            validUntil: body.validUntil,
+            humanSummary: body.humanSummary,
+            rawPolicy: body.rawPolicy,
+            userId: body.userId,
+            vaultId: body.vaultId,
+          });
+
+          return new Response(JSON.stringify({ success: true, policy }), { headers: corsHeaders });
+        }
+
+        if (url.pathname === "/api/automation/sessions" && request.method === "POST") {
+          const body = await request.json() as any;
+          const session = await automation.upsertSession({
+            sessionId: body.sessionId,
+            policyId: body.policyId,
+            ownerEoa: body.ownerEoa,
+            userSmartAccount: body.userSmartAccount,
+            agentSessionSigner: body.agentSessionSigner,
+            chainId: body.chainId,
+            sessionStatus: body.sessionStatus,
+            grantTxHash: body.grantTxHash,
+            revokeTxHash: body.revokeTxHash,
+            permissionId: body.permissionId,
+            sessionDetails: body.sessionDetails,
+            validAfter: body.validAfter,
+            validUntil: body.validUntil,
+            revokedAt: body.revokedAt,
+            providerSessionRef: body.providerSessionRef,
+            providerPermissionRef: body.providerPermissionRef,
+            consentMessage: body.consentMessage,
+            consentSignature: body.consentSignature,
+            turnkeySignerRef: body.turnkeySignerRef,
+            userId: body.userId,
+            vaultId: body.vaultId,
+            policyVersion: body.policyVersion,
+          });
+
+          return new Response(JSON.stringify({ success: true, session }), { headers: corsHeaders });
+        }
+
+        const activateSessionMatch = url.pathname.match(/^\/api\/automation\/sessions\/([^/]+)\/activate$/);
+        if (activateSessionMatch && request.method === "POST") {
+          const body = await request.json() as any;
+          const session = await automation.upsertSession({
+            sessionId: decodeURIComponent(activateSessionMatch[1]),
+            policyId: body.policyId,
+            ownerEoa: body.ownerEoa,
+            userSmartAccount: body.userSmartAccount,
+            agentSessionSigner: body.agentSessionSigner,
+            chainId: body.chainId,
+            sessionStatus: "active",
+            grantTxHash: body.grantTxHash,
+            permissionId: body.permissionId,
+            sessionDetails: body.sessionDetails,
+            validAfter: body.validAfter,
+            validUntil: body.validUntil,
+            providerSessionRef: body.providerSessionRef,
+            providerPermissionRef: body.providerPermissionRef,
+            consentMessage: body.consentMessage,
+            consentSignature: body.consentSignature,
+            turnkeySignerRef: body.turnkeySignerRef,
+            userId: body.userId,
+            vaultId: body.vaultId,
+            policyVersion: body.policyVersion,
+          });
+
+          return new Response(JSON.stringify({ success: true, session }), { headers: corsHeaders });
+        }
+
+        const revokeSessionMatch = url.pathname.match(/^\/api\/automation\/sessions\/([^/]+)\/revoke$/);
+        if (revokeSessionMatch && request.method === "POST") {
+          const body = await request.json() as any;
+          const session = await automation.upsertSession({
+            sessionId: decodeURIComponent(revokeSessionMatch[1]),
+            policyId: body.policyId,
+            ownerEoa: body.ownerEoa,
+            userSmartAccount: body.userSmartAccount,
+            agentSessionSigner: body.agentSessionSigner,
+            chainId: body.chainId,
+            sessionStatus: body.sessionStatus || "revoked",
+            grantTxHash: body.grantTxHash,
+            revokeTxHash: body.revokeTxHash,
+            permissionId: body.permissionId,
+            sessionDetails: body.sessionDetails,
+            validAfter: body.validAfter,
+            validUntil: body.validUntil,
+            revokedAt: body.revokedAt || new Date().toISOString(),
+            providerSessionRef: body.providerSessionRef,
+            providerPermissionRef: body.providerPermissionRef,
+            consentMessage: body.consentMessage,
+            consentSignature: body.consentSignature,
+            turnkeySignerRef: body.turnkeySignerRef,
+            userId: body.userId,
+            vaultId: body.vaultId,
+            policyVersion: body.policyVersion,
+          });
+
+          return new Response(JSON.stringify({ success: true, session }), { headers: corsHeaders });
+        }
+
+        if (url.pathname === "/api/automation/jobs" && request.method === "POST") {
+          const body = await request.json() as any;
+          const job = await automation.upsertAutomationJob({
+            jobId: body.jobId,
+            sessionId: body.sessionId,
+            ownerEoa: body.ownerEoa,
+            userSmartAccount: body.userSmartAccount,
+            executionDomain: body.executionDomain,
+            jobType: body.jobType,
+            targetContract: body.targetContract,
+            targetSelector: body.targetSelector,
+            payload: body.payload,
+            status: body.status,
+            txHash: body.txHash,
+            failureReason: body.failureReason,
+            providerJobRef: body.providerJobRef,
+            userId: body.userId,
+            vaultId: body.vaultId,
+            policyVersion: body.policyVersion,
+          });
+
+          return new Response(JSON.stringify({ success: true, job }), { headers: corsHeaders });
+        }
+
+        const automationJobMatch = url.pathname.match(/^\/api\/automation\/jobs\/([^/]+)$/);
+        if (automationJobMatch && request.method === "PATCH") {
+          const body = await request.json() as any;
+          const job = await automation.upsertAutomationJob({
+            jobId: decodeURIComponent(automationJobMatch[1]),
+            sessionId: body.sessionId,
+            ownerEoa: body.ownerEoa,
+            userSmartAccount: body.userSmartAccount,
+            executionDomain: body.executionDomain,
+            jobType: body.jobType,
+            targetContract: body.targetContract,
+            targetSelector: body.targetSelector,
+            payload: body.payload,
+            status: body.status,
+            txHash: body.txHash,
+            failureReason: body.failureReason,
+            providerJobRef: body.providerJobRef,
+            userId: body.userId,
+            vaultId: body.vaultId,
+            policyVersion: body.policyVersion,
+          });
+
+          return new Response(JSON.stringify({ success: true, job }), { headers: corsHeaders });
+        }
+
+        if (url.pathname === "/api/benchmark-jobs" && request.method === "POST") {
+          const body = await request.json() as any;
+          const benchmarkJob = await automation.upsertBenchmarkJob({
+            benchmarkJobId: body.benchmarkJobId,
+            decisionId: body.decisionId,
+            ownerEoa: body.ownerEoa,
+            agentSmartWallet: body.agentSmartWallet,
+            sessionId: body.sessionId,
+            status: body.status,
+            txHash: body.txHash,
+            onchainDecisionId: body.onchainDecisionId,
+            dataSnapshotHash: body.dataSnapshotHash,
+            payload: body.payload,
+            failureReason: body.failureReason,
+            providerJobRef: body.providerJobRef,
+            userId: body.userId,
+            vaultId: body.vaultId,
+            policyVersion: body.policyVersion,
+          });
+
+          return new Response(JSON.stringify({ success: true, benchmarkJob }), { headers: corsHeaders });
+        }
+
+        const benchmarkJobMatch = url.pathname.match(/^\/api\/benchmark-jobs\/([^/]+)$/);
+        if (benchmarkJobMatch && request.method === "PATCH") {
+          const body = await request.json() as any;
+          const benchmarkJob = await automation.upsertBenchmarkJob({
+            benchmarkJobId: decodeURIComponent(benchmarkJobMatch[1]),
+            decisionId: body.decisionId,
+            ownerEoa: body.ownerEoa,
+            agentSmartWallet: body.agentSmartWallet,
+            sessionId: body.sessionId,
+            status: body.status,
+            txHash: body.txHash,
+            onchainDecisionId: body.onchainDecisionId,
+            dataSnapshotHash: body.dataSnapshotHash,
+            payload: body.payload,
+            failureReason: body.failureReason,
+            providerJobRef: body.providerJobRef,
+            userId: body.userId,
+            vaultId: body.vaultId,
+            policyVersion: body.policyVersion,
+          });
+
+          return new Response(JSON.stringify({ success: true, benchmarkJob }), { headers: corsHeaders });
         }
 
         return new Response(JSON.stringify({ error: "Endpoint not found" }), { status: 404, headers: corsHeaders });

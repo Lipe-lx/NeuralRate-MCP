@@ -8,6 +8,8 @@ type DeploymentManifest = {
   contractName: string;
   address: string;
   txHash: string;
+  benchmarkWriter?: string;
+  deploymentMode?: string;
   agentId: string;
   agentURI: string;
   updatedAt: string;
@@ -24,8 +26,24 @@ async function main() {
   console.log("Deploying NeuralRateDecisionBenchmark...");
   console.log("Using deployer address:", signer.address);
 
+  const configuredBenchmarkWriter = process.env.NEURALRATE_AGENT_SMART_WALLET?.trim();
+  const allowLegacyWriter = process.env.ALLOW_LEGACY_BENCHMARK_WRITER === "true";
+  const zeroAddress = "0x0000000000000000000000000000000000000000";
+  const isMissingWriter =
+    !configuredBenchmarkWriter ||
+    configuredBenchmarkWriter.toLowerCase() === zeroAddress.toLowerCase();
+
+  if (isMissingWriter && !allowLegacyWriter) {
+    throw new Error(
+      "Missing a real NEURALRATE_AGENT_SMART_WALLET. Set the agent smart wallet address in .env, or explicitly opt into legacy deployment with ALLOW_LEGACY_BENCHMARK_WRITER=true."
+    );
+  }
+
+  const initialBenchmarkWriter = isMissingWriter ? signer.address : configuredBenchmarkWriter!;
+  console.log("Initial benchmark writer:", initialBenchmarkWriter);
+
   const NeuralRateDecisionBenchmark = await ethers.getContractFactory("NeuralRateDecisionBenchmark");
-  const contract = await NeuralRateDecisionBenchmark.deploy();
+  const contract = await NeuralRateDecisionBenchmark.deploy(initialBenchmarkWriter);
 
   await contract.waitForDeployment();
   const address = await contract.getAddress();
@@ -38,6 +56,8 @@ async function main() {
     contractName: "NeuralRateDecisionBenchmark",
     address,
     txHash,
+    benchmarkWriter: initialBenchmarkWriter,
+    deploymentMode: "agent-smart-wallet",
     agentId: "",
     agentURI: "",
     updatedAt: new Date().toISOString()

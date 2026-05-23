@@ -6,8 +6,12 @@ import YieldScanner from './components/YieldScanner';
 import RiskPanel from './components/RiskPanel';
 import NansenRadar from './components/NansenRadar';
 import DecisionLedger from './components/DecisionLedger';
+import VaultPanel from './components/VaultPanel';
+import AgentSettingsPanel from './components/AgentSettingsPanel';
 import { useApi } from './hooks/useApi';
 import { WalletProvider } from './context/WalletContext';
+import { useWalletContext } from './context/WalletContext';
+import { useNeuralRateUser } from './hooks/useNeuralRateUser';
 
 export interface Pool {
   symbol: string;
@@ -33,6 +37,19 @@ function AppContent() {
   const [mounted, setMounted] = useState(false);
   const { data, loading } = useApi<{ pools: Pool[] }>('/yields');
   const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
+  const wallet = useWalletContext();
+  const { address, isConnected, isCorrectChain, connect, switchToMantle } = wallet;
+  const neuralRateUser = useNeuralRateUser({
+    ownerEoa: address,
+    externalWalletAddress: wallet.externalWalletAddress,
+    embeddedWalletAddress: wallet.embeddedWalletAddress,
+    providerUserId: wallet.providerUserId,
+    authStrategy: wallet.authStrategy,
+    walletProvider: wallet.walletProvider,
+    canPredictVault: isConnected && isCorrectChain,
+    getEthereumProvider: wallet.getEthereumProvider,
+    signMessage: wallet.signMessage,
+  });
 
   useEffect(() => {
     setMounted(true);
@@ -68,12 +85,35 @@ function AppContent() {
 
           {/* Right: Decision Ledger */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minHeight: 0, maxHeight: '100%' }}>
-            <DecisionLedger />
+            <VaultPanel
+              state={neuralRateUser.state}
+              busy={neuralRateUser.busy}
+              notice={neuralRateUser.notice}
+              error={neuralRateUser.error}
+              isConnected={isConnected}
+              isCorrectChain={isCorrectChain}
+              onConnect={connect}
+              onSwitchChain={switchToMantle}
+              onBootstrap={neuralRateUser.bootstrap}
+              onFundingIntent={neuralRateUser.createFundingIntent}
+              onEnableAutomation={neuralRateUser.enableAutomation}
+              onRevokeAutomation={neuralRateUser.revokeAutomation}
+            />
+            <AgentSettingsPanel
+              config={neuralRateUser.state?.config ?? null}
+              busy={neuralRateUser.busy}
+              onSave={neuralRateUser.saveConfig}
+            />
+            <DecisionLedger
+              state={neuralRateUser.state}
+              busy={neuralRateUser.busy || neuralRateUser.loading}
+              onRefreshAutomation={neuralRateUser.refresh}
+            />
           </div>
         </main>
 
         <footer style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '0.75rem', borderTop: '1px solid var(--border-subtle)', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-          Powered by NeuralRate AI • Autonomous Web3 Agent • Mantle Network
+          NeuralRate MCP • Per-User Vault Automation + Benchmark Terminal • Mantle Sepolia
         </footer>
       </div>
     </div>

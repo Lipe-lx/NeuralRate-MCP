@@ -35,7 +35,7 @@ V2 is stronger as a hackathon-grade narrative and differentiation layer. It adds
 | Nansen integration | Treats Nansen as a premium intelligence source, not a decorative API. |
 | Deterministic scoring | Makes risk scoring deterministic, with the LLM used only for synthesis/explanation. |
 | On-chain benchmarking | Adds `DecisionCreated` and `DecisionSettled`, turning recommendations into measurable predictions. |
-| Benchmark dashboard | Adds predicted vs realized APY, error bps and T-bill outperformance. |
+| Benchmark terminal | Adds predicted vs realized APY, error bps and T-bill outperformance. |
 | Data snapshots | Adds `dataSnapshotHash`, prompt version, model version and scoring version. |
 | Risk mitigation | Explicitly addresses demo risk, Nansen downtime, hallucination and UI sameness. |
 | Submission narrative | Provides clearer pitch, tagline and final positioning for judges. |
@@ -56,7 +56,7 @@ The consolidated version uses:
 
 Yield-bearing stablecoins and RWA-backed assets on Mantle create a strong opportunity for autonomous agents: they can monitor liquidity, yield spreads, depeg signals, smart money movement, protocol-level risk and Treasury benchmark spreads faster than human users or static dashboards.
 
-However, the hackathon space is saturated with generic “AI yield optimizer” concepts. **NeuralRate MCP** is intentionally positioned differently: it is not just a frontend that recommends the highest APY. It is a **Model Context Protocol server that gives autonomous agents a verifiable yield reasoning layer**.
+However, the hackathon space is saturated with generic “AI yield optimizer” concepts. **NeuralRate MCP** is intentionally positioned differently: it is not just a frontend that recommends the highest APY. It is a **Model Context Protocol server that gives autonomous agents a verifiable yield reasoning layer with non-custodial automation primitives**.
 
 The server exposes callable MCP tools for:
 
@@ -72,11 +72,12 @@ The core idea:
 
 > Agents should not only make financial recommendations. They should make recommendations that can be audited, benchmarked and scored over time.
 
-NeuralRate MCP focuses on three pillars:
+NeuralRate MCP focuses on four pillars:
 
 1. **Agent-native composability** — any MCP-compatible agent can call the tools.
 2. **Nansen-enhanced intelligence** — wallet labels, smart money movement, holder behavior, flow anomalies and protocol/entity context enrich the raw on-chain data.
-3. **Verifiable benchmarking** — every major recommendation is committed on-chain, then later settled against realized outcomes.
+3. **Verifiable benchmarking** — major recommendations can be committed on-chain from the benchmark terminal, then later settled against realized outcomes.
+4. **Non-custodial automation** — user EOAs only grant revocable permissions, while the executor and agent smart wallet operate within bounded smart-session scopes.
 
 ---
 
@@ -530,7 +531,7 @@ Persists a recommendation and its benchmark metadata in D1 after the allocation 
 
 ## 6.7 `get_decisions(limit)`
 
-Retrieves the latest logged recommendations for the dashboard and agent consumers.
+Retrieves the latest logged recommendations for the benchmark terminal and agent consumers.
 
 **Input:**
 
@@ -576,7 +577,7 @@ This creates the strongest hackathon story:
 7. Server commits DecisionCreated on Mantle.
 8. After settlement horizon, server recomputes realized outcome.
 9. Server commits DecisionSettled on Mantle.
-10. Agent reputation/performance dashboard updates.
+10. Agent reputation/performance terminal updates.
 ```
 
 ## 7.2 Solidity contract sketch
@@ -625,13 +626,13 @@ contract NeuralRateDecisionBenchmark {
         string settlementURI
     );
 
-    modifier onlyAgent() {
-        require(msg.sender == agentIdentity, "Only agent");
+    modifier onlyBenchmarkWriter() {
+        require(msg.sender == benchmarkWriter, "Only benchmark writer");
         _;
     }
 
-    constructor(address _agentIdentity) {
-        agentIdentity = _agentIdentity;
+    constructor(address initialBenchmarkWriter) {
+        benchmarkWriter = initialBenchmarkWriter;
     }
 
     function createDecision(
@@ -642,7 +643,7 @@ contract NeuralRateDecisionBenchmark {
         uint256 benchmarkRateBps,
         uint256 settlementDueAt,
         string calldata recommendationURI
-    ) external onlyAgent returns (uint256 decisionId) {
+    ) external onlyBenchmarkWriter returns (uint256 decisionId) {
         decisionId = nextDecisionId++;
 
         decisions[decisionId] = DecisionMeta({
@@ -676,7 +677,7 @@ contract NeuralRateDecisionBenchmark {
         int256 predictionErrorBps,
         int256 outperformanceVsBenchmarkBps,
         string calldata settlementURI
-    ) external onlyAgent {
+    ) external onlyBenchmarkWriter {
         DecisionMeta storage decision = decisions[decisionId];
         require(decision.agent != address(0), "Invalid decision");
         require(!decision.settled, "Already settled");
@@ -709,7 +710,7 @@ This is much more aligned with the hackathon's on-chain benchmarking narrative.
 
 NeuralRate MCP uses ERC-8004 as the server's agent identity layer.
 
-The server has its own agent identity and every decision is associated with that identity. Consumers may call the MCP server without having their own on-chain identity, but identity-aware callers can pass an address or ERC-8004 agent address to start building their own usage history.
+The server has its own agent identity, but benchmark decisions are currently tracked in two layers: the ERC-8004 registry identifies the public agent, while `NeuralRateDecisionBenchmark` records explicit benchmark transactions. Consumers may call the MCP server without having their own on-chain identity, but identity-aware callers can still pass an address to build their own usage history in D1.
 
 ## 8.1 Identity model
 
@@ -1070,7 +1071,7 @@ This keeps gas low while preserving verifiability.
   2. Fetch realized APY / liquidity / depeg data.
   3. Compute error and benchmark performance.
   4. Commit DecisionSettled event on Mantle.
-  5. Update agent benchmark dashboard.
+  5. Update agent benchmark terminal.
 
 [On monitor trigger]
   1. Cron checks APY, liquidity, depeg and Nansen flow signals.
@@ -1086,7 +1087,7 @@ This keeps gas low while preserving verifiability.
 |---|---|---|
 | MCP Server | Cloudflare Workers | Zero-cost, SSE native, strong fit for lightweight agent infrastructure. |
 | Cache | Cloudflare KV | Short TTL cache for yield, price and Nansen snapshots. |
-| Structured storage | Cloudflare D1 | Decision metadata, settlement schedule and benchmark dashboard data. |
+| Structured storage | Cloudflare D1 | Decision metadata, settlement schedule and benchmark terminal data. |
 | Snapshot storage | Cloudflare R2 or KV/D1 | Full off-chain data snapshots linked by hash. |
 | LLM reasoning | BYOK — Claude Sonnet / Gemini Flash | LLM explains deterministic outputs and allocation tradeoffs. |
 | On-chain reads | Mantle RPC + ethers.js | Pool state, token supply, TVL and contract reads. |
@@ -1150,7 +1151,7 @@ https://neuralrate-worker.neuralrate.workers.dev/mcp
 └──────────────────────────────┴─────────────────────────────────────┘
 ```
 
-## 14.3 Benchmark dashboard
+## 14.3 Benchmark terminal
 
 ```txt
 Agent Performance
@@ -1172,7 +1173,7 @@ Recent Decisions
 | 140 | Conservative | USDY/mUSD | 5.02% | 4.94% | 8 bps | Settled |
 ```
 
-This dashboard is central to the pitch. It proves the project understands agent performance as a measurable system.
+This terminal is central to the pitch. It proves the project understands agent performance as a measurable system.
 
 ---
 
@@ -1180,7 +1181,7 @@ This dashboard is central to the pitch. It proves the project understands agent 
 
 | Dimension | Typical AI Yield App | NeuralRate MCP |
 |---|---|---|
-| Main interface | Human dashboard | MCP primitive for agents |
+| Main interface | Human benchmark terminal | MCP primitive for agents |
 | Main output | Highest APY recommendation | Risk-adjusted, benchmarked decision |
 | Data quality | APY + TVL | APY + TVL + T-bill + Nansen context |
 | Risk scoring | Often vague or LLM-only | Deterministic scoring with LLM explanation |
@@ -1219,7 +1220,7 @@ The project can also qualify as an agentic wallet/economy primitive if the demo 
 
 ## 16.3 Stretch: Best UI/UX
 
-Possible only if the benchmark dashboard and tool execution stream feel polished.
+Possible only if the benchmark terminal and tool execution stream feel polished.
 
 ---
 
@@ -1272,7 +1273,7 @@ Possible only if the benchmark dashboard and tool execution stream feel polished
 - `DecisionCreated` event.
 - `DecisionSettled` event.
 - ERC-8004 agent identity.
-- First benchmark dashboard data.
+- First benchmark terminal data.
 
 **Goal:** transform the project from “recommendation app” to verifiable agent infrastructure.
 
@@ -1285,7 +1286,7 @@ Possible only if the benchmark dashboard and tool execution stream feel polished
 - Landing page.
 - Agent Playground.
 - Tool execution stream.
-- Benchmark dashboard.
+- Benchmark terminal.
 - Telegram alert demo.
 - README.
 - Pitch deck / demo video.
@@ -1306,7 +1307,7 @@ The submission can be strong with the following minimum:
 4. `DecisionCreated` contract deployed on Mantle.
 5. At least one `DecisionSettled` example.
 6. Playground showing tool calls.
-7. Benchmark dashboard showing predicted vs realized outcome.
+7. Benchmark terminal showing predicted vs realized outcome.
 8. Dashboard/agent consumers retrieving recent history via `get_decisions`.
 
 ---
@@ -1331,7 +1332,7 @@ The submission can be strong with the following minimum:
 
 ## 20.1 Short pitch
 
-> NeuralRate MCP is a verifiable RWA yield reasoning layer for autonomous agents on Mantle. It scans Mantle yield venues, compares returns against Treasury benchmarks, enriches risk analysis with Nansen on-chain intelligence, and produces risk-adjusted allocation recommendations through MCP. Every recommendation is committed on-chain under an ERC-8004 agent identity and later settled against realized outcomes, turning agent decisions into a measurable performance record.
+> NeuralRate MCP is a verifiable RWA yield reasoning layer for autonomous agents on Mantle. It scans Mantle yield venues, compares returns against Treasury benchmarks, enriches risk analysis with Nansen on-chain intelligence, and produces risk-adjusted allocation recommendations through MCP. Recommendations are first logged in the benchmark terminal, then can be committed on-chain on Mantle Sepolia through the benchmark contract, turning agent decisions into a measurable performance record over time.
 
 ## 20.2 Tagline
 

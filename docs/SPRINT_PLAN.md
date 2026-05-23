@@ -48,7 +48,7 @@
 | Chain ID | `5003` |
 | RPC URL | `https://rpc.sepolia.mantle.xyz` |
 | Currency | MNT |
-| Explorer | `https://explorer.sepolia.mantle.xyz` |
+| Explorer | `https://sepolia.mantlescan.xyz` |
 | Faucet | `https://faucet.sepolia.mantle.xyz/` |
 | Bridge | `https://bridge.sepolia.mantle.xyz/` |
 
@@ -93,7 +93,7 @@ const IDENTITY_REGISTRY_ABI = [
 
 ## ⚠️ Insight Crítico do Q&A
 
-> **ERC-8004 é emitido pela Mantle para participantes**, mas os contratos de registro estão abertos — qualquer um pode chamar `register()`. Para maximizar pontuação em "Mantle Ecosystem Contribution" (25%), faremos **AMBOS**: registrar nosso agente diretamente via contrato E referenciar o agentId em todas as decisões on-chain.
+> **ERC-8004 é emitido pela Mantle para participantes**, mas os contratos de registro estão abertos — qualquer um pode chamar `register()`. Para maximizar pontuação em "Mantle Ecosystem Contribution" (25%), faremos **AMBOS**: registrar nosso agente diretamente via contrato e exibir essa identidade ao lado do benchmark contract. O `agentId` público identifica o agente; as decisões benchmarked são gravadas separadamente em `NeuralRateDecisionBenchmark`.
 
 > **Mainnet vs Testnet:** A página oficial de "Requirements & Criteria" aceita ambos para o Deployment Award. Para tracks principais, Mainnet é preferido. **Estratégia:** Desenvolver em Sepolia Testnet, deploy final em Mainnet.
 
@@ -233,7 +233,7 @@ const IDENTITY_REGISTRY_ABI = [
   - `struct DecisionMeta` (agent, requestedBy, dataSnapshotHash, predictedApyBps, etc.)
   - `createDecision()` → emite `DecisionCreated` event
   - `settleDecision()` → emite `DecisionSettled` event
-  - Modifier `onlyAgent` para restringir ao endereço do agente
+  - `benchmarkWriter` configurável para suportar smart wallet do agente
   - Getter functions para consultas públicas
 - [x] Escrever testes unitários Hardhat:
   - Test: criar decisão com dados válidos
@@ -247,7 +247,7 @@ const IDENTITY_REGISTRY_ABI = [
 - [ ] Escrever script `deploy.ts` (deploya contrato + log do endereço)
 - [ ] Deploy para Mantle Sepolia: `npx hardhat run scripts/deploy.ts --network mantleSepolia`
 - [ ] Verificar contrato: `npx hardhat verify --network mantleSepolia <ADDRESS> <CONSTRUCTOR_ARGS>`
-- [ ] Confirmar no explorer: `https://explorer.sepolia.mantle.xyz/address/<ADDRESS>`
+- [ ] Confirmar no explorer: `https://sepolia.mantlescan.xyz/address/<ADDRESS>`
 
 ### ERC-8004 Agent Identity
 - [x] Criar `agent-card.json` seguindo o schema oficial
@@ -316,12 +316,12 @@ const IDENTITY_REGISTRY_ABI = [
 - [ ] Combinar yield_scan + tbill_spread + risk_assess + nansen_context
 - [ ] Aceitar `amount_usd`, `risk_profile`, `assets[]`, `settlement_horizon_hours`
 - [ ] Gerar alocação percentual por asset/protocol
-- [ ] Se `log_onchain: true`, chamar `createDecision()` no contrato
+- [ ] Se `log_onchain: true`, enfileirar benchmark job no executor
 - [ ] Retornar `decision_id` e `data_snapshot_hash`
 
 #### Tool 6: `log_decision`
 - [ ] Persistir decisão, risk profile, allocation JSON e hashes no D1
-- [ ] Associar tx hash on-chain quando `createDecision()` for usado
+- [ ] Associar tx hash on-chain quando o executor confirmar `createDecision()`
 - [ ] Retornar confirmação com `decision_id`, `created_at` e status
 
 #### Tool 7: `get_decisions`
@@ -477,7 +477,7 @@ const IDENTITY_REGISTRY_ABI = [
 - [ ] Endereços de contratos deployados
 - [ ] Agent ID no ERC-8004
 - [ ] Links para demo e vídeo
-- [ ] Screenshots da dashboard
+- [ ] Screenshots do benchmark terminal / automation terminal
 - [ ] Tecnologias utilizadas
 - [ ] Integrações (DefiLlama, FRED, Nansen, Mantle RPC)
 
@@ -520,12 +520,12 @@ const IDENTITY_REGISTRY_ABI = [
 
 | Sprint | Descrição | Status | Prazo Alvo |
 |--------|-----------|--------|------------|
-| Sprint 1 | Scaffold & Ambiente | `[ ]` Não iniciado | Dia 1 (22 Mai) |
-| Sprint 2 | Smart Contracts & ERC-8004 | `[ ]` Não iniciado | Dias 2-3 (23-24 Mai) |
-| Sprint 3 | MCP Server Core | `[ ]` Não iniciado | Dias 3-6 (24-27 Mai) |
-| Sprint 4 | Data Sources & Integrations | `[ ]` Não iniciado | Dias 5-7 (26-28 Mai) |
-| Sprint 5 | Dashboard UI Premium | `[ ]` Não iniciado | Dias 7-10 (28-31 Mai) |
-| Sprint 6 | Polish, Deploy & Submissão | `[ ]` Não iniciado | Dias 10-14 (31 Mai - 4 Jun) |
+| Sprint 1 | Scaffold & Ambiente | `[x]` Concluido | Dia 1 (22 Mai) |
+| Sprint 2 | Smart Contracts & ERC-8004 | `[x]` Concluido | Dias 2-3 (23-24 Mai) |
+| Sprint 3 | MCP Server Core | `[-]` Em andamento | Dias 3-6 (24-27 Mai) |
+| Sprint 4 | Data Sources & Integrations | `[-]` Em andamento | Dias 5-7 (26-28 Mai) |
+| Sprint 5 | Dashboard UI Premium | `[-]` Em andamento | Dias 7-10 (28-31 Mai) |
+| Sprint 6 | Polish, Deploy & Submissão | `[ ]` Pendente | Dias 10-14 (31 Mai - 4 Jun) |
 
 > **Buffer de segurança:** ~11 dias entre conclusão planejada (4 Jun) e deadline (15 Jun).
 

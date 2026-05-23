@@ -6,17 +6,19 @@ NeuralRate MCP is built using a modern, decentralized micro-architecture designe
 
 ## 🏗️ Structural Overview
 
-The platform consists of four primary layers:
-1. **Frontend Dashboard:** A Vite React Single Page Application (SPA) leveraging premium glassmorphism aesthetics and EIP-1193 wallet integration.
+The platform consists of five primary layers:
+1. **Frontend Benchmark Terminal:** A Vite React Single Page Application (SPA) leveraging premium glassmorphism aesthetics, EIP-1193 wallet integration, per-user vault bootstrap, and personalized agent controls.
 2. **Backend & MCP Server:** A unified Cloudflare Worker acting as both a REST API for the frontend and a Model Context Protocol (MCP) Server for AI agents over Server-Sent Events (SSE).
-3. **Database & Cache Layer:** Cloudflare D1 (SQLite) for persistent decision records and Cloudflare KV for indexing caching metrics.
-4. **On-Chain Registry (Mantle Network):** A Solidity benchmark contract that acts as an immutable ledger for AI decisions.
+3. **Database & Cache Layer:** Cloudflare D1 (SQLite) for persistent decision, user, vault, policy, and job records; Cloudflare KV for indexing caching metrics.
+4. **Executor Service:** A dedicated automation runtime that prepares vault-scoped permissions, tracks activation / revocation, and manages autonomous benchmark and execution jobs.
+5. **On-Chain Benchmark Contract (Mantle Network):** A Solidity benchmark contract that acts as an immutable ledger for explicitly confirmed benchmark decisions and is prepared for a configurable agent smart wallet benchmark writer.
 
 ```mermaid
 graph TB
     subgraph Frontend [Client Layer: Vite React]
-        UI[NeuralRate Dashboard]
+        UI[NeuralRate Benchmark Terminal]
         WC[Wallet Provider: EIP-1193]
+        VP[Vault + Settings Panels]
         MC[MCP Connection Modal]
     end
 
@@ -27,6 +29,11 @@ graph TB
         D1[(Cloudflare D1 Database)]
     end
 
+    subgraph Executor [Automation Layer]
+        EX[Executor Service]
+        MS[Managed Signer Adapter]
+    end
+
     subgraph External [Data Providers]
         DL[DefiLlama API]
         FR[FRED Treasury API]
@@ -35,16 +42,22 @@ graph TB
 
     subgraph Blockchain [Mantle Sepolia Network]
         SC[NeuralRateDecisionBenchmark.sol]
+        USA[Per-User Vault]
+        ASW[Agent Smart Wallet]
     end
 
     %% Interactions
     UI -->|HTTP GET/POST| API
-    UI -->|EIP-1193 Signatures| SC
+    UI -->|Bootstrap / Enable / Revoke| EX
     WC -->|Web3 Connection| UI
     MCP <-->|SSE Protocol| Agent[LLM AI Agent]
     
     API -->|Read/Write Decisions| D1
     API -->|Cache Queries| KV
+    EX -->|Persist Policies + Jobs| API
+    EX -->|Autonomous Benchmark Writes| ASW
+    EX -->|Vault-Scoped Execution| USA
+    ASW -->|Benchmark Writes| SC
     
     API -->|Fetch Yields| DL
     API -->|Fetch T-Bill Rates| FR
@@ -63,7 +76,9 @@ graph TB
 To achieve a clean separation of concerns:
 * **The Frontend** communicates with the Backend via standard JSON over HTTP REST endpoints (`/api/*`).
 * **AI Agents** communicate with the Backend using the **Model Context Protocol (MCP) over Server-Sent Events (SSE)** at `/mcp`. Under the hood, a Cloudflare Durable Object (`NeuralRateMcpAgent`) manages stateful SSE channels.
-* **Smart Contracts** are triggered directly from the frontend using the user's connected Web3 wallet (MetaMask, Rabby, etc.) targeting the **Mantle Sepolia Testnet** (Chain ID `5003`).
+* **Automation** is orchestrated by the dedicated executor service rather than the Cloudflare Worker. Users sign consent from the frontend, while the executor manages vault-scoped session state and job queues.
+* **Recommendations** consume global market data but resolve user-specific policy, presets, and limits from D1 before ranking pools.
+* **Smart Contracts** are targeted on the **Mantle Sepolia Testnet** (Chain ID `5003`). The benchmark contract remains global, while user execution is always isolated to a dedicated vault per user.
 
 ---
 

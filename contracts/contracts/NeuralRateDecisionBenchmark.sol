@@ -2,7 +2,8 @@
 pragma solidity ^0.8.20;
 
 contract NeuralRateDecisionBenchmark {
-    address public agent;
+    address public owner;
+    address public benchmarkWriter;
     
     struct DecisionMeta {
         uint256 decisionId;
@@ -32,13 +33,36 @@ contract NeuralRateDecisionBenchmark {
         int256 outperformanceBps
     );
 
-    modifier onlyAgent() {
-        require(msg.sender == agent, "Only registered agent can call this");
+    event BenchmarkWriterUpdated(address indexed previousWriter, address indexed newWriter);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this");
         _;
     }
 
-    constructor() {
-        agent = msg.sender;
+    modifier onlyBenchmarkWriter() {
+        require(msg.sender == benchmarkWriter, "Only benchmark writer can call this");
+        _;
+    }
+
+    constructor(address initialBenchmarkWriter) {
+        require(initialBenchmarkWriter != address(0), "Invalid benchmark writer");
+        owner = msg.sender;
+        benchmarkWriter = initialBenchmarkWriter;
+
+        emit BenchmarkWriterUpdated(address(0), initialBenchmarkWriter);
+    }
+
+    function agent() external view returns (address) {
+        return benchmarkWriter;
+    }
+
+    function setBenchmarkWriter(address newBenchmarkWriter) external onlyOwner {
+        require(newBenchmarkWriter != address(0), "Invalid benchmark writer");
+        address previousWriter = benchmarkWriter;
+        benchmarkWriter = newBenchmarkWriter;
+
+        emit BenchmarkWriterUpdated(previousWriter, newBenchmarkWriter);
     }
 
     function createDecision(
@@ -46,7 +70,7 @@ contract NeuralRateDecisionBenchmark {
         string calldata _dataSnapshotHash,
         int256 _predictedApyBps,
         uint256 _settlementHorizonHours
-    ) external onlyAgent returns (uint256) {
+    ) external onlyBenchmarkWriter returns (uint256) {
         uint256 id = nextDecisionId++;
         
         decisions[id] = DecisionMeta({
@@ -68,7 +92,7 @@ contract NeuralRateDecisionBenchmark {
         uint256 _decisionId,
         int256 _realizedApyBps,
         int256 _tbillApyBps
-    ) external onlyAgent {
+    ) external onlyBenchmarkWriter {
         DecisionMeta storage decision = decisions[_decisionId];
         require(decision.decisionId == _decisionId, "Decision does not exist");
         require(!decision.isSettled, "Decision already settled");

@@ -1,6 +1,6 @@
 # Frontend Benchmark Terminal
 
-The NeuralRate Frontend is built as a highly optimized Vite React SPA leveraging advanced styling tokens, responsive layouts, and zero-dependency Web3 integrations.
+The NeuralRate Frontend is built as a highly optimized Vite React SPA leveraging advanced styling tokens, responsive layouts, zero-dependency wallet connectivity, and a **per-user vault flow** on Mantle Sepolia.
 
 ---
 
@@ -20,7 +20,7 @@ Located in `useWallet.ts` and `WalletContext.tsx`, NeuralRate implements a nativ
 * **Target Network:** **Mantle Sepolia Testnet**
   * Chain ID: `5003` (`0x138b` hex)
   * RPC Endpoint: `https://rpc.sepolia.mantle.xyz`
-  * Block Explorer: `https://explorer.sepolia.mantle.xyz`
+  * Block Explorer: `https://sepolia.mantlescan.xyz`
 * **Features:**
   * **Auto Chain Check:** Displays a glowing red warn button if the wallet is on the wrong chain.
   * **Network Switcher (`switchToMantle`):** Programmatically calls `wallet_switchEthereumChain` or `wallet_addEthereumChain` to add and switch the user's browser wallet to Mantle Sepolia.
@@ -41,9 +41,9 @@ The top right header houses two highly polished interactive buttons:
 
 ---
 
-## 🧩 Dashboard Panels
+## 🧩 Terminal Panels
 
-The UI is divided into four modular components:
+The UI is divided into six modular components:
 
 ### 1. `YieldScanner`
 * **Purpose:** Displays high-yield pool opportunities on Mantle fetched directly from DefiLlama.
@@ -62,11 +62,25 @@ The UI is divided into four modular components:
 * **Purpose:** Summarizes Smart Money flows for the selected pool's tokens.
 * **Features:** Implements a graceful fallback container that guides the user on how to enable full flow features if the Nansen API key is missing.
 
-### 4. `DecisionLedger`
-* **Purpose:** Displays an ERC-8004 inspired ledger tracking the historical recommendations logged in the D1 Database.
-* **Features:** 
-  * **Trigger Allocation:** Simulates an allocation calculation of $10,000 (Medium Risk) on the backend and immediately logs it into D1, updating the UI. This button is active **only if the wallet is connected** and on the correct Mantle chain.
-  * **Clear:** Instantly wipes the historical ledger records from the SQLite D1 database.
+### 4. `VaultPanel`
+* **Purpose:** Explains and controls the dedicated user vault that the agent may operate.
+* **Features:**
+  * Shows vault identity, provider strategy, onboarding provider, managed signer mode, and deposit address.
+  * Bootstraps a new vault for the connected user.
+  * Records funding intents and enables or revokes automation without implying any shared treasury.
+
+### 5. `AgentSettingsPanel`
+* **Purpose:** Personalizes the agent per user.
+* **Features:**
+  * Simple settings for objective, risk, horizon, automation mode, and restriction preset.
+  * Advanced drawer for allowlists, deny lists, spend limits, caps, slippage, and manual-approval thresholds.
+
+### 6. `DecisionLedger`
+* **Purpose:** Displays the benchmark ledger for historical recommendations logged in D1 and routed through the autonomous benchmark flow.
+* **Features:**
+  * **Generate Decision:** Builds a recommendation using global market data but filters it through the connected user's vault policy.
+  * **Queue Auto Benchmark:** Sends a vault-scoped benchmark job to the executor once automation is active.
+  * **Benchmark State:** Tracks `Local`, `Pending`, and `On-Chain` states, plus vault ID, policy version, benchmark job status, and explorer links for the benchmark contract and ERC-8004 registry.
 
 ---
 
