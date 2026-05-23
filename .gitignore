@@ -16,3 +16,11 @@ typechain-types/
 apps/worker/.dev.vars
 apps/worker/.dev.vars.*
 !apps/worker/.dev.vars.example
+
+# Python / Virtual Environments
+venv/
+.venv/
+venv_svg/
+env/
+*.venv/
+
