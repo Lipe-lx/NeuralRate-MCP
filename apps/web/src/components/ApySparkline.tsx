@@ -50,7 +50,7 @@ export const ApySparkline: React.FC<Props> = ({ poolId }) => {
     };
   }, [poolId]);
 
-  const { points, minApy, maxApy, isPositiveTrend } = useMemo(() => {
+  const { points, isPositiveTrend } = useMemo(() => {
     if (!data || data.length === 0) return { points: [], minApy: 0, maxApy: 0, isPositiveTrend: true };
     
     // Determine trend (comparing last point to 7 days ago, or earliest available)
