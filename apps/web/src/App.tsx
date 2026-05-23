@@ -39,7 +39,8 @@ export interface Pool {
 function AppContent() {
   const { data, loading } = useApi<{ pools: Pool[] }>('/yields');
   const [selectedPoolId, setSelectedPoolId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'principal' | 'vault' | 'settings' | 'history'>('principal');
+  const [activeTab, setActiveTab] = useState<'principal' | 'vault'>('principal');
+  const [activeVaultTab, setActiveVaultTab] = useState<'vault' | 'settings' | 'history'>('vault');
   const [isOwnershipModalOpen, setIsOwnershipModalOpen] = useState(false);
   const wallet = useWalletContext();
   const { address, isConnected, isCorrectChain, connect, switchToMantle } = wallet;
@@ -114,21 +115,7 @@ function AppContent() {
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
-              <span>User Vault</span>
-            </button>
-            <button className={`sidebar-nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-              <span>Agent Settings</span>
-            </button>
-            <button className={`sidebar-nav-item ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
-              </svg>
-              <span>Benchmark History</span>
+              <span>Agent Vault</span>
             </button>
           </nav>
           
@@ -141,7 +128,11 @@ function AppContent() {
 
       {/* Main Workspace Area */}
       <div className="opacity-100" style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: '100%', maxWidth: '1380px', margin: '0 auto' }}>
-        <Header />
+        <Header
+          vaultTabsVisible={activeTab === 'vault'}
+          activeVaultTab={activeVaultTab}
+          onVaultTabChange={setActiveVaultTab}
+        />
 
         <main style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           {activeTab === 'principal' && (
@@ -166,48 +157,48 @@ function AppContent() {
           )}
 
           {activeTab === 'vault' && (
-            <div className="tab-pane animate-enter" style={{ overflowY: 'auto', paddingRight: '0.25rem' }}>
-              <div className="centered-page-container">
-                <VaultPanel
-                  state={neuralRateUser.state}
-                  busy={neuralRateUser.busy}
-                  notice={neuralRateUser.notice}
-                  error={neuralRateUser.error}
-                  isConnected={isConnected}
-                  isCorrectChain={isCorrectChain}
-                  onConnect={connect}
-                  onSwitchChain={switchToMantle}
-                  onBootstrap={handleBootstrap}
-                  onFundingIntent={neuralRateUser.createFundingIntent}
-                  onEnableAutomation={neuralRateUser.enableAutomation}
-                  onRevokeAutomation={neuralRateUser.revokeAutomation}
-                  onReviewOwnership={() => setIsOwnershipModalOpen(true)}
-                  controlWalletLabel={controlWalletLabel}
-                />
-              </div>
-            </div>
-          )}
+            <div className="tab-pane animate-enter" style={{ minHeight: 0 }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: activeVaultTab === 'history' ? 'hidden' : 'auto', paddingRight: '0.25rem' }}>
+                {activeVaultTab === 'vault' && (
+                  <div className="centered-page-container">
+                    <VaultPanel
+                      state={neuralRateUser.state}
+                      busy={neuralRateUser.busy}
+                      notice={neuralRateUser.notice}
+                      error={neuralRateUser.error}
+                      isConnected={isConnected}
+                      isCorrectChain={isCorrectChain}
+                      onConnect={connect}
+                      onSwitchChain={switchToMantle}
+                      onBootstrap={handleBootstrap}
+                      onFundingIntent={neuralRateUser.createFundingIntent}
+                      onEnableAutomation={neuralRateUser.enableAutomation}
+                      onRevokeAutomation={neuralRateUser.revokeAutomation}
+                      onReviewOwnership={() => setIsOwnershipModalOpen(true)}
+                      controlWalletLabel={controlWalletLabel}
+                    />
+                  </div>
+                )}
 
-          {activeTab === 'settings' && (
-            <div className="tab-pane animate-enter" style={{ overflowY: 'auto', paddingRight: '0.25rem' }}>
-              <div className="centered-page-container">
-                <AgentSettingsPanel
-                  config={neuralRateUser.state?.config ?? null}
-                  busy={neuralRateUser.busy}
-                  onSave={neuralRateUser.saveConfig}
-                />
-              </div>
-            </div>
-          )}
+                {activeVaultTab === 'settings' && (
+                  <div className="centered-page-container">
+                    <AgentSettingsPanel
+                      config={neuralRateUser.state?.config ?? null}
+                      busy={neuralRateUser.busy}
+                      onSave={neuralRateUser.saveConfig}
+                    />
+                  </div>
+                )}
 
-          {activeTab === 'history' && (
-            <div className="tab-pane animate-enter" style={{ height: '100%', minHeight: 0 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-                <DecisionLedger
-                  state={neuralRateUser.state}
-                  busy={neuralRateUser.busy || neuralRateUser.loading}
-                  onRefreshAutomation={neuralRateUser.refresh}
-                />
+                {activeVaultTab === 'history' && (
+                  <div className="centered-page-container" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+                    <DecisionLedger
+                      state={neuralRateUser.state}
+                      busy={neuralRateUser.busy || neuralRateUser.loading}
+                      onRefreshAutomation={neuralRateUser.refresh}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           )}

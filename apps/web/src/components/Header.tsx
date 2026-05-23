@@ -2,73 +2,94 @@ import React, { useState } from 'react';
 import McpConnectModal from './McpConnectModal';
 import { useWalletContext } from '../context/WalletContext';
 
-const Header: React.FC = () => {
+type VaultHeaderTab = 'vault' | 'settings' | 'history';
+
+type HeaderProps = {
+  vaultTabsVisible?: boolean;
+  activeVaultTab?: VaultHeaderTab;
+  onVaultTabChange?: (tab: VaultHeaderTab) => void;
+};
+
+const Header: React.FC<HeaderProps> = ({ vaultTabsVisible = false, activeVaultTab, onVaultTabChange }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { isConnected, isConnecting, isCorrectChain, shortAddress, connect, disconnect, switchToMantle, error } = useWalletContext();
 
   return (
-    <header className="animate-enter" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', padding: '0.75rem 0', marginBottom: '1rem', flexShrink: 0 }}>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-        {/* MCP Agent Access Button */}
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="btn-premium btn-premium-agent"
-          title="Connect AI Agent to MCP"
-        >
-          <span className="agent-dot agent-dot-active"></span>
-          <span style={{ fontSize: '0.8rem', fontWeight: 600, letterSpacing: '0.5px' }}>AGENT ACCESS</span>
-        </button>
-
-        {/* Wallet Connect Button */}
-        {!isConnected ? (
-          <button
-            onClick={connect}
-            disabled={isConnecting}
-            className="btn-premium btn-premium-wallet"
-            style={{ cursor: isConnecting ? 'wait' : 'pointer', opacity: isConnecting ? 0.7 : 1 }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <rect x="2" y="6" width="20" height="14" rx="3" />
-              <path d="M16 14h.01" />
-              <path d="M2 10h20" />
-            </svg>
-            {isConnecting ? 'Connecting...' : 'Connect Wallet'}
+    <header className="animate-enter" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', padding: '0.75rem 0', marginBottom: '1rem', flexShrink: 0 }}>
+      {vaultTabsVisible && activeVaultTab && onVaultTabChange ? (
+        <div className="vault-subnav vault-subnav-header">
+          <button className={`vault-subnav-item ${activeVaultTab === 'vault' ? 'active' : ''}`} onClick={() => onVaultTabChange('vault')}>
+            Vault
           </button>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            {/* Chain indicator */}
-            {!isCorrectChain && (
-              <button
-                onClick={switchToMantle}
-                className="btn-premium btn-premium-switch"
-                style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}
-              >
-                ⚠ Switch to Mantle
-              </button>
-            )}
+          <button className={`vault-subnav-item ${activeVaultTab === 'settings' ? 'active' : ''}`} onClick={() => onVaultTabChange('settings')}>
+            Agent Settings
+          </button>
+          <button className={`vault-subnav-item ${activeVaultTab === 'history' ? 'active' : ''}`} onClick={() => onVaultTabChange('history')}>
+            Benchmark History
+          </button>
+        </div>
+      ) : (
+        <div />
+      )}
 
-            {/* Connected wallet pill */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="btn-premium btn-premium-agent"
+            title="Connect AI Agent to MCP"
+          >
+            <span className="agent-dot agent-dot-active"></span>
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, letterSpacing: '0.5px' }}>AGENT ACCESS</span>
+          </button>
+
+          {!isConnected ? (
             <button
-              onClick={disconnect}
-              className="btn-premium btn-premium-connected"
-              onMouseOver={e => {
-                const label = e.currentTarget.querySelector('[data-wallet-label]') as HTMLElement;
-                if (label) label.textContent = 'Disconnect';
-              }}
-              onMouseOut={e => {
-                const label = e.currentTarget.querySelector('[data-wallet-label]') as HTMLElement;
-                if (label) label.textContent = shortAddress;
-              }}
-              title="Click to disconnect"
+              onClick={connect}
+              disabled={isConnecting}
+              className="btn-premium btn-premium-wallet"
+              style={{ cursor: isConnecting ? 'wait' : 'pointer', opacity: isConnecting ? 0.7 : 1 }}
             >
-              <span className="wallet-dot-active" style={{ width: '8px', height: '8px', borderRadius: '50%', background: isCorrectChain ? 'var(--color-success)' : 'var(--color-warning)', display: 'inline-block' }}></span>
-              <span data-wallet-label style={{ fontSize: '0.8rem', color: 'inherit', fontWeight: 600, letterSpacing: '0.5px' }}>
-                {shortAddress}
-              </span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <rect x="2" y="6" width="20" height="14" rx="3" />
+                <path d="M16 14h.01" />
+                <path d="M2 10h20" />
+              </svg>
+              {isConnecting ? 'Connecting...' : 'Connect Wallet'}
             </button>
-          </div>
-        )}
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {!isCorrectChain && (
+                <button
+                  onClick={switchToMantle}
+                  className="btn-premium btn-premium-switch"
+                  style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}
+                >
+                  ⚠ Switch to Mantle
+                </button>
+              )}
+
+              <button
+                onClick={disconnect}
+                className="btn-premium btn-premium-connected"
+                onMouseOver={e => {
+                  const label = e.currentTarget.querySelector('[data-wallet-label]') as HTMLElement;
+                  if (label) label.textContent = 'Disconnect';
+                }}
+                onMouseOut={e => {
+                  const label = e.currentTarget.querySelector('[data-wallet-label]') as HTMLElement;
+                  if (label) label.textContent = shortAddress;
+                }}
+                title="Click to disconnect"
+              >
+                <span className="wallet-dot-active" style={{ width: '8px', height: '8px', borderRadius: '50%', background: isCorrectChain ? 'var(--color-success)' : 'var(--color-warning)', display: 'inline-block' }}></span>
+                <span data-wallet-label style={{ fontSize: '0.8rem', color: 'inherit', fontWeight: 600, letterSpacing: '0.5px' }}>
+                  {shortAddress}
+                </span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {error && (

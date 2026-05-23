@@ -450,6 +450,50 @@ input[type="checkbox"] {
   width: 100%;
 }
 
+.vault-subnav {
+  display: flex;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  padding-bottom: 1rem;
+  margin-bottom: 0.35rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.vault-subnav-item {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-secondary);
+  padding: 0.65rem 0.9rem;
+  border-radius: 999px;
+  font-family: var(--font-main);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.vault-subnav-item:hover {
+  color: var(--text-primary);
+  border-color: rgba(223, 246, 81, 0.18);
+  background: rgba(223, 246, 81, 0.06);
+}
+
+.vault-subnav-item.active {
+  color: var(--text-primary);
+  background: rgba(223, 246, 81, 0.1);
+  border-color: rgba(223, 246, 81, 0.22);
+  box-shadow: 0 0 0 1px rgba(223, 246, 81, 0.08);
+}
+
+.vault-subnav-header {
+  flex: 1;
+  align-items: center;
+  justify-content: flex-start;
+  padding-bottom: 0;
+  margin-bottom: 0;
+  border-bottom: none;
+}
+
 /* Sparkline Animations */
 @keyframes sparkline-draw {
   to {
@@ -470,6 +514,3 @@ input[type="checkbox"] {
   animation: pulse-danger-border 2s infinite ease-in-out;
   /* Reusing the pulse logic for skeleton */
 }
-
-
-
