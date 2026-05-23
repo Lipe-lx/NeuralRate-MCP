@@ -138,6 +138,23 @@ export default {
           return new Response(res.content[0].text, { headers: corsHeaders });
         }
 
+        if (url.pathname === "/api/nansen/batch" && request.method === "POST") {
+          const body = await request.json() as {
+            chain?: string;
+            pools?: Array<{
+              pool: string;
+              symbol: string;
+              project: string;
+              underlyingTokens?: string[] | null;
+              stablecoin?: boolean;
+              exposure?: string | null;
+            }>;
+          };
+
+          const result = await nansen.buildBatchPoolResponse(body.pools || [], body.chain || "mantle");
+          return new Response(JSON.stringify(result), { headers: corsHeaders });
+        }
+
         if (url.pathname.startsWith("/api/nansen/") && request.method === "GET") {
           const tokenAddress = url.pathname.split("/").pop() || "";
           const res = await handlers.handleNansenContext({ tokenAddress, chain: "mantle" });

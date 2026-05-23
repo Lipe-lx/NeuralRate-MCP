@@ -31,6 +31,8 @@ export interface Pool {
   apyMean30d: number | null;
   stablecoin: boolean;
   sigma: number | null;
+  underlyingTokens?: string[] | null;
+  rewardTokens?: string[] | null;
 }
 
 function AppContent() {
@@ -132,7 +134,7 @@ function AppContent() {
               <aside style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minHeight: 0, height: '100%', overflowY: 'auto' }}>
                 <RiskPanel selectedPool={selectedPool} />
                 <div style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', margin: '0.25rem 0' }} />
-                <NansenRadar selectedPool={selectedPool} />
+                <NansenRadar selectedPool={selectedPool} pools={data?.pools || []} />
               </aside>
 
               {/* Right Column: Yield Scanner */}
