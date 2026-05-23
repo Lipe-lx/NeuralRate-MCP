@@ -26,6 +26,12 @@ export interface DefiLlamaPool {
   predictedProbability: number | null;
 }
 
+export interface DefiLlamaChartPoint {
+  timestamp: string;
+  tvlUsd: number;
+  apy: number;
+}
+
 export interface DefiLlamaResponse {
   status: string;
   data: DefiLlamaPool[];
@@ -63,5 +69,31 @@ export class DefiLlamaService {
     await this.cacheKv.put(cacheKey, JSON.stringify(filtered), { expirationTtl: 300 });
 
     return filtered;
+  }
+
+  async getPoolChart(poolId: string): Promise<DefiLlamaChartPoint[]> {
+    const cacheKey = `defillama_chart_${poolId}`;
+    
+    // Check Cache
+    const cached = await this.cacheKv.get(cacheKey, "json");
+    if (cached) {
+      return cached as DefiLlamaChartPoint[];
+    }
+
+    // Fetch from DefiLlama
+    const response = await fetch(`https://yields.llama.fi/chart/${poolId}`);
+    if (!response.ok) {
+      throw new Error(`DefiLlama API error: ${response.statusText}`);
+    }
+
+    const json = (await response.json()) as { status: string; data: DefiLlamaChartPoint[] };
+    
+    // Get last 30 days
+    const last30Days = json.data.slice(-30);
+
+    // Cache for 15 minutes (900 seconds)
+    await this.cacheKv.put(cacheKey, JSON.stringify(last30Days), { expirationTtl: 900 });
+
+    return last30Days;
   }
 }

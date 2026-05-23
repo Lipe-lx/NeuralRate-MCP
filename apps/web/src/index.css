@@ -450,4 +450,26 @@ input[type="checkbox"] {
   width: 100%;
 }
 
+/* Sparkline Animations */
+@keyframes sparkline-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes sparkline-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.sparkline-skeleton {
+  animation: pulse-danger-border 2s infinite ease-in-out;
+  /* Reusing the pulse logic for skeleton */
+}
+
+
 

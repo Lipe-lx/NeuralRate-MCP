@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Pool } from '../App';
+import { ApySparkline } from './ApySparkline';
 
 interface Props {
   pools: Pool[];
@@ -36,8 +37,9 @@ const YieldScanner: React.FC<Props> = ({ pools, loading, onSelectPool, selectedP
             const isSelected = p.pool === selectedPool?.pool;
             return (
               <div key={idx} style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
+                display: 'grid', 
+                gridTemplateColumns: 'minmax(120px, 1.5fr) auto minmax(120px, 1fr)',
+                gap: '1rem',
                 alignItems: 'center', 
                 padding: '1.25rem 0.5rem', 
                 background: isSelected 
@@ -76,6 +78,11 @@ const YieldScanner: React.FC<Props> = ({ pools, loading, onSelectPool, selectedP
                   <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600, color: 'var(--text-primary)' }}>{p.symbol}</h4>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{p.project}</span>
                 </div>
+                
+                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                  <ApySparkline poolId={p.pool} />
+                </div>
+
                 <div style={{ textAlign: 'right' }}>
                   <div className="text-lime" style={{ fontSize: '1.3rem', fontWeight: 700 }}>{p.apy.toFixed(2)}% APY</div>
                   <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>TVL: ${(p.tvlUsd / 1000000).toFixed(1)}M</div>

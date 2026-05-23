@@ -126,6 +126,12 @@ export default {
           return new Response(res.content[0].text, { headers: corsHeaders });
         }
 
+        const yieldsChartMatch = url.pathname.match(/^\/api\/yields\/chart\/([^/]+)$/);
+        if (yieldsChartMatch && request.method === "GET") {
+          const data = await defillama.getPoolChart(decodeURIComponent(yieldsChartMatch[1]));
+          return new Response(JSON.stringify({ data }), { headers: corsHeaders });
+        }
+
         if (url.pathname === "/api/tbill-spread" && request.method === "GET") {
           const apy = parseFloat(url.searchParams.get("apy") || "0");
           const res = await handlers.handleTbillSpread({ apy });
