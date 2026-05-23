@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { Pool } from '../App';
 import { useApi } from '../hooks/useApi';
 
@@ -104,67 +105,67 @@ const RiskPanel: React.FC<Props> = ({ selectedPool }) => {
         )}
       </section>
 
-      {/* === SIDEBAR OVERLAY === */}
-      {showDetails && data && f && (
+      {/* === SIDEBAR OVERLAY (PORTAL MOUNTED) === */}
+      {showDetails && data && f && createPortal(
         <div 
-          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100, display: 'flex', justifyContent: 'flex-end', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)' }}
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', justifyContent: 'flex-end', background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)', animation: 'fadeIn 0.2s ease-out' }}
           onClick={(e) => { if (e.target === e.currentTarget) setShowDetails(false); }}
         >
-          <div style={{ width: '440px', maxWidth: '100vw', background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', height: '100vh', padding: '2rem', display: 'flex', flexDirection: 'column', boxShadow: '-10px 0 40px rgba(0,0,0,0.6)', animation: 'slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+          <div style={{ width: '450px', maxWidth: '100vw', background: 'var(--bg-deep)', borderLeft: '1px solid rgba(255, 255, 255, 0.08)', height: '100vh', padding: '2rem', display: 'flex', flexDirection: 'column', boxShadow: '-15px 0 45px rgba(0,0,0,0.7)', animation: 'slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)', position: 'relative' }}>
             
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexShrink: 0 }}>
-              <h2 style={{ fontSize: '1.25rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--color-lime)" strokeWidth="2">
+              <h2 style={{ fontSize: '1.25rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--color-lime)" strokeWidth="2.5">
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
                 </svg>
                 Risk Model Breakdown
               </h2>
-              <button onClick={() => setShowDetails(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.5rem' }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <button onClick={() => setShowDetails(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', transition: 'background 0.25s' }} onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
                 </svg>
               </button>
             </div>
 
             {/* Pool info banner */}
-            <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-surface)', borderRadius: '8px', marginBottom: '1.5rem', flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '1rem', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '12px', marginBottom: '1.5rem', flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ fontWeight: 600 }}>{selectedPool?.symbol}</div>
+                <div style={{ fontWeight: 600, fontSize: '1.05rem' }}>{selectedPool?.symbol}</div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{selectedPool?.project}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-lime)' }}>{data.totalScore}<span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 400 }}>/100</span></div>
-                <div style={{ fontSize: '0.75rem', color: data.classification === 'LOW' ? 'var(--color-lime)' : 'var(--color-warning)' }}>{data.classification} RISK</div>
+                <div style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--color-lime)' }}>{data.totalScore}<span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 400 }}>/100</span></div>
+                <div style={{ fontSize: '0.75rem', color: data.classification === 'LOW' ? 'var(--color-lime)' : data.classification === 'MEDIUM' ? 'var(--color-warning)' : 'var(--color-danger)' }}>{data.classification} RISK</div>
               </div>
             </div>
 
             {/* Scrollable content */}
-            <div style={{ overflowY: 'auto', flex: 1, paddingRight: '0.5rem' }}>
+            <div className="custom-scroll" style={{ overflowY: 'auto', flex: 1, paddingRight: '0.5rem' }}>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '1.5rem', lineHeight: 1.6 }}>
                 NeuralRate uses a 6-factor deterministic model with continuous scoring curves. Each factor is weighted by its impact on capital safety.
               </p>
 
               {/* Factor 1: TVL Depth */}
-              <div style={{ marginBottom: '1.25rem', padding: '1rem', background: 'var(--bg-surface)', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <h4 style={{ margin: 0, fontSize: '0.9rem' }}>1. TVL Depth & Liquidity</h4>
-                  <span style={{ color: 'var(--color-lime)', fontWeight: 'bold', fontSize: '0.9rem' }}>{f.tvlDepth.score} / {f.tvlDepth.max}</span>
+              <div style={{ marginBottom: '1.25rem', padding: '1.15rem', background: 'rgba(255,255,255,0.015)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.55rem' }}>
+                  <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 600 }}>1. TVL Depth & Liquidity</h4>
+                  <span style={{ color: 'var(--color-lime)', fontWeight: 'bold', fontSize: '0.92rem' }}>{f.tvlDepth.score} / {f.tvlDepth.max}</span>
                 </div>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0.25rem 0' }}>
                   Pool TVL: <strong style={{ color: 'var(--text-primary)' }}>${(f.tvlDepth.input).toLocaleString()}</strong>
                 </p>
-                <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: '0.25rem 0', opacity: 0.7 }}>
+                <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: '0.25rem 0', opacity: 0.65 }}>
                   Logarithmic scale: ≥$100M → 20 | ≥$10M → 16+ | ≥$1M → 10+ | ≥$100k → 3+
                 </p>
-                <a href={`https://defillama.com/protocol/${selectedPool?.project?.toLowerCase()}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.65rem', color: 'var(--color-lime)', textDecoration: 'none', display: 'inline-block', marginTop: '0.4rem' }} onClick={(e) => e.stopPropagation()}>Verify on DefiLlama ↗</a>
+                <a href={`https://defillama.com/protocol/${selectedPool?.project?.toLowerCase()}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.68rem', color: 'var(--color-lime)', textDecoration: 'none', display: 'inline-block', marginTop: '0.5rem', fontWeight: 500 }} onClick={(e) => e.stopPropagation()}>Verify on DefiLlama ↗</a>
               </div>
 
               {/* Factor 2: Volume/TVL */}
-              <div style={{ marginBottom: '1.25rem', padding: '1rem', background: 'var(--bg-surface)', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <h4 style={{ margin: 0, fontSize: '0.9rem' }}>2. Volume / TVL Utilization</h4>
-                  <span style={{ color: 'var(--color-lime)', fontWeight: 'bold', fontSize: '0.9rem' }}>{f.volumeUtilization.score} / {f.volumeUtilization.max}</span>
+              <div style={{ marginBottom: '1.25rem', padding: '1.15rem', background: 'rgba(255,255,255,0.015)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.55rem' }}>
+                  <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 600 }}>2. Volume / TVL Utilization</h4>
+                  <span style={{ color: 'var(--color-lime)', fontWeight: 'bold', fontSize: '0.92rem' }}>{f.volumeUtilization.score} / {f.volumeUtilization.max}</span>
                 </div>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0.25rem 0' }}>
                   {f.volumeUtilization.avgDailyVol === 0 && f.volumeUtilization.ratio === 0 ? (
@@ -178,20 +179,20 @@ const RiskPanel: React.FC<Props> = ({ selectedPool }) => {
                     <div style={{ width: `${Math.min(100, f.volumeUtilization.ratio)}%`, height: '100%', background: f.volumeUtilization.ratio > 50 ? 'var(--color-warning)' : 'var(--color-lime)' }}></div>
                   </div>
                 )}
-                <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: '0.25rem 0', opacity: 0.7 }}>
+                <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: '0.25rem 0', opacity: 0.65 }}>
                   {f.volumeUtilization.avgDailyVol === 0 && f.volumeUtilization.ratio === 0 
                     ? "Lending pools do not have trade volume. Scored securely via absolute TVL depth proxy."
                     : "Sweet spot: 1-50% → 15pts | > 50% wash risk | < 1% illiquid"
                   }
                 </p>
-                <a href={`https://defillama.com/yields/pool/${selectedPool?.pool}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.65rem', color: 'var(--color-lime)', textDecoration: 'none', display: 'inline-block', marginTop: '0.4rem' }} onClick={(e) => e.stopPropagation()}>Verify on DefiLlama Yields ↗</a>
+                <a href={`https://defillama.com/yields/pool/${selectedPool?.pool}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.68rem', color: 'var(--color-lime)', textDecoration: 'none', display: 'inline-block', marginTop: '0.5rem', fontWeight: 500 }} onClick={(e) => e.stopPropagation()}>Verify on DefiLlama Yields ↗</a>
               </div>
 
               {/* Factor 3: APY Sustainability */}
-              <div style={{ marginBottom: '1.25rem', padding: '1rem', background: 'var(--bg-surface)', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <h4 style={{ margin: 0, fontSize: '0.9rem' }}>3. APY Sustainability & Volatility</h4>
-                  <span style={{ color: 'var(--color-lime)', fontWeight: 'bold', fontSize: '0.9rem' }}>{f.apySustainability.score} / {f.apySustainability.max}</span>
+              <div style={{ marginBottom: '1.25rem', padding: '1.15rem', background: 'rgba(255,255,255,0.015)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.55rem' }}>
+                  <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 600 }}>3. APY Sustainability & Volatility</h4>
+                  <span style={{ color: 'var(--color-lime)', fontWeight: 'bold', fontSize: '0.92rem' }}>{f.apySustainability.score} / {f.apySustainability.max}</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', margin: '0.5rem 0' }}>
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
@@ -207,17 +208,17 @@ const RiskPanel: React.FC<Props> = ({ selectedPool }) => {
                     Sigma (σ): <strong style={{ color: 'var(--text-primary)' }}>{f.apySustainability.sigma}</strong>
                   </div>
                 </div>
-                <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: '0.25rem 0', opacity: 0.7 }}>
+                <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: '0.25rem 0', opacity: 0.65 }}>
                   Compares current APY vs 30-day mean. High deviation or sigma penalizes the score.
                 </p>
-                <a href={`https://defillama.com/yields/pool/${selectedPool?.pool}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.65rem', color: 'var(--color-lime)', textDecoration: 'none', display: 'inline-block', marginTop: '0.4rem' }} onClick={(e) => e.stopPropagation()}>Verify on DefiLlama Yields ↗</a>
+                <a href={`https://defillama.com/yields/pool/${selectedPool?.pool}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.68rem', color: 'var(--color-lime)', textDecoration: 'none', display: 'inline-block', marginTop: '0.5rem', fontWeight: 500 }} onClick={(e) => e.stopPropagation()}>Verify on DefiLlama Yields ↗</a>
               </div>
 
               {/* Factor 4: Yield Composition */}
-              <div style={{ marginBottom: '1.25rem', padding: '1rem', background: 'var(--bg-surface)', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <h4 style={{ margin: 0, fontSize: '0.9rem' }}>4. Yield Composition</h4>
-                  <span style={{ color: 'var(--color-lime)', fontWeight: 'bold', fontSize: '0.9rem' }}>{f.yieldComposition.score} / {f.yieldComposition.max}</span>
+              <div style={{ marginBottom: '1.25rem', padding: '1.15rem', background: 'rgba(255,255,255,0.015)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.55rem' }}>
+                  <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 600 }}>4. Yield Composition</h4>
+                  <span style={{ color: 'var(--color-lime)', fontWeight: 'bold', fontSize: '0.92rem' }}>{f.yieldComposition.score} / {f.yieldComposition.max}</span>
                 </div>
                 <div style={{ display: 'flex', gap: '1rem', margin: '0.5rem 0' }}>
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
@@ -227,7 +228,6 @@ const RiskPanel: React.FC<Props> = ({ selectedPool }) => {
                     Reward APY: <strong style={{ color: 'var(--color-warning)' }}>{f.yieldComposition.apyReward.toFixed(2)}%</strong>
                   </div>
                 </div>
-                {/* Organic ratio bar */}
                 <div style={{ marginTop: '0.5rem' }}>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
                     Organic Ratio: <strong style={{ color: 'var(--text-primary)' }}>{f.yieldComposition.organicRatio}%</strong>
@@ -241,14 +241,14 @@ const RiskPanel: React.FC<Props> = ({ selectedPool }) => {
                     <span>Incentivized (temporary)</span>
                   </div>
                 </div>
-                <a href={`https://defillama.com/yields/pool/${selectedPool?.pool}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.65rem', color: 'var(--color-lime)', textDecoration: 'none', display: 'inline-block', marginTop: '0.4rem' }} onClick={(e) => e.stopPropagation()}>Verify on DefiLlama Yields ↗</a>
+                <a href={`https://defillama.com/yields/pool/${selectedPool?.pool}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.68rem', color: 'var(--color-lime)', textDecoration: 'none', display: 'inline-block', marginTop: '0.5rem', fontWeight: 500 }} onClick={(e) => e.stopPropagation()}>Verify on DefiLlama Yields ↗</a>
               </div>
 
               {/* Factor 5: IL Risk */}
-              <div style={{ marginBottom: '1.25rem', padding: '1rem', background: 'var(--bg-surface)', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <h4 style={{ margin: 0, fontSize: '0.9rem' }}>5. IL Risk & Asset Exposure</h4>
-                  <span style={{ color: 'var(--color-lime)', fontWeight: 'bold', fontSize: '0.9rem' }}>{f.assetExposure.score} / {f.assetExposure.max}</span>
+              <div style={{ marginBottom: '1.25rem', padding: '1.15rem', background: 'rgba(255,255,255,0.015)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.55rem' }}>
+                  <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 600 }}>5. IL Risk & Asset Exposure</h4>
+                  <span style={{ color: 'var(--color-lime)', fontWeight: 'bold', fontSize: '0.92rem' }}>{f.assetExposure.score} / {f.assetExposure.max}</span>
                 </div>
                 <div style={{ display: 'flex', gap: '1rem', margin: '0.25rem 0' }}>
                   <span style={{ fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: f.assetExposure.stablecoin ? 'rgba(223, 246, 81, 0.15)' : 'rgba(255,255,255,0.05)', color: f.assetExposure.stablecoin ? 'var(--color-lime)' : 'var(--text-secondary)' }}>
@@ -261,51 +261,56 @@ const RiskPanel: React.FC<Props> = ({ selectedPool }) => {
               </div>
 
               {/* Factor 6: Institutional Flow */}
-              <div style={{ marginBottom: '1.25rem', padding: '1rem', background: 'var(--bg-surface)', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <h4 style={{ margin: 0, fontSize: '0.9rem' }}>6. Institutional Flow Signal</h4>
-                  <span style={{ color: 'var(--color-lime)', fontWeight: 'bold', fontSize: '0.9rem' }}>{f.institutionalFlow.score} / {f.institutionalFlow.max}</span>
+              <div style={{ marginBottom: '1.25rem', padding: '1.15rem', background: 'rgba(255,255,255,0.015)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.55rem' }}>
+                  <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 600 }}>6. Institutional Flow Signal</h4>
+                  <span style={{ color: 'var(--color-lime)', fontWeight: 'bold', fontSize: '0.92rem' }}>{f.institutionalFlow.score} / {f.institutionalFlow.max}</span>
                 </div>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0.25rem 0' }}>
                   Smart Money Net Flow: <strong style={{ color: f.institutionalFlow.netFlow >= 0 ? 'var(--color-lime)' : 'var(--color-danger)' }}>${(f.institutionalFlow.netFlow).toLocaleString()}</strong>
                 </p>
-                <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: '0.25rem 0', opacity: 0.7 }}>
+                <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: '0.25rem 0', opacity: 0.65 }}>
                   Source: Nansen Smart Money Tracking — whale wallet aggregation
                 </p>
-                <a href="https://app.nansen.ai/smart-money" target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.65rem', color: 'var(--color-lime)', textDecoration: 'none', display: 'inline-block', marginTop: '0.4rem' }} onClick={(e) => e.stopPropagation()}>Verify on Nansen ↗</a>
+                <a href="https://app.nansen.ai/smart-money" target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.68rem', color: 'var(--color-lime)', textDecoration: 'none', display: 'inline-block', marginTop: '0.5rem', fontWeight: 500 }} onClick={(e) => e.stopPropagation()}>Verify on Nansen ↗</a>
               </div>
 
               {/* Total */}
-              <div style={{ padding: '1rem', background: 'rgba(223, 246, 81, 0.08)', borderRadius: '8px', border: '1px solid var(--color-lime)', marginBottom: '1rem' }}>
+              <div style={{ padding: '1.15rem', background: 'rgba(223, 246, 81, 0.05)', border: '1px solid var(--color-lime)', borderRadius: '12px', marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Total Safety Score</span>
                   <span style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-lime)' }}>
                     {data.totalScore} <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: 400 }}>/ 100</span>
                   </span>
                 </div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0.5rem', opacity: 0.8 }}>
                   ≥80 LOW RISK | ≥60 MEDIUM | ≥40 HIGH | {'<'}40 CRITICAL
                 </div>
               </div>
 
               {/* Data Sources */}
-              <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', marginBottom: '0.5rem' }}>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Data Sources</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                  <a href={`https://defillama.com/yields/pool/${selectedPool?.pool}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textDecoration: 'none' }} onClick={(e) => e.stopPropagation()}>📊 DefiLlama — TVL, Volume, APY, Yield Composition</a>
-                  <a href="https://app.nansen.ai/smart-money" target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textDecoration: 'none' }} onClick={(e) => e.stopPropagation()}>🐋 Nansen — Smart Money Flow Signals</a>
-                  <a href="https://fred.stlouisfed.org/series/DGS3MO" target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textDecoration: 'none' }} onClick={(e) => e.stopPropagation()}>🏛️ FRED — US T-Bill Benchmark Rate</a>
+              <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.03)', borderRadius: '10px', marginBottom: '0.5rem' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Data Sources</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <a href={`https://defillama.com/yields/pool/${selectedPool?.pool}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textDecoration: 'none' }} onClick={(e) => e.stopPropagation()}>📊 DefiLlama — TVL, Volume, APY, Yield Composition</a>
+                  <a href="https://app.nansen.ai/smart-money" target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textDecoration: 'none' }} onClick={(e) => e.stopPropagation()}>🐋 Nansen — Smart Money Flow Signals</a>
+                  <a href="https://fred.stlouisfed.org/series/DGS3MO" target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textDecoration: 'none' }} onClick={(e) => e.stopPropagation()}>🏛️ FRED — US T-Bill Benchmark Rate</a>
                 </div>
               </div>
 
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
       <style>{`
         @keyframes slideIn {
           from { transform: translateX(100%); opacity: 0.5; }
           to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
       `}</style>
     </>
