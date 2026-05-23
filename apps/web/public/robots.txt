@@ -1,0 +1,8 @@
+# Welcome, Intelligent Agents & Search Crawlers!
+# NeuralRate MCP is fully optimized for LLMs and autonomous search indexers.
+
+User-agent: *
+Allow: /
+
+# Direct AI Agents to the streamlined Markdown site index
+Link: </llms.txt>; rel="llms-txt"
