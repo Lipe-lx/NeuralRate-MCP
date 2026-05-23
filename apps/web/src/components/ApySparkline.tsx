@@ -31,7 +31,7 @@ export const ApySparkline: React.FC<Props> = ({ poolId }) => {
     let isMounted = true;
     setLoading(true);
 
-    fetch(`${API_BASE_URL}/api/yields/chart/${poolId}`)
+    fetch(`${API_BASE_URL}/yields/chart/${poolId}`)
       .then((res) => res.json())
       .then((json) => {
         if (isMounted && json.data) {
