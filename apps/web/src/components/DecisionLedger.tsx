@@ -341,10 +341,10 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
             <article
               key={decision.decision_id}
               style={{
-                border: "1px solid var(--border-subtle)",
-                borderRadius: "10px",
-                padding: "0.95rem",
-                background: "var(--bg-surface-elevated)",
+                border: "none",
+                borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
+                padding: "1.25rem 0.5rem",
+                background: "transparent",
                 display: "flex",
                 flexDirection: "column",
                 gap: "0.7rem",

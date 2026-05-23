@@ -32,36 +32,57 @@ const YieldScanner: React.FC<Props> = ({ pools, loading, onSelectPool, selectedP
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', overflowY: 'auto', flex: 1, paddingRight: '0.5rem' }}>
-          {[...pools].sort((a, b) => b.apy - a.apy).map((p, idx) => (
-            <div key={idx} style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
-              padding: '1rem', 
-              background: p.pool === selectedPool?.pool ? 'var(--bg-surface-elevated-hover)' : 'var(--bg-surface-elevated)', 
-              borderRadius: '8px',
-              border: p.pool === selectedPool?.pool ? '1px solid var(--color-lime)' : '1px solid transparent',
-              transition: 'all 0.2s',
-              cursor: 'pointer'
-            }}
-            onClick={() => onSelectPool(p)}
-            onMouseOver={(e) => {
-              if (p.pool !== selectedPool?.pool) e.currentTarget.style.border = '1px solid var(--border-subtle)';
-            }}
-            onMouseOut={(e) => {
-              if (p.pool !== selectedPool?.pool) e.currentTarget.style.border = '1px solid transparent';
-            }}
-            >
-              <div>
-                <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-primary)' }}>{p.symbol}</h4>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{p.project}</span>
+          {[...pools].sort((a, b) => b.apy - a.apy).map((p, idx) => {
+            const isSelected = p.pool === selectedPool?.pool;
+            return (
+              <div key={idx} style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                padding: '1.25rem 0.5rem', 
+                background: isSelected 
+                  ? 'rgba(223, 246, 81, 0.04)' 
+                  : 'transparent', 
+                border: 'none',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                cursor: 'pointer',
+                position: 'relative',
+              }}
+              onClick={() => onSelectPool(p)}
+              onMouseOver={(e) => {
+                if (!isSelected) {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.015)';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (!isSelected) {
+                  e.currentTarget.style.background = 'transparent';
+                }
+              }}
+              >
+                {isSelected && (
+                  <div style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: '20%',
+                    bottom: '20%',
+                    width: '3px',
+                    background: 'var(--color-lime)',
+                    boxShadow: '0 0 8px var(--color-lime-glow)'
+                  }} />
+                )}
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600, color: 'var(--text-primary)' }}>{p.symbol}</h4>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{p.project}</span>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div className="text-lime" style={{ fontSize: '1.3rem', fontWeight: 700 }}>{p.apy.toFixed(2)}% APY</div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>TVL: ${(p.tvlUsd / 1000000).toFixed(1)}M</div>
+                </div>
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <div className="text-lime" style={{ fontSize: '1.25rem', fontWeight: 600 }}>{p.apy.toFixed(2)}% APY</div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>TVL: ${(p.tvlUsd / 1000000).toFixed(1)}M</div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>

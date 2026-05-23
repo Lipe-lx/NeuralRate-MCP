@@ -7,24 +7,7 @@ const Header: React.FC = () => {
   const { isConnected, isConnecting, isCorrectChain, shortAddress, connect, disconnect, switchToMantle, error } = useWalletContext();
 
   return (
-    <header className="animate-enter" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem 0', marginBottom: '1rem', flexShrink: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        <div style={{
-          width: '48px', 
-          height: '48px', 
-          backgroundImage: 'url(/logo.png)', 
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          borderRadius: '12px',
-          boxShadow: '0 0 15px var(--color-lime-glow)'
-        }} />
-        <div>
-          <h1 className="text-gradient" style={{ fontSize: '1.5rem', margin: 0, fontWeight: 700 }}>NeuralRate MCP</h1>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
-            Per-user vault benchmark terminal on Mantle Sepolia
-          </div>
-        </div>
-      </div>
+    <header className="animate-enter" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', padding: '0.75rem 0', marginBottom: '1rem', flexShrink: 0 }}>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
         {/* MCP Agent Access Button */}
