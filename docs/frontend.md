@@ -68,6 +68,19 @@ The UI is divided into six modular components:
   * Shows vault identity, provider strategy, onboarding provider, managed signer mode, and deposit address.
   * Bootstraps a new vault for the connected user.
   * Records funding intents and enables or revokes automation without implying any shared treasury.
+  * Gates funding and automation until the user explicitly acknowledges the wallet-ownership handoff for that vault.
+  * Uses **control wallet** wording rather than assuming the controlling signer is always an external browser wallet.
+
+### 4.1 `WalletOwnershipModal`
+* **Purpose:** Performs the post-bootstrap ownership handoff after a Safe vault is created or predicted.
+* **Features:**
+  * Shows the Safe vault address that receives user funds.
+  * Shows the controlling wallet address that owns/administers that Safe.
+  * Explains that the Safe itself does **not** have a seed phrase or private key export flow.
+  * Allows copying both addresses.
+  * Opens Privy's secure export UI for the controlling embedded wallet when available.
+  * Prompts the user to configure recovery when the embedded wallet is still using Privy-managed recovery.
+  * Requires explicit acknowledgment before funding and automation actions are unlocked.
 
 ### 5. `AgentSettingsPanel`
 * **Purpose:** Personalizes the agent per user.

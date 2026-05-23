@@ -4,7 +4,7 @@ NeuralRate MCP is a verifiable RWA yield intelligence layer for autonomous agent
 
 It leverages real-time yields data, macroeconomic indicators, and institutional orderflow signals to assess risk deterministically using a **6-factor Risk Assessment Model** and calculate optimal allocations. Built for AI-agent interoperability, NeuralRate exposes its capabilities directly to Large Language Models (LLMs) via the **Model Context Protocol (MCP)**, includes an operator-facing benchmark terminal, and now ships a **non-custodial per-user vault automation foundation** on Mantle Sepolia:
 
-* **User EOA for consent, ownership, and revocation**
+* **User control wallet for consent, ownership, and revocation**
 * **Dedicated vault / smart account per user**
 * **Personalized agent configuration per user**
 * **Global NeuralRate benchmark identity kept separate from user funds**
@@ -57,7 +57,7 @@ graph TD
 The project is structured as a monorepo containing the following components:
 
 * **`/apps/worker`**: The Cloudflare Worker backend. Exposes a CORS-enabled REST API for the operator-facing web app and runs the stateful Model Context Protocol (MCP) server over Server-Sent Events (SSE). Integrates Cloudflare KV caching and D1 SQLite storage.
-* **`/apps/web`**: The Vite React frontend benchmark terminal, featuring dark glassmorphism styling, custom OKLCH colors, native EIP-1193 wallet integration, per-user vault bootstrap, personalized agent settings, and vault-scoped automation consent on Mantle Sepolia.
+* **`/apps/web`**: The Vite React frontend benchmark terminal, featuring dark glassmorphism styling, custom OKLCH colors, native EIP-1193 wallet integration, per-user vault bootstrap, wallet-ownership handoff, personalized agent settings, and vault-scoped automation consent on Mantle Sepolia.
 * **`/apps/executor`**: The dedicated automation service. Prepares vault-scoped permissions, tracks activation / revocation, and owns the autonomous job queue without ever holding user keys.
 * **`/contracts`**: The Hardhat development workspace containing `NeuralRateDecisionBenchmark.sol`, a Solidity benchmark contract prepared for a configurable benchmark writer such as the NeuralRate agent smart wallet.
 * **`/docs`**: Comprehensive, zero-speculation technical documentation of the entire platform:
@@ -128,6 +128,6 @@ npm run dev
 1. **6-Factor Deterministic Risk Engine:** Evaluates protocols based on TVL, Volume utilization (detecting lending pools automatically), APY sustainability, Yield Composition (base vs reward incentives), IL risk, and Nansen Smart Money flows.
 2. **Per-User Vault Isolation:** Every user gets a dedicated vault / smart account, so no user funds are pooled behind a shared agent treasury.
 3. **Personalized Agent Settings:** Recommendations are ranked from global market data but filtered and capped by the user’s own vault policy, presets, allowlists, and automation limits.
-4. **Vault-Scoped Automation Flow:** The frontend bootstraps a dedicated vault, records funding intents, enables revocable automation, and keeps benchmark identity separate from execution funds.
+4. **Vault-Scoped Automation Flow:** The frontend bootstraps a dedicated vault, performs an explicit wallet-ownership handoff, records funding intents, enables revocable automation, and keeps benchmark identity separate from execution funds.
 5. **Executor-Based Benchmark Orchestration:** Decisions are generated and stored locally in D1 first, then queued into a dedicated executor that manages autonomous benchmark jobs under a revocable user-vault policy model.
 6. **Agent-Access MCP Portal:** Connects AI agents directly to our DeFi tools in 1-click using SSE and standard JSON configurations.

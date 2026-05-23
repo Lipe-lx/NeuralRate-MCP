@@ -53,7 +53,7 @@ The `decisions` table maps all fields required to perform auditing and tracking 
 
 ## 📁 Migration SQL Definition
 
-The current schema reflects the combined result of Wrangler migrations `0001_initial.sql`, `0002_benchmark_status.sql`, `0003_automation_foundation.sql`, `0004_user_vault_personalization.sql`, and `0005_live_provider_refs.sql`.
+The current schema reflects the combined result of Wrangler migrations `0001_initial.sql`, `0002_benchmark_status.sql`, `0003_automation_foundation.sql`, `0004_user_vault_personalization.sql`, `0005_live_provider_refs.sql`, and `0006_vault_ownership_ack.sql`.
 
 
 ```sql
@@ -91,11 +91,10 @@ NeuralRate now persists delegated automation separately from benchmark decisions
 
 * **`user_profiles`** stores the user identity layer and onboarding model (including Privy details: `privy_user_id`, `provider_user_ref`, `wallet_provider`).
 * **`user_agent_configs`** stores personalized objectives, presets, allowlists, limits, and automation preferences.
-* **`user_vaults`** stores the dedicated vault for each user, including funding and automation status (plus Safe attributes: `safe_deployment_status`, `safe_salt_nonce`, `provider_vault_ref`, `safe_vault_address`).
+* **`user_vaults`** stores the dedicated vault for each user, including funding and automation status (plus Safe attributes: `safe_deployment_status`, `safe_salt_nonce`, `provider_vault_ref`, `safe_vault_address`) and the explicit wallet-possession acknowledgment timestamp `ownership_acknowledged_at`.
 * **`vault_permissions`** stores the human-readable and machine-readable execution boundaries for that vault (plus Turnkey signer reference: `turnkey_signer_ref`, `provider_permission_ref`).
 * **`user_accounts`** remains as a compatibility mapping between the user's EOA and the resolved smart account address.
 * **`automation_policies`** stores executor-facing policy records, mirrored into `vault_permissions`.
 * **`automation_sessions`** stores activation state, grant / revoke transaction hashes, permission IDs, Turnkey references (`turnkey_signer_ref`, `provider_session_ref`, `provider_permission_ref`), and raw session consent signatures.
 * **`automation_jobs`** stores delegated execution jobs scoped to a specific `user_id`, `vault_id`, and `provider_job_ref`.
 * **`benchmark_jobs`** stores benchmark-specific jobs executed by the NeuralRate agent smart wallet using Turnkey so benchmark identity remains isolated from user fund execution (`provider_job_ref`).
-
