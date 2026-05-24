@@ -841,6 +841,14 @@ input[type="checkbox"] {
   flex-direction: column;
   gap: 0.9rem;
   min-width: 0;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.agent-settings-layout.advanced-open .agent-settings-primary {
+  max-width: none;
+  margin: 0;
 }
 
 .agent-settings-simple-grid {

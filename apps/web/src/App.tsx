@@ -181,7 +181,7 @@ function AppContent() {
                 )}
 
                 {activeVaultTab === 'settings' && (
-                  <div className="centered-page-container" style={{ maxWidth: '1200px', margin: '0.65rem auto 0', height: '100%' }}>
+                  <div className="centered-page-container" style={{ maxWidth: '1200px', margin: '0.65rem auto 0' }}>
                     <AgentSettingsPanel
                       config={neuralRateUser.state?.config ?? null}
                       busy={neuralRateUser.busy}
