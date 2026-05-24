@@ -95,7 +95,7 @@ const AgentSettingsPanel: React.FC<Props> = ({ config, busy, onSave }) => {
   };
 
   return (
-    <section className="glass-panel animate-enter delay-100" style={{ display: "flex", flexDirection: "column", gap: "0.9rem" }}>
+    <section className="glass-panel animate-enter delay-100 agent-settings-panel">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
           <h2 style={{ margin: 0, fontSize: "1.1rem" }}>Agent Settings</h2>
@@ -111,127 +111,144 @@ const AgentSettingsPanel: React.FC<Props> = ({ config, busy, onSave }) => {
         </button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "0.8rem" }}>
-        <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-          Objective
-          <select value={form.objective} onChange={(event) => setForm((current) => ({ ...current, objective: event.target.value }))} style={{ width: "100%", marginTop: "0.25rem" }}>
-            {objectiveOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-          Risk Profile
-          <select value={form.riskProfile} onChange={(event) => setForm((current) => ({ ...current, riskProfile: event.target.value }))} style={{ width: "100%", marginTop: "0.25rem" }}>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
-        </label>
-        <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-          Horizon (hours)
-          <input type="number" value={form.horizonHours} onChange={(event) => setForm((current) => ({ ...current, horizonHours: Number(event.target.value) }))} style={{ width: "100%", marginTop: "0.25rem" }} />
-        </label>
-        <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-          Automation Mode
-          <select value={form.automationMode} onChange={(event) => setForm((current) => ({ ...current, automationMode: event.target.value }))} style={{ width: "100%", marginTop: "0.25rem" }}>
-            {automationModeOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)", gridColumn: "1 / -1" }}>
-          Restriction Preset
-          <select value={form.restrictionPreset} onChange={(event) => setForm((current) => ({ ...current, restrictionPreset: event.target.value }))} style={{ width: "100%", marginTop: "0.25rem" }}>
-            {restrictionPresetOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <div className={`agent-settings-layout ${advancedOpen ? "advanced-open" : ""}`}>
+        <div className="agent-settings-primary">
+          <div className="agent-settings-simple-grid">
+            <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+              Objective
+              <select value={form.objective} onChange={(event) => setForm((current) => ({ ...current, objective: event.target.value }))} style={{ width: "100%", marginTop: "0.25rem" }}>
+                {objectiveOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+              Risk Profile
+              <select value={form.riskProfile} onChange={(event) => setForm((current) => ({ ...current, riskProfile: event.target.value }))} style={{ width: "100%", marginTop: "0.25rem" }}>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </label>
+            <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+              Horizon (hours)
+              <input type="number" value={form.horizonHours} onChange={(event) => setForm((current) => ({ ...current, horizonHours: Number(event.target.value) }))} style={{ width: "100%", marginTop: "0.25rem" }} />
+            </label>
+            <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+              Automation Mode
+              <select value={form.automationMode} onChange={(event) => setForm((current) => ({ ...current, automationMode: event.target.value }))} style={{ width: "100%", marginTop: "0.25rem" }}>
+                {automationModeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)", gridColumn: "1 / -1" }}>
+              Restriction Preset
+              <select value={form.restrictionPreset} onChange={(event) => setForm((current) => ({ ...current, restrictionPreset: event.target.value }))} style={{ width: "100%", marginTop: "0.25rem" }}>
+                {restrictionPresetOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
 
-      {advancedOpen && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "0.8rem" }}>
-          <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-            Allowed Assets
-            <input value={form.allowedAssets} onChange={(event) => setForm((current) => ({ ...current, allowedAssets: event.target.value }))} placeholder="USDC, USDY" style={{ width: "100%", marginTop: "0.25rem" }} />
+          <div className="agent-settings-simple-note">
+            <div className="vault-swiss-kicker">Simple Layer</div>
+            <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+              Set the portfolio objective, risk posture and automation mode here. Open `Advanced` to move the full policy guardrails into a dedicated right-side workspace.
+            </div>
+          </div>
+
+          <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+            <input type="checkbox" checked={form.pauseOnRiskEvent} onChange={(event) => setForm((current) => ({ ...current, pauseOnRiskEvent: event.target.checked }))} />
+            Pause automation if a risk event is detected
           </label>
-          <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-            Denied Assets
-            <input value={form.deniedAssets} onChange={(event) => setForm((current) => ({ ...current, deniedAssets: event.target.value }))} placeholder="METH" style={{ width: "100%", marginTop: "0.25rem" }} />
-          </label>
-          <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-            Allowed Protocols
-            <input value={form.allowedProtocols} onChange={(event) => setForm((current) => ({ ...current, allowedProtocols: event.target.value }))} placeholder="Aave, Lendle" style={{ width: "100%", marginTop: "0.25rem" }} />
-          </label>
-          <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-            Denied Protocols
-            <input value={form.deniedProtocols} onChange={(event) => setForm((current) => ({ ...current, deniedProtocols: event.target.value }))} placeholder="UnknownDex" style={{ width: "100%", marginTop: "0.25rem" }} />
-          </label>
-          <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-            Max Action USD
-            <input type="number" value={form.maxActionUsd} onChange={(event) => setForm((current) => ({ ...current, maxActionUsd: Number(event.target.value) }))} style={{ width: "100%", marginTop: "0.25rem" }} />
-          </label>
-          <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-            Max Daily USD
-            <input type="number" value={form.maxDailyUsd} onChange={(event) => setForm((current) => ({ ...current, maxDailyUsd: Number(event.target.value) }))} style={{ width: "100%", marginTop: "0.25rem" }} />
-          </label>
-          <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-            Max Automation USD
-            <input type="number" value={form.maxAutomationUsd} onChange={(event) => setForm((current) => ({ ...current, maxAutomationUsd: Number(event.target.value) }))} style={{ width: "100%", marginTop: "0.25rem" }} />
-          </label>
-          <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-            Manual Approval Above
-            <input type="number" value={form.requireManualAboveUsd} onChange={(event) => setForm((current) => ({ ...current, requireManualAboveUsd: Number(event.target.value) }))} style={{ width: "100%", marginTop: "0.25rem" }} />
-          </label>
-          <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-            Max Protocol Weight (bps)
-            <input type="number" value={form.maxProtocolWeightBps} onChange={(event) => setForm((current) => ({ ...current, maxProtocolWeightBps: Number(event.target.value) }))} style={{ width: "100%", marginTop: "0.25rem" }} />
-          </label>
-          <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-            Max Asset Weight (bps)
-            <input type="number" value={form.maxAssetWeightBps} onChange={(event) => setForm((current) => ({ ...current, maxAssetWeightBps: Number(event.target.value) }))} style={{ width: "100%", marginTop: "0.25rem" }} />
-          </label>
-          <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-            Max Slippage (bps)
-            <input type="number" value={form.maxSlippageBps} onChange={(event) => setForm((current) => ({ ...current, maxSlippageBps: Number(event.target.value) }))} style={{ width: "100%", marginTop: "0.25rem" }} />
-          </label>
-          <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-            Min Spread vs T-Bill (bps)
-            <input type="number" value={form.minSpreadOverTbillBps} onChange={(event) => setForm((current) => ({ ...current, minSpreadOverTbillBps: Number(event.target.value) }))} style={{ width: "100%", marginTop: "0.25rem" }} />
-          </label>
+
+          <button
+            onClick={() => {
+              void save();
+            }}
+            disabled={busy}
+            style={{
+              border: "none",
+              background: "var(--color-lime)",
+              color: "#06110a",
+              padding: "0.65rem 0.9rem",
+              borderRadius: "8px",
+              fontWeight: 700,
+              cursor: busy ? "not-allowed" : "pointer",
+              opacity: busy ? 0.7 : 1,
+            }}
+          >
+            {busy ? "Saving..." : "Save Agent Settings"}
+          </button>
         </div>
-      )}
 
-      <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-        <input type="checkbox" checked={form.pauseOnRiskEvent} onChange={(event) => setForm((current) => ({ ...current, pauseOnRiskEvent: event.target.checked }))} />
-        Pause automation if a risk event is detected
-      </label>
-
-      <button
-        onClick={() => {
-          void save();
-        }}
-        disabled={busy}
-        style={{
-          border: "none",
-          background: "var(--color-lime)",
-          color: "#06110a",
-          padding: "0.65rem 0.9rem",
-          borderRadius: "8px",
-          fontWeight: 700,
-          cursor: busy ? "not-allowed" : "pointer",
-          opacity: busy ? 0.7 : 1,
-        }}
-      >
-        {busy ? "Saving..." : "Save Agent Settings"}
-      </button>
+        {advancedOpen && (
+          <aside className="agent-settings-advanced animate-enter">
+            <div className="vault-swiss-kicker">Advanced Guardrails</div>
+            <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+              Fine tune asset allowlists, protocol constraints, action ceilings and execution tolerance without hiding the core settings.
+            </div>
+            <div className="agent-settings-advanced-grid">
+              <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                Allowed Assets
+                <input value={form.allowedAssets} onChange={(event) => setForm((current) => ({ ...current, allowedAssets: event.target.value }))} placeholder="USDC, USDY" style={{ width: "100%", marginTop: "0.25rem" }} />
+              </label>
+              <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                Denied Assets
+                <input value={form.deniedAssets} onChange={(event) => setForm((current) => ({ ...current, deniedAssets: event.target.value }))} placeholder="METH" style={{ width: "100%", marginTop: "0.25rem" }} />
+              </label>
+              <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                Allowed Protocols
+                <input value={form.allowedProtocols} onChange={(event) => setForm((current) => ({ ...current, allowedProtocols: event.target.value }))} placeholder="Aave, Lendle" style={{ width: "100%", marginTop: "0.25rem" }} />
+              </label>
+              <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                Denied Protocols
+                <input value={form.deniedProtocols} onChange={(event) => setForm((current) => ({ ...current, deniedProtocols: event.target.value }))} placeholder="UnknownDex" style={{ width: "100%", marginTop: "0.25rem" }} />
+              </label>
+              <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                Max Action USD
+                <input type="number" value={form.maxActionUsd} onChange={(event) => setForm((current) => ({ ...current, maxActionUsd: Number(event.target.value) }))} style={{ width: "100%", marginTop: "0.25rem" }} />
+              </label>
+              <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                Max Daily USD
+                <input type="number" value={form.maxDailyUsd} onChange={(event) => setForm((current) => ({ ...current, maxDailyUsd: Number(event.target.value) }))} style={{ width: "100%", marginTop: "0.25rem" }} />
+              </label>
+              <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                Max Automation USD
+                <input type="number" value={form.maxAutomationUsd} onChange={(event) => setForm((current) => ({ ...current, maxAutomationUsd: Number(event.target.value) }))} style={{ width: "100%", marginTop: "0.25rem" }} />
+              </label>
+              <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                Manual Approval Above
+                <input type="number" value={form.requireManualAboveUsd} onChange={(event) => setForm((current) => ({ ...current, requireManualAboveUsd: Number(event.target.value) }))} style={{ width: "100%", marginTop: "0.25rem" }} />
+              </label>
+              <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                Max Protocol Weight (bps)
+                <input type="number" value={form.maxProtocolWeightBps} onChange={(event) => setForm((current) => ({ ...current, maxProtocolWeightBps: Number(event.target.value) }))} style={{ width: "100%", marginTop: "0.25rem" }} />
+              </label>
+              <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                Max Asset Weight (bps)
+                <input type="number" value={form.maxAssetWeightBps} onChange={(event) => setForm((current) => ({ ...current, maxAssetWeightBps: Number(event.target.value) }))} style={{ width: "100%", marginTop: "0.25rem" }} />
+              </label>
+              <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                Max Slippage (bps)
+                <input type="number" value={form.maxSlippageBps} onChange={(event) => setForm((current) => ({ ...current, maxSlippageBps: Number(event.target.value) }))} style={{ width: "100%", marginTop: "0.25rem" }} />
+              </label>
+              <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                Min Spread vs T-Bill (bps)
+                <input type="number" value={form.minSpreadOverTbillBps} onChange={(event) => setForm((current) => ({ ...current, minSpreadOverTbillBps: Number(event.target.value) }))} style={{ width: "100%", marginTop: "0.25rem" }} />
+              </label>
+            </div>
+          </aside>
+        )}
+      </div>
     </section>
   );
 };

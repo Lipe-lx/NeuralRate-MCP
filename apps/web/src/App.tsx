@@ -181,7 +181,7 @@ function AppContent() {
                 )}
 
                 {activeVaultTab === 'settings' && (
-                  <div className="centered-page-container">
+                  <div className="centered-page-container" style={{ maxWidth: '1200px', margin: '0.65rem auto 0', height: '100%' }}>
                     <AgentSettingsPanel
                       config={neuralRateUser.state?.config ?? null}
                       busy={neuralRateUser.busy}
@@ -191,7 +191,7 @@ function AppContent() {
                 )}
 
                 {activeVaultTab === 'history' && (
-                  <div className="centered-page-container" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+                  <div className="centered-page-container" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, maxWidth: '1200px', margin: '0.65rem auto 0' }}>
                     <DecisionLedger
                       state={neuralRateUser.state}
                       busy={neuralRateUser.busy || neuralRateUser.loading}

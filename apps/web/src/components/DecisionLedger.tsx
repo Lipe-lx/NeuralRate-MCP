@@ -77,6 +77,13 @@ const parseJson = <T,>(value: string | null, fallback: T): T => {
   }
 };
 
+const formatUsd = (value: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: value >= 100 ? 0 : 2,
+  }).format(value);
+
 const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) => {
   const [amountUsd, setAmountUsd] = useState(10000);
   const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
@@ -279,152 +286,194 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
     [state?.benchmarkJobs]
   );
 
+  const queuedCount = decisions.filter((decision) => decision.benchmark_status === "pending" || decision.benchmark_status === "onchain").length;
+  const latestDecision = decisions[0] ?? null;
+
   return (
-    <section className="glass-panel animate-enter delay-150" style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: "1.1rem" }}>Benchmark History</h2>
-          <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginTop: "0.2rem" }}>
-            Personalized decisions constrained by the current user vault policy
-          </div>
-        </div>
-        <button
-          onClick={() => {
-            void generateDecision();
-          }}
-          disabled={loading || busy || !state?.config}
-          style={{
-            border: "none",
-            background: "var(--color-lime)",
-            color: "#06110a",
-            padding: "0.65rem 0.9rem",
-            borderRadius: "8px",
-            fontWeight: 700,
-            cursor: loading || busy ? "not-allowed" : "pointer",
-            opacity: loading || busy ? 0.7 : 1,
-          }}
-        >
-          {loading ? "Generating..." : "Generate Decision"}
-        </button>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: "0.75rem", marginBottom: "1rem" }}>
-        <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-          Target Size (USD)
-          <input type="number" value={amountUsd} onChange={(event) => setAmountUsd(Number(event.target.value))} style={{ width: "100%", marginTop: "0.25rem" }} />
-        </label>
-        <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
-          NeuralRate reads global Mantle yield data, then ranks opportunities only inside the limits of this user's vault policy. No shared treasury is used across users.
-        </div>
-      </div>
-
-      <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginBottom: "1rem", fontSize: "0.75rem" }}>
-        <a href={`${MANTLE_EXPLORER_BASE_URL}/address/${NEURALRATE_BENCHMARK_CONTRACT}`} target="_blank" rel="noreferrer" style={{ color: "var(--color-lime)" }}>
-          Benchmark Contract
-        </a>
-        <a href={`${MANTLE_EXPLORER_BASE_URL}/address/${ERC8004_IDENTITY_REGISTRY}`} target="_blank" rel="noreferrer" style={{ color: "var(--color-lime)" }}>
-          ERC-8004 Registry
-        </a>
-        <span style={{ color: "var(--text-secondary)" }}>Agent ID {ERC8004_AGENT_ID}</span>
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem", overflowY: "auto", minHeight: 0, paddingRight: "0.35rem" }}>
-        {decisions.map((decision) => {
-          const allocations = parseJson<
-            Array<{ asset: string; protocol: string; allocationPercentage: number; allocationUsd?: number }>
-          >(decision.allocation_json, []);
-          const constraints = parseJson<Record<string, unknown>>(decision.applied_constraints_json, {});
-          const job = activeJobByDecision.get(decision.decision_id);
-          const status = statusStyles[decision.benchmark_status || "local"] || statusStyles.local;
-
-          return (
-            <article
-              key={decision.decision_id}
+    <section className="glass-panel animate-enter delay-150 decision-ledger-panel">
+      <div className="decision-ledger-layout">
+        <div className="decision-ledger-control">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem" }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: "1.1rem" }}>Benchmark History</h2>
+              <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginTop: "0.2rem" }}>
+                Personalized decisions constrained by the current user vault policy
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                void generateDecision();
+              }}
+              disabled={loading || busy || !state?.config}
               style={{
                 border: "none",
-                borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
-                padding: "1.25rem 0.5rem",
-                background: "transparent",
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.7rem",
+                background: "var(--color-lime)",
+                color: "#06110a",
+                padding: "0.65rem 0.9rem",
+                borderRadius: "8px",
+                fontWeight: 700,
+                cursor: loading || busy ? "not-allowed" : "pointer",
+                opacity: loading || busy ? 0.7 : 1,
+                flexShrink: 0,
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem" }}>
-                <div>
-                  <div style={{ fontWeight: 700, color: "var(--text-primary)" }}>{truncate(decision.decision_id)}</div>
-                  <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
-                    {decision.objective || "income"} • {decision.risk_profile} • {new Date(decision.created_at).toLocaleString()}
-                  </div>
-                </div>
-                <span
-                  style={{
-                    background: status.background,
-                    color: status.color,
-                    padding: "0.25rem 0.5rem",
-                    borderRadius: "999px",
-                    fontSize: "0.72rem",
-                    fontWeight: 700,
-                  }}
-                >
-                  {status.label}
-                </span>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "0.75rem", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-                <div>Predicted APY: <strong style={{ color: "var(--text-primary)" }}>{(decision.predicted_apy_bps / 100).toFixed(2)}%</strong></div>
-                <div>Vault: <strong style={{ color: "var(--text-primary)" }}>{truncate(decision.vault_id || "n/a")}</strong></div>
-                <div>Policy: <strong style={{ color: "var(--text-primary)" }}>{decision.policy_version || "n/a"}</strong></div>
-                <div>Mode: <strong style={{ color: "var(--text-primary)" }}>{decision.automation_mode || "recommend-only"}</strong></div>
-              </div>
-
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem" }}>
-                {allocations.map((allocation, index) => (
-                  <span key={`${decision.decision_id}-${index}`} style={{ fontSize: "0.74rem", background: "rgba(255,255,255,0.06)", borderRadius: "999px", padding: "0.28rem 0.55rem", color: "var(--text-secondary)" }}>
-                    {allocation.asset} / {allocation.protocol} • {allocation.allocationPercentage.toFixed(1)}%
-                  </span>
-                ))}
-              </div>
-
-              <div style={{ fontSize: "0.76rem", color: "var(--text-secondary)" }}>
-                Applied restrictions: {String(constraints.policyVersion || decision.policy_version || "vault-v1")} · max action ${String(constraints.maxActionUsd || state?.config?.max_action_usd || "n/a")}
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-                <div style={{ fontSize: "0.76rem", color: job?.failure_reason ? "var(--color-warning)" : "var(--text-secondary)" }}>
-                  {job ? `Job ${truncate(job.benchmark_job_id)} • ${job.status}` : "Not queued for autonomous benchmarking yet."}
-                </div>
-                <button
-                  onClick={() => {
-                    void queueBenchmark(decision);
-                  }}
-                  disabled={busy || queueing === decision.decision_id || !state?.activeSession}
-                  style={{
-                    border: "1px solid var(--border-subtle)",
-                    background: "transparent",
-                    color: "var(--text-primary)",
-                    padding: "0.45rem 0.75rem",
-                    borderRadius: "8px",
-                    cursor: busy || queueing === decision.decision_id || !state?.activeSession ? "not-allowed" : "pointer",
-                    opacity: busy || queueing === decision.decision_id || !state?.activeSession ? 0.65 : 1,
-                  }}
-                >
-                  {queueing === decision.decision_id ? "Queueing..." : "Queue Auto Benchmark"}
-                </button>
-              </div>
-            </article>
-          );
-        })}
-
-        {!loading && decisions.length === 0 && (
-          <div style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>
-            No personalized decisions yet. Bootstrap the vault, save settings, and generate the first benchmark decision.
+              {loading ? "Generating..." : "Generate Decision"}
+            </button>
           </div>
-        )}
-      </div>
 
-      {notice && <div style={{ marginTop: "0.85rem", fontSize: "0.78rem", color: "var(--color-lime)" }}>{notice}</div>}
-      {error && <div style={{ marginTop: "0.85rem", fontSize: "0.78rem", color: "var(--color-danger)" }}>{error}</div>}
+          <div className="decision-ledger-summary-grid">
+            <div className="decision-ledger-summary-card accent">
+              <div className="vault-swiss-kicker">Recorded Decisions</div>
+              <div className="decision-ledger-summary-value">{decisions.length}</div>
+              <div className="decision-ledger-summary-note">Every benchmark candidate generated for this vault.</div>
+            </div>
+            <div className="decision-ledger-summary-card">
+              <div className="vault-swiss-kicker">Queued / Onchain</div>
+              <div className="decision-ledger-summary-value">{queuedCount}</div>
+              <div className="decision-ledger-summary-note">Decisions already moving through autonomous execution.</div>
+            </div>
+            <div className="decision-ledger-summary-card">
+              <div className="vault-swiss-kicker">Latest APY</div>
+              <div className="decision-ledger-summary-value">
+                {latestDecision ? `${(latestDecision.predicted_apy_bps / 100).toFixed(2)}%` : "0.00%"}
+              </div>
+              <div className="decision-ledger-summary-note">
+                {latestDecision ? `Last recorded ${new Date(latestDecision.created_at).toLocaleDateString()}` : "Generate the first decision to start the feed."}
+              </div>
+            </div>
+          </div>
+
+          <div className="decision-ledger-config-card">
+            <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: "0.75rem", alignItems: "start" }}>
+              <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                Target Size (USD)
+                <input type="number" value={amountUsd} onChange={(event) => setAmountUsd(Number(event.target.value))} style={{ width: "100%", marginTop: "0.25rem" }} />
+              </label>
+              <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                NeuralRate reads global Mantle yield data, then ranks opportunities only inside the limits of this user's vault policy. No shared treasury is used across users.
+              </div>
+            </div>
+          </div>
+
+          <div className="decision-ledger-link-row">
+            <a href={`${MANTLE_EXPLORER_BASE_URL}/address/${NEURALRATE_BENCHMARK_CONTRACT}`} target="_blank" rel="noreferrer" style={{ color: "var(--color-lime)" }}>
+              Benchmark Contract
+            </a>
+            <a href={`${MANTLE_EXPLORER_BASE_URL}/address/${ERC8004_IDENTITY_REGISTRY}`} target="_blank" rel="noreferrer" style={{ color: "var(--color-lime)" }}>
+              ERC-8004 Registry
+            </a>
+            <span style={{ color: "var(--text-secondary)" }}>Agent ID {ERC8004_AGENT_ID}</span>
+          </div>
+
+          {(notice || error) && (
+            <div className="decision-ledger-feedback">
+              {notice && <div style={{ color: "var(--color-lime)" }}>{notice}</div>}
+              {error && <div style={{ color: "var(--color-danger)" }}>{error}</div>}
+            </div>
+          )}
+        </div>
+
+        <aside className="decision-ledger-history organic-col-divider">
+          <div className="decision-ledger-history-header">
+            <div>
+              <div className="vault-swiss-kicker">Decision Feed</div>
+              <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginTop: "0.18rem" }}>
+                The most recent benchmark records stay pinned on the right.
+              </div>
+            </div>
+            <div style={{ fontSize: "0.74rem", color: "var(--text-secondary)" }}>
+              {decisions.length} record{decisions.length === 1 ? "" : "s"}
+            </div>
+          </div>
+
+          <div className="decision-ledger-history-list">
+            {decisions.map((decision) => {
+              const allocations = parseJson<
+                Array<{ asset: string; protocol: string; allocationPercentage: number; allocationUsd?: number }>
+              >(decision.allocation_json, []);
+              const constraints = parseJson<Record<string, unknown>>(decision.applied_constraints_json, {});
+              const job = activeJobByDecision.get(decision.decision_id);
+              const status = statusStyles[decision.benchmark_status || "local"] || statusStyles.local;
+
+              return (
+                <article
+                  key={decision.decision_id}
+                  className="decision-ledger-entry"
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem" }}>
+                    <div>
+                      <div style={{ fontWeight: 700, color: "var(--text-primary)" }}>{truncate(decision.decision_id)}</div>
+                      <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
+                        {decision.objective || "income"} • {decision.risk_profile} • {new Date(decision.created_at).toLocaleString()}
+                      </div>
+                    </div>
+                    <span
+                      style={{
+                        background: status.background,
+                        color: status.color,
+                        padding: "0.25rem 0.5rem",
+                        borderRadius: "999px",
+                        fontSize: "0.72rem",
+                        fontWeight: 700,
+                      }}
+                    >
+                      {status.label}
+                    </span>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "0.75rem", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                    <div>Predicted APY: <strong style={{ color: "var(--text-primary)" }}>{(decision.predicted_apy_bps / 100).toFixed(2)}%</strong></div>
+                    <div>Target: <strong style={{ color: "var(--text-primary)" }}>{formatUsd(Number(allocations.reduce((sum, item) => sum + (item.allocationUsd ?? 0), 0)))}</strong></div>
+                    <div>Vault: <strong style={{ color: "var(--text-primary)" }}>{truncate(decision.vault_id || "n/a")}</strong></div>
+                    <div>Mode: <strong style={{ color: "var(--text-primary)" }}>{decision.automation_mode || "recommend-only"}</strong></div>
+                  </div>
+
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem" }}>
+                    {allocations.map((allocation, index) => (
+                      <span key={`${decision.decision_id}-${index}`} style={{ fontSize: "0.74rem", background: "rgba(255,255,255,0.06)", borderRadius: "999px", padding: "0.28rem 0.55rem", color: "var(--text-secondary)" }}>
+                        {allocation.asset} / {allocation.protocol} • {allocation.allocationPercentage.toFixed(1)}%
+                      </span>
+                    ))}
+                  </div>
+
+                  <div style={{ fontSize: "0.76rem", color: "var(--text-secondary)" }}>
+                    Applied restrictions: {String(constraints.policyVersion || decision.policy_version || "vault-v1")} · max action ${String(constraints.maxActionUsd || state?.config?.max_action_usd || "n/a")}
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+                    <div style={{ fontSize: "0.76rem", color: job?.failure_reason ? "var(--color-warning)" : "var(--text-secondary)" }}>
+                      {job ? `Job ${truncate(job.benchmark_job_id)} • ${job.status}` : "Not queued for autonomous benchmarking yet."}
+                    </div>
+                    <button
+                      onClick={() => {
+                        void queueBenchmark(decision);
+                      }}
+                      disabled={busy || queueing === decision.decision_id || !state?.activeSession}
+                      style={{
+                        border: "1px solid var(--border-subtle)",
+                        background: "transparent",
+                        color: "var(--text-primary)",
+                        padding: "0.45rem 0.75rem",
+                        borderRadius: "8px",
+                        cursor: busy || queueing === decision.decision_id || !state?.activeSession ? "not-allowed" : "pointer",
+                        opacity: busy || queueing === decision.decision_id || !state?.activeSession ? 0.65 : 1,
+                      }}
+                    >
+                      {queueing === decision.decision_id ? "Queueing..." : "Queue Auto Benchmark"}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+
+            {!loading && decisions.length === 0 && (
+              <div className="decision-ledger-empty">
+                No personalized decisions yet. Bootstrap the vault, save settings, and generate the first benchmark decision.
+              </div>
+            )}
+          </div>
+        </aside>
+      </div>
     </section>
   );
 };
