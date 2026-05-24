@@ -160,7 +160,7 @@ function AppContent() {
             <div className="tab-pane animate-enter" style={{ minHeight: 0 }}>
               <div style={{ flex: 1, minHeight: 0, overflowY: activeVaultTab === 'history' ? 'hidden' : 'auto', paddingRight: '0.25rem' }}>
                 {activeVaultTab === 'vault' && (
-                  <div className="centered-page-container">
+                  <div className="centered-page-container" style={{ maxWidth: '1160px' }}>
                     <VaultPanel
                       state={neuralRateUser.state}
                       busy={neuralRateUser.busy}

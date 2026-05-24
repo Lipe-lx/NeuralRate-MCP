@@ -24,6 +24,65 @@ type Props = {
   controlWalletLabel: string;
 };
 
+const formatUsd = (value: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: value >= 100 ? 0 : 2,
+  }).format(value);
+
+const formatCount = (value: number) => new Intl.NumberFormat("en-US").format(value);
+
+const formatDateTime = (value: string | null | undefined) => {
+  if (!value) {
+    return "Not scheduled";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Not scheduled";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+};
+
+const parseNumeric = (value: string | number | null | undefined) => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value.replace(/,/g, ""));
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
+};
+
+const getRecordNumber = (record: Record<string, unknown> | null | undefined, key: string) => {
+  const value = record?.[key];
+  return typeof value === "number" || typeof value === "string" ? parseNumeric(value) : 0;
+};
+
+const getRecordString = (record: Record<string, unknown> | null | undefined, key: string) => {
+  const value = record?.[key];
+  return typeof value === "string" ? value : null;
+};
+
+const humanize = (value: string | null | undefined) =>
+  value
+    ? value
+        .split(/[_-]/g)
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ")
+    : "Not available";
+
 const ActionButton: React.FC<{
   label: string;
   onClick: () => void | Promise<unknown>;
@@ -76,6 +135,19 @@ const rowStyle: React.CSSProperties = {
 const truncate = (value: string | null | undefined) =>
   value ? `${value.slice(0, 8)}...${value.slice(-6)}` : "n/a";
 
+const MetricCard: React.FC<{
+  eyebrow: string;
+  value: string;
+  note: string;
+  accent?: boolean;
+}> = ({ eyebrow, value, note, accent = false }) => (
+  <div className={`vault-metric-card${accent ? " accent" : ""}`}>
+    <div className="vault-metric-eyebrow">{eyebrow}</div>
+    <div className="vault-metric-value">{value}</div>
+    <div className="vault-metric-note">{note}</div>
+  </div>
+);
+
 const VaultPanel: React.FC<Props> = ({
   state,
   busy,
@@ -93,137 +165,256 @@ const VaultPanel: React.FC<Props> = ({
   controlWalletLabel,
 }) => {
   const vault = state?.vault;
+  const config = state?.config;
   const session = state?.activeSession;
+  const activePermission = state?.activePermission;
   const ownershipAcknowledged = Boolean(vault?.ownership_acknowledged_at);
   const isActionGated = Boolean(vault) && !ownershipAcknowledged;
+  const managedValueUsd = parseNumeric(vault?.balance_usd);
+  const fundingIntentUsd = getRecordNumber(vault?.last_funding_intent, "amountUsd");
+  const fundingIntentSource = humanize(getRecordString(vault?.last_funding_intent, "source"));
+  const allowedAssets = activePermission?.allowed_assets?.length
+    ? activePermission.allowed_assets
+    : (config?.allowed_assets ?? []);
+  const allowedProtocols = activePermission?.allowed_protocols?.length
+    ? activePermission.allowed_protocols
+    : (config?.allowed_protocols ?? []);
+  const tokensInScope = Array.from(
+    new Set([
+      ...allowedAssets,
+      ...(activePermission?.spend_token ? [activePermission.spend_token] : []),
+    ]),
+  );
+  const dailyLimitUsd = parseNumeric(activePermission?.spend_limit_daily ?? config?.max_daily_usd);
+  const perActionUsd = parseNumeric(activePermission?.spend_limit_per_use ?? config?.max_action_usd);
+  const automationBudgetUsd = parseNumeric(activePermission?.spend_limit_total ?? config?.max_automation_usd);
+  const manualApprovalUsd = parseNumeric(config?.require_manual_above_usd);
+  const sessionWindowEnd = session?.valid_until ?? activePermission?.valid_until ?? null;
+  const usageLimit = activePermission?.usage_limit ?? null;
+  const budgetCoverage = automationBudgetUsd > 0 ? Math.min((managedValueUsd / automationBudgetUsd) * 100, 100) : 0;
+  const automationStatus = humanize(session?.session_status ?? vault?.automation_status ?? "inactive");
+  const fundingStatus = humanize(vault?.funding_status ?? "not-created");
+  const policyPreset = humanize(config?.restriction_preset ?? "not-set");
+  const riskProfile = humanize(config?.risk_profile ?? "medium");
 
   return (
-    <section className="glass-panel animate-enter" style={{ display: "flex", flexDirection: "column", gap: "0.9rem" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: "1.1rem" }}>Vault</h2>
-          <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginTop: "0.2rem" }}>
-            Dedicated user vault, isolated from every other user
+    <section className="glass-panel animate-enter vault-panel">
+      <div className="vault-panel-layout">
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.9rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: "1.1rem" }}>Vault</h2>
+              <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginTop: "0.2rem" }}>
+                Dedicated user vault, isolated from every other user
+              </div>
+            </div>
+            <div style={{ fontSize: "0.72rem", color: "var(--color-lime)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Sepolia</div>
           </div>
-        </div>
-        <div style={{ fontSize: "0.72rem", color: "var(--color-lime)" }}>Sepolia</div>
-      </div>
 
-      <div style={rowStyle}>
-        <span>Onboarding</span>
-        <strong style={{ color: "var(--text-primary)" }}>{ONBOARDING_PROVIDER}</strong>
-      </div>
-      <div style={rowStyle}>
-        <span>Vault Strategy</span>
-        <strong style={{ color: "var(--text-primary)" }}>{VAULT_PROVIDER_STRATEGY}</strong>
-      </div>
-      <div style={rowStyle}>
-        <span>Managed Signer</span>
-        <strong style={{ color: "var(--text-primary)" }}>{MANAGED_SIGNER_PROVIDER}</strong>
-      </div>
-      <div style={rowStyle}>
-        <span>Vault ID</span>
-        <strong style={{ color: "var(--text-primary)" }}>{truncate(vault?.vault_id)}</strong>
-      </div>
-      <div style={rowStyle}>
-        <span>Vault Address</span>
-        <strong style={{ color: "var(--text-primary)" }}>
-          {vault?.vault_address ? (
-            <a
-              href={`${MANTLE_EXPLORER_BASE_URL}/address/${vault.vault_address}`}
-              target="_blank"
-              rel="noreferrer"
-              style={{ color: "var(--color-lime)", textDecoration: "none" }}
+          <div className="vault-detail-grid">
+            <div style={rowStyle}>
+              <span>Onboarding</span>
+              <strong style={{ color: "var(--text-primary)" }}>{ONBOARDING_PROVIDER}</strong>
+            </div>
+            <div style={rowStyle}>
+              <span>Vault Strategy</span>
+              <strong style={{ color: "var(--text-primary)" }}>{VAULT_PROVIDER_STRATEGY}</strong>
+            </div>
+            <div style={rowStyle}>
+              <span>Managed Signer</span>
+              <strong style={{ color: "var(--text-primary)" }}>{MANAGED_SIGNER_PROVIDER}</strong>
+            </div>
+            <div style={rowStyle}>
+              <span>Vault ID</span>
+              <strong style={{ color: "var(--text-primary)" }}>{truncate(vault?.vault_id)}</strong>
+            </div>
+            <div style={rowStyle}>
+              <span>Vault Address</span>
+              <strong style={{ color: "var(--text-primary)" }}>
+                {vault?.vault_address ? (
+                  <a
+                    href={`${MANTLE_EXPLORER_BASE_URL}/address/${vault.vault_address}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ color: "var(--color-lime)", textDecoration: "none" }}
+                  >
+                    {truncate(vault.vault_address)}
+                  </a>
+                ) : (
+                  "Pending bootstrap"
+                )}
+              </strong>
+            </div>
+            <div style={rowStyle}>
+              <span>Funding Status</span>
+              <strong style={{ color: "var(--text-primary)" }}>{fundingStatus}</strong>
+            </div>
+            <div style={rowStyle}>
+              <span>Automation</span>
+              <strong style={{ color: "var(--text-primary)" }}>{automationStatus}</strong>
+            </div>
+            <div style={rowStyle}>
+              <span>Automation Ready</span>
+              <strong style={{ color: state?.automationReady ? "var(--color-lime)" : "var(--text-primary)" }}>
+                {state?.automationReady ? "Ready" : "Pending"}
+              </strong>
+            </div>
+          </div>
+
+          <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+            Your {controlWalletLabel.toLowerCase()} approves and revokes. The agent only operates inside this vault and within the policy bound to it.
+          </div>
+
+          {vault && !ownershipAcknowledged && (
+            <div
+              style={{
+                border: "1px solid rgba(255, 184, 77, 0.22)",
+                background: "rgba(255, 184, 77, 0.08)",
+                borderRadius: "12px",
+                padding: "0.85rem 0.95rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.65rem",
+              }}
             >
-              {truncate(vault.vault_address)}
-            </a>
-          ) : (
-            "Pending bootstrap"
+              <div style={{ fontSize: "0.82rem", color: "var(--text-primary)", fontWeight: 700 }}>
+                Review vault ownership before funding or enabling automation
+              </div>
+              <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                This Safe vault can already receive funds, but funding and automation stay locked until you confirm you understand how the control wallet and export flow work.
+              </div>
+              <div>
+                <ActionButton label="Review Wallet Ownership" onClick={onReviewOwnership} />
+              </div>
+            </div>
           )}
-        </strong>
-      </div>
-      <div style={rowStyle}>
-        <span>Funding Status</span>
-        <strong style={{ color: "var(--text-primary)" }}>{vault?.funding_status ?? "not-created"}</strong>
-      </div>
-      <div style={rowStyle}>
-        <span>Automation</span>
-        <strong style={{ color: "var(--text-primary)" }}>{session?.session_status ?? vault?.automation_status ?? "inactive"}</strong>
-      </div>
-      <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
-        Your {controlWalletLabel.toLowerCase()} approves and revokes. The agent only operates inside this vault and within the policy bound to it.
-      </div>
 
-      {vault && !ownershipAcknowledged && (
-        <div
-          style={{
-            border: "1px solid rgba(255, 184, 77, 0.22)",
-            background: "rgba(255, 184, 77, 0.08)",
-            borderRadius: "12px",
-            padding: "0.85rem 0.95rem",
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.65rem",
-          }}
-        >
-          <div style={{ fontSize: "0.82rem", color: "var(--text-primary)", fontWeight: 700 }}>
-            Review vault ownership before funding or enabling automation
-          </div>
-          <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", lineHeight: 1.6 }}>
-            This Safe vault can already receive funds, but funding and automation stay locked until you confirm you understand how the control wallet and export flow work.
-          </div>
-          <div>
-            <ActionButton label="Review Wallet Ownership" onClick={onReviewOwnership} />
-          </div>
-        </div>
-      )}
+          {vault?.deposit_address && (
+            <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+              Deposit address:{" "}
+              <span style={{ color: "var(--text-primary)", wordBreak: "break-all" }}>{vault.deposit_address}</span>
+            </div>
+          )}
 
-      {vault?.deposit_address && (
-        <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-          Deposit address:{" "}
-          <span style={{ color: "var(--text-primary)", wordBreak: "break-all" }}>{vault.deposit_address}</span>
-        </div>
-      )}
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "0.6rem" }}>
-        {!isConnected ? (
-          <ActionButton label="Connect Wallet" tone="primary" onClick={onConnect} disabled={busy} />
-        ) : !isCorrectChain ? (
-          <ActionButton label="Switch to Mantle" tone="primary" onClick={onSwitchChain} disabled={busy} />
-        ) : !vault ? (
-          <ActionButton label={busy ? "Bootstrapping..." : "Create User Vault"} tone="primary" onClick={onBootstrap} disabled={busy} />
-        ) : (
-          <>
-            <ActionButton label="Funding Intent" onClick={() => onFundingIntent(1000)} disabled={busy || isActionGated} />
-            {!session || session.session_status === "revoked" ? (
-              <ActionButton
-                label={busy ? "Enabling..." : "Enable Automation"}
-                tone="primary"
-                onClick={onEnableAutomation}
-                disabled={busy || !vault.vault_address || isActionGated}
-              />
+          <div className="vault-actions-grid">
+            {!isConnected ? (
+              <ActionButton label="Connect Wallet" tone="primary" onClick={onConnect} disabled={busy} />
+            ) : !isCorrectChain ? (
+              <ActionButton label="Switch to Mantle" tone="primary" onClick={onSwitchChain} disabled={busy} />
+            ) : !vault ? (
+              <ActionButton label={busy ? "Bootstrapping..." : "Create User Vault"} tone="primary" onClick={onBootstrap} disabled={busy} />
             ) : (
-              <ActionButton
-                label={busy ? "Revoking..." : "Revoke Automation"}
-                tone="warning"
-                onClick={onRevokeAutomation}
-                disabled={busy}
-              />
+              <>
+                <ActionButton label="Funding Intent" onClick={() => onFundingIntent(1000)} disabled={busy || isActionGated} />
+                {!session || session.session_status === "revoked" ? (
+                  <ActionButton
+                    label={busy ? "Enabling..." : "Enable Automation"}
+                    tone="primary"
+                    onClick={onEnableAutomation}
+                    disabled={busy || !vault.vault_address || isActionGated}
+                  />
+                ) : (
+                  <ActionButton
+                    label={busy ? "Revoking..." : "Revoke Automation"}
+                    tone="warning"
+                    onClick={onRevokeAutomation}
+                    disabled={busy}
+                  />
+                )}
+              </>
             )}
-          </>
-        )}
+          </div>
+
+          {vault && (
+            <ActionButton
+              label="Review Wallet Ownership"
+              onClick={onReviewOwnership}
+              disabled={busy}
+            />
+          )}
+
+          {notice && <div style={{ fontSize: "0.78rem", color: "var(--color-lime)" }}>{notice}</div>}
+          {error && <div style={{ fontSize: "0.78rem", color: "var(--color-danger)" }}>{error}</div>}
+        </div>
+
+        <aside className="vault-panel-aside organic-col-divider">
+          <div className="vault-swiss-kicker">Vault Telemetry</div>
+          <div className="vault-hero-card">
+            <div className="vault-metric-eyebrow">Managed Capital</div>
+            <div className="vault-hero-value">{formatUsd(managedValueUsd)}</div>
+            <div className="vault-hero-note">Current balance administered inside this dedicated Safe vault.</div>
+            <div className="vault-status-strip">
+              <span>{fundingStatus}</span>
+              <span>{automationStatus}</span>
+            </div>
+            <div className="vault-budget-rail">
+              <div className="vault-budget-rail-fill" style={{ width: `${budgetCoverage}%` }} />
+            </div>
+            <div className="vault-budget-caption">
+              Policy ceiling {formatUsd(automationBudgetUsd)} {automationBudgetUsd > 0 ? `• ${Math.round(budgetCoverage)}% currently represented` : ""}
+            </div>
+          </div>
+
+          <div className="vault-metric-grid">
+            <MetricCard
+              eyebrow="Tokens In Scope"
+              value={formatCount(tokensInScope.length)}
+              note={tokensInScope.length ? tokensInScope.slice(0, 3).join(" · ") : "No token policy set yet"}
+              accent
+            />
+            <MetricCard
+              eyebrow="Protocols Open"
+              value={formatCount(allowedProtocols.length)}
+              note={allowedProtocols.length ? allowedProtocols.slice(0, 2).join(" · ") : policyPreset}
+            />
+            <MetricCard
+              eyebrow="Daily Limit"
+              value={formatUsd(dailyLimitUsd)}
+              note="Agent throughput allowed per 24h"
+            />
+            <MetricCard
+              eyebrow="Per Action"
+              value={formatUsd(perActionUsd)}
+              note="Maximum amount per autonomous action"
+            />
+          </div>
+
+          <div className="vault-info-card">
+            <div className="vault-swiss-kicker">Policy Envelope</div>
+            <div className="vault-info-row">
+              <span>Total automation budget</span>
+              <strong>{formatUsd(automationBudgetUsd)}</strong>
+            </div>
+            <div className="vault-info-row">
+              <span>Manual approval threshold</span>
+              <strong>{formatUsd(manualApprovalUsd)}</strong>
+            </div>
+            <div className="vault-info-row">
+              <span>Risk profile</span>
+              <strong>{riskProfile}</strong>
+            </div>
+          </div>
+
+          <div className="vault-info-card">
+            <div className="vault-swiss-kicker">Session Window</div>
+            <div className="vault-info-row">
+              <span>Valid until</span>
+              <strong>{formatDateTime(sessionWindowEnd)}</strong>
+            </div>
+            <div className="vault-info-row">
+              <span>Usage limit</span>
+              <strong>{usageLimit ? formatCount(usageLimit) : "Not issued"}</strong>
+            </div>
+            <div className="vault-info-row">
+              <span>Funding intent</span>
+              <strong>{fundingIntentUsd > 0 ? formatUsd(fundingIntentUsd) : "None"}</strong>
+            </div>
+            <div className="vault-info-caption">
+              {fundingIntentUsd > 0 ? `Last funding source: ${fundingIntentSource}` : "Create a funding intent to stage the first deposit into the vault."}
+            </div>
+          </div>
+        </aside>
       </div>
-
-      {vault && (
-        <ActionButton
-          label="Review Wallet Ownership"
-          onClick={onReviewOwnership}
-          disabled={busy}
-        />
-      )}
-
-      {notice && <div style={{ fontSize: "0.78rem", color: "var(--color-lime)" }}>{notice}</div>}
-      {error && <div style={{ fontSize: "0.78rem", color: "var(--color-danger)" }}>{error}</div>}
     </section>
   );
 };
