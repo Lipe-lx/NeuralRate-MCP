@@ -225,26 +225,70 @@ export class NansenService {
     });
   }
 
-  private async fetchUpstream(chain: string, tokenAddresses: string[]) {
+  private buildUpstreamBody(chain: string, tokenFilter: string | string[]) {
+    return {
+      chains: [chain],
+      filters: {
+        include_stablecoins: true,
+        token_address: tokenFilter,
+      },
+      pagination: {
+        page: 1,
+        per_page: Array.isArray(tokenFilter) ? tokenFilter.length : 1,
+      },
+      order_by: [{ field: "net_flow_24h_usd", direction: "DESC" }],
+    };
+  }
+
+  private async fetchUpstreamRequest(chain: string, tokenFilter: string | string[]) {
     return fetch(NANSEN_URL, {
       method: "POST",
       headers: {
         apikey: this.apiKey,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        chains: [chain],
-        filters: {
-          include_stablecoins: true,
-          token_addresses: tokenAddresses,
-        },
-        pagination: {
-          page: 1,
-          per_page: tokenAddresses.length,
-        },
-        order_by: [{ field: "net_flow_24h_usd", direction: "DESC" }],
-      }),
+      body: JSON.stringify(this.buildUpstreamBody(chain, tokenFilter)),
     });
+  }
+
+  private async fetchUpstream(chain: string, tokenAddresses: string[]) {
+    const batchFilter = tokenAddresses.length === 1 ? tokenAddresses[0] : tokenAddresses;
+    const response = await this.fetchUpstreamRequest(chain, batchFilter);
+
+    if (response.ok) {
+      return {
+        status: response.status,
+        json: (await response.json()) as any,
+      };
+    }
+
+    const errorText = await response.text();
+    const shouldRetryIndividually =
+      response.status === 422 &&
+      tokenAddresses.length > 1 &&
+      /field\s+'token_(address|addresses)'|not recognized|validation/i.test(errorText);
+
+    if (!shouldRetryIndividually) {
+      throw new Error(`Nansen API ${response.status}: ${errorText.substring(0, 200)}`);
+    }
+
+    const retriedResponses = await Promise.all(tokenAddresses.map(async (tokenAddress) => {
+      const retryResponse = await this.fetchUpstreamRequest(chain, tokenAddress);
+      if (!retryResponse.ok) {
+        const retryErrorText = await retryResponse.text();
+        throw new Error(`Nansen API ${retryResponse.status}: ${retryErrorText.substring(0, 200)}`);
+      }
+
+      const retryJson = (await retryResponse.json()) as any;
+      return Array.isArray(retryJson?.data) ? retryJson.data : [];
+    }));
+
+    return {
+      status: 200,
+      json: {
+        data: retriedResponses.flat(),
+      },
+    };
   }
 
   async getSmartMoneyFlowsBatch(args: NansenBatchRequest): Promise<NansenBatchResult> {
@@ -314,13 +358,7 @@ export class NansenService {
       try {
         const response = await this.fetchUpstream(chain, refreshCandidates);
         upstreamStatus = response.status;
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Nansen API ${response.status}: ${errorText.substring(0, 200)}`);
-        }
-
-        const json = (await response.json()) as any;
+        const json = response.json;
         const parsedTokens = ((json.data || json || []) as any[])
           .map((token) => parseNansenToken(token, chain))
           .filter((token) => Boolean(token.token_address));

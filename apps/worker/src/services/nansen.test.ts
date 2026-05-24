@@ -107,7 +107,8 @@ test("getSmartMoneyFlowsBatch fetches only cache misses when part of the batch i
   await withFetchMock(async (_input, init) => {
     const body = JSON.parse(String(init?.body || "{}"));
     requestedBodies.push(body);
-    const addresses = body.filters?.token_addresses || [];
+    const rawAddresses = body.filters?.token_address;
+    const addresses = Array.isArray(rawAddresses) ? rawAddresses : rawAddresses ? [rawAddresses] : [];
 
     return new Response(JSON.stringify({
       data: addresses.map((address: string) =>
@@ -130,7 +131,47 @@ test("getSmartMoneyFlowsBatch fetches only cache misses when part of the batch i
   });
 
   assert.equal(requestedBodies.length, 2);
-  assert.deepEqual(requestedBodies[1].filters.token_addresses, [tokenB]);
+  assert.equal(requestedBodies[1].filters.token_address, tokenB);
+});
+
+test("getSmartMoneyFlowsBatch retries individual requests when Nansen rejects batched token filters", async () => {
+  const kv = new MemoryKv();
+  const service = new NansenService(kv as unknown as KVNamespace, "test-key");
+  const requestedBodies: any[] = [];
+
+  await withFetchMock(async (_input, init) => {
+    const body = JSON.parse(String(init?.body || "{}"));
+    requestedBodies.push(body);
+    const tokenFilter = body.filters?.token_address;
+
+    if (Array.isArray(tokenFilter)) {
+      return new Response(JSON.stringify({
+        error: "Unknown field",
+        message: "Field 'token_addresses' is not recognized. Please check the API documentation for valid request fields.",
+      }), { status: 422 });
+    }
+
+    return new Response(JSON.stringify({
+      data: [makeToken({
+        token_address: tokenFilter,
+        token_symbol: tokenFilter === tokenA ? "AAA" : "BBB",
+        net_flow_24h_usd: tokenFilter === tokenA ? 100 : 200,
+      })],
+    }), { status: 200 });
+  }, async () => {
+    const result = await service.getSmartMoneyFlowsBatch({ chain: "mantle", tokenAddresses: [tokenA, tokenB] });
+
+    assert.equal(result.status, "success");
+    assert.equal(result.tokensByAddress[tokenA]?.[0]?.token_symbol, "AAA");
+    assert.equal(result.tokensByAddress[tokenB]?.[0]?.token_symbol, "BBB");
+    assert.equal(result.cacheStatusByAddress[tokenA], "fresh");
+    assert.equal(result.cacheStatusByAddress[tokenB], "fresh");
+  });
+
+  assert.equal(requestedBodies.length, 3);
+  assert.deepEqual(requestedBodies[0].filters.token_address, [tokenA, tokenB]);
+  assert.equal(requestedBodies[1].filters.token_address, tokenA);
+  assert.equal(requestedBodies[2].filters.token_address, tokenB);
 });
 
 test("getSmartMoneyFlowsBatch serves stale cache when upstream fails", async () => {
