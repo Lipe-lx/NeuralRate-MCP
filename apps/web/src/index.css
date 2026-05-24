@@ -495,21 +495,30 @@ input[type="checkbox"] {
 }
 
 .vault-panel {
-  padding-top: 1.5rem;
+  padding-top: 0.35rem;
+  height: 100%;
 }
 
 .vault-panel-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.9fr);
-  gap: 1.75rem;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.95fr);
+  gap: 1.2rem;
   align-items: start;
+  height: 100%;
+}
+
+.vault-panel-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  min-width: 0;
 }
 
 .vault-detail-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.7rem 1rem;
-  padding: 1rem 0 1.1rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem 0.85rem;
+  padding: 0.7rem 0 0.8rem;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
@@ -517,13 +526,13 @@ input[type="checkbox"] {
 .vault-actions-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.6rem;
+  gap: 0.5rem;
 }
 
 .vault-panel-aside {
   display: flex;
   flex-direction: column;
-  gap: 0.95rem;
+  gap: 0.75rem;
   min-width: 0;
 }
 
@@ -543,7 +552,7 @@ input[type="checkbox"] {
 }
 
 .vault-hero-card {
-  padding: 1.15rem;
+  padding: 0.95rem;
   background:
     linear-gradient(180deg, rgba(223, 246, 81, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%),
     rgba(255, 255, 255, 0.02);
@@ -556,43 +565,43 @@ input[type="checkbox"] {
 }
 
 .vault-hero-value {
-  font-size: clamp(2rem, 4vw, 3.4rem);
+  font-size: clamp(1.7rem, 3.2vw, 2.8rem);
   line-height: 0.95;
-  margin-top: 0.45rem;
+  margin-top: 0.35rem;
 }
 
 .vault-hero-note,
 .vault-metric-note,
 .vault-info-caption {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   color: var(--text-secondary);
-  line-height: 1.55;
+  line-height: 1.45;
 }
 
 .vault-hero-note {
-  margin-top: 0.55rem;
-  max-width: 28ch;
+  margin-top: 0.4rem;
+  max-width: 24ch;
 }
 
 .vault-status-strip {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.45rem;
-  margin-top: 0.9rem;
+  gap: 0.35rem;
+  margin-top: 0.65rem;
 }
 
 .vault-status-strip span {
-  padding: 0.35rem 0.55rem;
+  padding: 0.28rem 0.5rem;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   color: var(--text-primary);
 }
 
 .vault-budget-rail {
-  height: 6px;
-  margin-top: 1rem;
+  height: 5px;
+  margin-top: 0.75rem;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
   overflow: hidden;
@@ -606,20 +615,20 @@ input[type="checkbox"] {
 }
 
 .vault-budget-caption {
-  margin-top: 0.5rem;
-  font-size: 0.72rem;
+  margin-top: 0.35rem;
+  font-size: 0.68rem;
   color: var(--text-secondary);
 }
 
 .vault-metric-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
+  gap: 0.55rem;
 }
 
 .vault-metric-card {
-  padding: 0.95rem;
-  min-height: 144px;
+  padding: 0.75rem;
+  min-height: 118px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -631,31 +640,37 @@ input[type="checkbox"] {
 }
 
 .vault-metric-eyebrow {
-  font-size: 0.68rem;
+  font-size: 0.64rem;
   color: var(--text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
 }
 
 .vault-metric-value {
-  font-size: 1.7rem;
+  font-size: 1.4rem;
   line-height: 1;
-  margin: 0.65rem 0 0.5rem;
+  margin: 0.45rem 0 0.35rem;
   color: var(--text-primary);
 }
 
+.vault-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
 .vault-info-card {
-  padding: 1rem;
+  padding: 0.8rem;
   display: flex;
   flex-direction: column;
-  gap: 0.8rem;
+  gap: 0.55rem;
 }
 
 .vault-info-row {
   display: flex;
   justify-content: space-between;
-  gap: 0.75rem;
-  font-size: 0.8rem;
+  gap: 0.55rem;
+  font-size: 0.72rem;
   color: var(--text-secondary);
 }
 
@@ -664,9 +679,27 @@ input[type="checkbox"] {
   text-align: right;
 }
 
+.vault-inline-address {
+  display: inline-block;
+  max-width: min(100%, 44ch);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.vault-feedback-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
 @media (max-width: 980px) {
   .vault-panel-layout {
     grid-template-columns: 1fr;
+    height: auto;
   }
 
   .vault-panel-aside {
@@ -674,6 +707,14 @@ input[type="checkbox"] {
     padding-left: 0;
     border-top: 1px solid rgba(255, 255, 255, 0.06);
     padding-top: 1.25rem;
+  }
+
+  .vault-detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vault-info-grid {
+    grid-template-columns: 1fr;
   }
 }
 

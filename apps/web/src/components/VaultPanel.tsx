@@ -112,9 +112,11 @@ const ActionButton: React.FC<{
         border: tone === "primary" ? "none" : "1px solid var(--border-subtle)",
         background,
         color,
-        padding: "0.55rem 0.75rem",
+        padding: "0.5rem 0.7rem",
         borderRadius: "8px",
         fontWeight: 700,
+        fontSize: "0.78rem",
+        lineHeight: 1.2,
         cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.65 : 1,
       }}
@@ -200,7 +202,7 @@ const VaultPanel: React.FC<Props> = ({
   return (
     <section className="glass-panel animate-enter vault-panel">
       <div className="vault-panel-layout">
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.9rem" }}>
+        <div className="vault-panel-main">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
               <h2 style={{ margin: 0, fontSize: "1.1rem" }}>Vault</h2>
@@ -261,7 +263,7 @@ const VaultPanel: React.FC<Props> = ({
             </div>
           </div>
 
-          <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+          <div style={{ fontSize: "0.74rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
             Your {controlWalletLabel.toLowerCase()} approves and revokes. The agent only operates inside this vault and within the policy bound to it.
           </div>
 
@@ -277,10 +279,10 @@ const VaultPanel: React.FC<Props> = ({
                 gap: "0.65rem",
               }}
             >
-              <div style={{ fontSize: "0.82rem", color: "var(--text-primary)", fontWeight: 700 }}>
+              <div style={{ fontSize: "0.8rem", color: "var(--text-primary)", fontWeight: 700 }}>
                 Review vault ownership before funding or enabling automation
               </div>
-              <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", lineHeight: 1.6 }}>
+              <div style={{ fontSize: "0.74rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
                 This Safe vault can already receive funds, but funding and automation stay locked until you confirm you understand how the control wallet and export flow work.
               </div>
               <div>
@@ -290,9 +292,11 @@ const VaultPanel: React.FC<Props> = ({
           )}
 
           {vault?.deposit_address && (
-            <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+            <div style={{ fontSize: "0.74rem", color: "var(--text-secondary)" }}>
               Deposit address:{" "}
-              <span style={{ color: "var(--text-primary)", wordBreak: "break-all" }}>{vault.deposit_address}</span>
+              <span className="vault-inline-address" title={vault.deposit_address} style={{ color: "var(--text-primary)" }}>
+                {vault.deposit_address}
+              </span>
             </div>
           )}
 
@@ -325,7 +329,7 @@ const VaultPanel: React.FC<Props> = ({
             )}
           </div>
 
-          {vault && (
+          {vault && ownershipAcknowledged && (
             <ActionButton
               label="Review Wallet Ownership"
               onClick={onReviewOwnership}
@@ -333,8 +337,12 @@ const VaultPanel: React.FC<Props> = ({
             />
           )}
 
-          {notice && <div style={{ fontSize: "0.78rem", color: "var(--color-lime)" }}>{notice}</div>}
-          {error && <div style={{ fontSize: "0.78rem", color: "var(--color-danger)" }}>{error}</div>}
+          {(notice || error) && (
+            <div className="vault-feedback-strip">
+              {notice && <div style={{ color: "var(--color-lime)" }}>{notice}</div>}
+              {error && <div style={{ color: "var(--color-danger)" }}>{error}</div>}
+            </div>
+          )}
         </div>
 
         <aside className="vault-panel-aside organic-col-divider">
@@ -379,38 +387,40 @@ const VaultPanel: React.FC<Props> = ({
             />
           </div>
 
-          <div className="vault-info-card">
-            <div className="vault-swiss-kicker">Policy Envelope</div>
-            <div className="vault-info-row">
-              <span>Total automation budget</span>
-              <strong>{formatUsd(automationBudgetUsd)}</strong>
+          <div className="vault-info-grid">
+            <div className="vault-info-card">
+              <div className="vault-swiss-kicker">Policy Envelope</div>
+              <div className="vault-info-row">
+                <span>Total automation budget</span>
+                <strong>{formatUsd(automationBudgetUsd)}</strong>
+              </div>
+              <div className="vault-info-row">
+                <span>Manual approval threshold</span>
+                <strong>{formatUsd(manualApprovalUsd)}</strong>
+              </div>
+              <div className="vault-info-row">
+                <span>Risk profile</span>
+                <strong>{riskProfile}</strong>
+              </div>
             </div>
-            <div className="vault-info-row">
-              <span>Manual approval threshold</span>
-              <strong>{formatUsd(manualApprovalUsd)}</strong>
-            </div>
-            <div className="vault-info-row">
-              <span>Risk profile</span>
-              <strong>{riskProfile}</strong>
-            </div>
-          </div>
 
-          <div className="vault-info-card">
-            <div className="vault-swiss-kicker">Session Window</div>
-            <div className="vault-info-row">
-              <span>Valid until</span>
-              <strong>{formatDateTime(sessionWindowEnd)}</strong>
-            </div>
-            <div className="vault-info-row">
-              <span>Usage limit</span>
-              <strong>{usageLimit ? formatCount(usageLimit) : "Not issued"}</strong>
-            </div>
-            <div className="vault-info-row">
-              <span>Funding intent</span>
-              <strong>{fundingIntentUsd > 0 ? formatUsd(fundingIntentUsd) : "None"}</strong>
-            </div>
-            <div className="vault-info-caption">
-              {fundingIntentUsd > 0 ? `Last funding source: ${fundingIntentSource}` : "Create a funding intent to stage the first deposit into the vault."}
+            <div className="vault-info-card">
+              <div className="vault-swiss-kicker">Session Window</div>
+              <div className="vault-info-row">
+                <span>Valid until</span>
+                <strong>{formatDateTime(sessionWindowEnd)}</strong>
+              </div>
+              <div className="vault-info-row">
+                <span>Usage limit</span>
+                <strong>{usageLimit ? formatCount(usageLimit) : "Not issued"}</strong>
+              </div>
+              <div className="vault-info-row">
+                <span>Funding intent</span>
+                <strong>{fundingIntentUsd > 0 ? formatUsd(fundingIntentUsd) : "None"}</strong>
+              </div>
+              <div className="vault-info-caption">
+                {fundingIntentUsd > 0 ? `Last funding source: ${fundingIntentSource}` : "Create a funding intent to stage the first deposit into the vault."}
+              </div>
             </div>
           </div>
         </aside>

@@ -158,9 +158,9 @@ function AppContent() {
 
           {activeTab === 'vault' && (
             <div className="tab-pane animate-enter" style={{ minHeight: 0 }}>
-              <div style={{ flex: 1, minHeight: 0, overflowY: activeVaultTab === 'history' ? 'hidden' : 'auto', paddingRight: '0.25rem' }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: activeVaultTab === 'settings' ? 'auto' : 'hidden', paddingRight: '0.25rem' }}>
                 {activeVaultTab === 'vault' && (
-                  <div className="centered-page-container" style={{ maxWidth: '1160px' }}>
+                  <div className="centered-page-container" style={{ maxWidth: '1160px', margin: '0.65rem auto 0', height: '100%' }}>
                     <VaultPanel
                       state={neuralRateUser.state}
                       busy={neuralRateUser.busy}
