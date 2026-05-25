@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { createPublicClient, defineChain, http } from "viem";
 import { config } from "./config.js";
 import { DataApiClient } from "./dataApi.js";
 import {
@@ -9,8 +10,22 @@ import {
 } from "./managedSigner.js";
 import { buildBenchmarkPolicy, buildExecutionPolicy } from "./policy.js";
 import { executeBenchmarkJob } from "./benchmarkExecutor.js";
+import { getApprovedStrategySurface, resolveExecutionPlan } from "./executionPlanner.js";
+import type { StrategyIntent } from "./executionRegistry.js";
 
-const dataApi = new DataApiClient(config.dataApiBaseUrl.replace(/\/+$/, ""));
+const dataApi = new DataApiClient(config.dataApiBaseUrl.replace(/\/+$/, ""), config.internalApiToken);
+const mantleSepolia = defineChain({
+  id: 5003,
+  name: "Mantle Sepolia",
+  nativeCurrency: { name: "MNT", symbol: "MNT", decimals: 18 },
+  rpcUrls: {
+    default: { http: [config.mantleSepoliaRpcUrl] },
+  },
+});
+const publicClient = createPublicClient({
+  chain: mantleSepolia,
+  transport: http(config.mantleSepoliaRpcUrl),
+});
 const managedSigner: ManagedSigner = config.managedSignerUrl
   ? new RemoteManagedSigner(config.managedSignerUrl, config.managedSignerToken)
   : (
@@ -59,6 +74,31 @@ const readJson = async <T>(request: IncomingMessage) => {
 
 const makeId = (prefix: string) => `${prefix}_${crypto.randomUUID()}`;
 
+const waitForConfirmation = async (txHash: `0x${string}`) => {
+  const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+  if (receipt.status !== "success") {
+    throw new Error("Transaction reverted on-chain.");
+  }
+
+  const block = await publicClient.getBlock({ blockHash: receipt.blockHash });
+  return new Date(Number(block.timestamp) * 1000).toISOString();
+};
+
+const getNumeric = (record: Record<string, unknown> | null | undefined, key: string, fallback: number) => {
+  const raw = record?.[key];
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return raw;
+  }
+  if (typeof raw === "string") {
+    const parsed = Number.parseFloat(raw);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return fallback;
+};
+
 type AutomationStateResponse = {
   ownerEoa: string;
   userId?: string | null;
@@ -67,6 +107,25 @@ type AutomationStateResponse = {
   account?: Record<string, unknown> | null;
   profile?: Record<string, unknown> | null;
   activeSession?: Record<string, unknown> | null;
+};
+
+type MutationAuthPayload = {
+  ownerEoa: string;
+  nonce: string;
+  issuedAt: string;
+  expiresAt: string;
+  signature: string;
+};
+
+const requireSignedMutation = async (body: Record<string, unknown>, ownerEoa: string) => {
+  if (!body.auth || typeof body.auth !== "object") {
+    throw new Error("Missing signed mutation auth envelope.");
+  }
+
+  await dataApi.verifyMutationAuth({
+    ownerEoa,
+    auth: body.auth,
+  });
 };
 
 const resolveScopedState = async (ownerEoa: string) => {
@@ -115,6 +174,7 @@ createServer(async (request, response) => {
         managedSignerProvider: config.managedSignerProvider,
         managedSigner: await managedSigner.getPublicAddress(),
         capabilities: managedSigner.getCapabilities(),
+        approvedStrategies: getApprovedStrategySurface().strategyKeys,
       });
       return;
     }
@@ -142,7 +202,9 @@ createServer(async (request, response) => {
         vaultProvider?: string | null;
         vaultKind?: string | null;
         vaultStatus?: string | null;
+        auth?: MutationAuthPayload;
       }>(request);
+      await requireSignedMutation(body as unknown as Record<string, unknown>, body.ownerEoa);
 
       const state = await dataApi.bootstrapUser({
         ownerEoa: body.ownerEoa,
@@ -175,7 +237,9 @@ createServer(async (request, response) => {
         usageLimit?: number | null;
         validAfter?: string | null;
         validUntil?: string | null;
+        auth?: MutationAuthPayload;
       }>(request);
+      await requireSignedMutation(body as unknown as Record<string, unknown>, body.ownerEoa);
 
       const scoped = await resolveScopedState(body.ownerEoa);
       const policyId = makeId("policy");
@@ -276,6 +340,7 @@ createServer(async (request, response) => {
         chainId: 5003,
         executionPolicy,
         benchmarkPolicy,
+        approvedStrategies: getApprovedStrategySurface().strategyKeys,
         capabilities: managedSigner.getCapabilities(),
       });
       return;
@@ -290,7 +355,7 @@ createServer(async (request, response) => {
         policyId: string;
         ownerEoa: string;
         vaultAddress: string;
-        grantTxHash: string;
+        grantTxHash?: string | null;
         permissionId?: string | null;
         sessionDetails: unknown;
         validAfter?: string | null;
@@ -299,7 +364,11 @@ createServer(async (request, response) => {
         consentSignature?: string | null;
         providerSessionRef?: string | null;
         providerPermissionRef?: string | null;
+        consentDigest?: string | null;
+        consentVerifiedAt?: string | null;
+        auth?: MutationAuthPayload;
       }>(request);
+      await requireSignedMutation(body as unknown as Record<string, unknown>, body.ownerEoa);
 
       const scoped = await resolveScopedState(body.ownerEoa);
       const signerAddress = await managedSigner.getPublicAddress();
@@ -318,6 +387,8 @@ createServer(async (request, response) => {
         providerPermissionRef: body.providerPermissionRef,
         consentMessage: body.consentMessage,
         consentSignature: body.consentSignature,
+        consentDigest: body.consentDigest,
+        consentVerifiedAt: body.consentVerifiedAt,
         turnkeySignerRef: managedSigner.getCapabilities().mode === "turnkey"
           ? signerAddress
           : null,
@@ -345,7 +416,9 @@ createServer(async (request, response) => {
         sessionDetails?: unknown;
         providerSessionRef?: string | null;
         providerPermissionRef?: string | null;
+        auth?: MutationAuthPayload;
       }>(request);
+      await requireSignedMutation(body as unknown as Record<string, unknown>, body.ownerEoa);
 
       const scoped = await resolveScopedState(body.ownerEoa);
       const signerAddress = await managedSigner.getPublicAddress();
@@ -385,7 +458,9 @@ createServer(async (request, response) => {
         sessionId?: string | null;
         dataSnapshotHash?: string | null;
         payload?: Record<string, unknown>;
+        auth?: MutationAuthPayload;
       }>(request);
+      await requireSignedMutation(body as unknown as Record<string, unknown>, body.ownerEoa);
 
       const scoped = await resolveScopedState(body.ownerEoa);
       const capabilities = managedSigner.getCapabilities();
@@ -415,9 +490,19 @@ createServer(async (request, response) => {
         policyVersion: scoped.policyVersion,
       });
 
+      await dataApi.updateDecisionBenchmark(body.decisionId, {
+        benchmarkStatus: capabilities.canExecute ? "pending" : "local",
+        requestedBy: scoped.ownerEoa,
+        agentAddress: config.agentSmartWallet,
+        userId: scoped.userId,
+        vaultId: scoped.vaultId,
+        policyVersion: scoped.policyVersion,
+        dataSnapshotHash: body.dataSnapshotHash ?? null,
+      });
+
       if (capabilities.canExecute) {
         try {
-          const txHash = await executeBenchmarkJob(managedSigner, {
+          const execution = await executeBenchmarkJob(managedSigner, {
             requestedBy: scoped.ownerEoa,
             dataSnapshotHash: body.dataSnapshotHash ?? "",
             predictedApyBps: Number(body.payload?.predictedApyBps ?? 0),
@@ -425,26 +510,50 @@ createServer(async (request, response) => {
           });
 
           await dataApi.updateBenchmarkJob(benchmarkJobId, {
-            status: "completed",
-            tx_hash: txHash,
+            decisionId: body.decisionId,
+            ownerEoa: scoped.ownerEoa,
+            sessionId: body.sessionId ?? null,
+            agentSmartWallet: config.agentSmartWallet,
+            status: "confirmed",
+            txHash: execution.txHash,
+            onchainDecisionId: execution.onchainDecisionId,
+            confirmedAt: execution.confirmedAt,
+            userId: scoped.userId,
+            vaultId: scoped.vaultId,
+            policyVersion: scoped.policyVersion,
           });
 
-          // Inform API about the on-chain status
-          await fetch(`${config.dataApiBaseUrl}/decisions/${body.decisionId}/benchmark`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              status: "onchain",
-              txHash,
-              onchainDecisionId: benchmarkJobId, // Using jobId as temp identifier until receipt parsing
-            }),
-          }).catch(err => console.error("Failed to update decision status:", err));
-
+          await dataApi.updateDecisionBenchmark(body.decisionId, {
+            benchmarkStatus: "onchain",
+            txHash: execution.txHash,
+            onchainDecisionId: execution.onchainDecisionId,
+            requestedBy: scoped.ownerEoa,
+            dataSnapshotHash: body.dataSnapshotHash ?? "",
+            agentAddress: config.agentSmartWallet,
+            userId: scoped.userId,
+            vaultId: scoped.vaultId,
+            policyVersion: scoped.policyVersion,
+          });
         } catch (error) {
           console.error("Benchmark execution failed:", error);
           await dataApi.updateBenchmarkJob(benchmarkJobId, {
+            decisionId: body.decisionId,
+            ownerEoa: scoped.ownerEoa,
+            sessionId: body.sessionId ?? null,
+            agentSmartWallet: config.agentSmartWallet,
             status: "failed",
-            failureReason: String(error),
+            failureReason: error instanceof Error ? error.message : String(error),
+            userId: scoped.userId,
+            vaultId: scoped.vaultId,
+            policyVersion: scoped.policyVersion,
+          });
+          await dataApi.updateDecisionBenchmark(body.decisionId, {
+            benchmarkStatus: "local",
+            requestedBy: scoped.ownerEoa,
+            agentAddress: config.agentSmartWallet,
+            userId: scoped.userId,
+            vaultId: scoped.vaultId,
+            policyVersion: scoped.policyVersion,
           });
         }
       }
@@ -467,33 +576,108 @@ createServer(async (request, response) => {
         vaultAddress?: string | null;
         executionDomain?: "benchmark" | "execution";
         jobType: string;
+        strategyKey?: string | null;
+        intent?: StrategyIntent | null;
         targetContract?: string | null;
         targetSelector?: string | null;
         payload?: Record<string, unknown>;
+        auth?: MutationAuthPayload;
       }>(request);
+      await requireSignedMutation(body as unknown as Record<string, unknown>, body.ownerEoa);
 
       const scoped = await resolveScopedState(body.ownerEoa);
       const capabilities = managedSigner.getCapabilities();
       const jobId = makeId("job");
-      const status = body.executionDomain === "execution" && !capabilities.canExecute ? "blocked" : "queued";
-      const failureReason = status === "blocked"
-        ? "Managed signer backend is not configured yet. User vault jobs are stored but cannot be dispatched."
+      const strategyKey = typeof body.strategyKey === "string" ? body.strategyKey : null;
+      const normalizedIntent = body.intent && typeof body.intent === "object"
+        ? {
+            targetAsset: typeof body.intent.targetAsset === "string" ? body.intent.targetAsset : "",
+            amountUsd:
+              typeof body.intent.amountUsd === "number"
+                ? body.intent.amountUsd
+                : Number.parseFloat(String(body.intent.amountUsd ?? "")),
+            slippageBps:
+              typeof body.intent.slippageBps === "number"
+                ? body.intent.slippageBps
+                : body.intent.slippageBps == null
+                  ? null
+                  : Number.parseInt(String(body.intent.slippageBps), 10),
+            notes: typeof body.intent.notes === "string" ? body.intent.notes : null,
+          }
         : null;
+      const isStrategyExecution = body.jobType === "strategy-execution" && strategyKey && normalizedIntent;
 
-      const job = await dataApi.upsertAutomationJob({
+      let effectiveTargetContract = body.targetContract ?? null;
+      let effectiveTargetSelector = body.targetSelector ?? null;
+      let effectivePayload: Record<string, unknown> = {
+        vaultId: scoped.vaultId,
+        policyVersion: scoped.policyVersion,
+        ...(body.payload ?? {}),
+      };
+      let effectiveCalldata = typeof body.payload?.calldata === "string" ? body.payload.calldata : null;
+      let effectiveJobType = body.jobType;
+      let status = "queued";
+      let failureReason: string | null = null;
+      let finalJob: unknown = null;
+
+      if (isStrategyExecution) {
+        const resolvedPlan = await resolveExecutionPlan(
+          publicClient,
+          strategyKey,
+          normalizedIntent,
+          {
+            ownerEoa: scoped.ownerEoa,
+            vaultAddress: (body.vaultAddress?.toLowerCase() || scoped.vaultAddress),
+            chainId: 5003,
+            policyVersion: scoped.policyVersion,
+            maxActionUsd: getNumeric(scoped.config, "max_action_usd", 1000),
+            maxAutomationUsd: getNumeric(scoped.config, "max_automation_usd", 10000),
+            allowedAssets: Array.isArray(scoped.config.allowed_assets) ? scoped.config.allowed_assets as string[] : [],
+            allowedProtocols: Array.isArray(scoped.config.allowed_protocols) ? scoped.config.allowed_protocols as string[] : [],
+          },
+        );
+
+        effectiveTargetContract = resolvedPlan.targetContract;
+        effectiveTargetSelector = resolvedPlan.targetSelector;
+        effectiveCalldata = resolvedPlan.calldata;
+        effectivePayload = {
+          ...effectivePayload,
+          strategyKey: resolvedPlan.strategyKey,
+          strategyLabel: resolvedPlan.strategyLabel,
+          protocolId: resolvedPlan.protocolId,
+          actionId: resolvedPlan.actionId,
+          targetAsset: resolvedPlan.targetAsset,
+          resolvedContract: resolvedPlan.targetContract,
+          resolvedSelector: resolvedPlan.targetSelector,
+          resolvedArgs: resolvedPlan.resolvedArgs,
+          validationStatus: resolvedPlan.validationStatus,
+          validationReason: resolvedPlan.validationReason,
+          bytecodeValidation: resolvedPlan.bytecodeValidation,
+          policyChecks: resolvedPlan.policyChecks,
+          executionSummary: resolvedPlan.executionSummary,
+          riskFlags: resolvedPlan.riskFlags,
+          intent: resolvedPlan.intent,
+        };
+        effectiveJobType = `strategy:${resolvedPlan.strategyKey}`;
+        status = resolvedPlan.validationStatus === "ready" ? "queued" : "blocked";
+        failureReason = resolvedPlan.validationReason;
+      }
+
+      if (status !== "blocked" && body.executionDomain === "execution" && !capabilities.canExecute) {
+        status = "blocked";
+        failureReason = "Managed signer backend is not configured yet. User vault jobs are stored but cannot be dispatched.";
+      }
+
+      finalJob = await dataApi.upsertAutomationJob({
         jobId,
         sessionId: body.sessionId,
         ownerEoa: scoped.ownerEoa,
         userSmartAccount: body.vaultAddress?.toLowerCase() || scoped.vaultAddress,
         executionDomain: body.executionDomain ?? "execution",
-        jobType: body.jobType,
-        targetContract: body.targetContract,
-        targetSelector: body.targetSelector,
-        payload: {
-          vaultId: scoped.vaultId,
-          policyVersion: scoped.policyVersion,
-          ...(body.payload ?? {}),
-        },
+        jobType: effectiveJobType,
+        targetContract: effectiveTargetContract,
+        targetSelector: effectiveTargetSelector,
+        payload: effectivePayload,
         status,
         failureReason,
         providerJobRef: `${config.managedSignerProvider}:${jobId}`,
@@ -502,9 +686,73 @@ createServer(async (request, response) => {
         policyVersion: scoped.policyVersion,
       });
 
+      if (status !== "blocked" && effectiveTargetContract && effectiveCalldata) {
+        try {
+          const txHash = await managedSigner.signAndSendTransaction({
+            to: effectiveTargetContract,
+            data: effectiveCalldata,
+            chainId: 5003,
+          });
+
+          finalJob = await dataApi.updateAutomationJob(jobId, {
+            sessionId: body.sessionId,
+            ownerEoa: scoped.ownerEoa,
+            userSmartAccount: body.vaultAddress?.toLowerCase() || scoped.vaultAddress,
+            executionDomain: body.executionDomain ?? "execution",
+            jobType: effectiveJobType,
+            targetContract: effectiveTargetContract,
+            targetSelector: effectiveTargetSelector,
+            payload: effectivePayload,
+            status: "submitted",
+            txHash,
+            providerJobRef: `${config.managedSignerProvider}:${jobId}`,
+            userId: scoped.userId,
+            vaultId: scoped.vaultId,
+            policyVersion: scoped.policyVersion,
+          });
+
+          const confirmedAt = await waitForConfirmation(txHash as `0x${string}`);
+
+          finalJob = await dataApi.updateAutomationJob(jobId, {
+            sessionId: body.sessionId,
+            ownerEoa: scoped.ownerEoa,
+            userSmartAccount: body.vaultAddress?.toLowerCase() || scoped.vaultAddress,
+            executionDomain: body.executionDomain ?? "execution",
+            jobType: effectiveJobType,
+            targetContract: effectiveTargetContract,
+            targetSelector: effectiveTargetSelector,
+            payload: effectivePayload,
+            status: "confirmed",
+            txHash,
+            confirmedAt,
+            providerJobRef: `${config.managedSignerProvider}:${jobId}`,
+            userId: scoped.userId,
+            vaultId: scoped.vaultId,
+            policyVersion: scoped.policyVersion,
+          });
+        } catch (error) {
+          finalJob = await dataApi.updateAutomationJob(jobId, {
+            sessionId: body.sessionId,
+            ownerEoa: scoped.ownerEoa,
+            userSmartAccount: body.vaultAddress?.toLowerCase() || scoped.vaultAddress,
+            executionDomain: body.executionDomain ?? "execution",
+            jobType: effectiveJobType,
+            targetContract: effectiveTargetContract,
+            targetSelector: effectiveTargetSelector,
+            payload: effectivePayload,
+            status: "failed",
+            failureReason: error instanceof Error ? error.message : String(error),
+            providerJobRef: `${config.managedSignerProvider}:${jobId}`,
+            userId: scoped.userId,
+            vaultId: scoped.vaultId,
+            policyVersion: scoped.policyVersion,
+          });
+        }
+      }
+
       sendJson(response, 200, {
         success: true,
-        job,
+        job: finalJob,
         executionCapable: capabilities.canExecute,
       });
       return;

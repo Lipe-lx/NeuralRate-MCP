@@ -8,7 +8,9 @@ import {
   NEURALRATE_AGENT_SMART_WALLET,
   NEURALRATE_BENCHMARK_CONTRACT,
 } from "../config";
+import { signedJsonFetch } from "../lib/auth";
 import type { AutomationState, DecisionRecord } from "../lib/userState";
+import { useWalletContext } from "../context/WalletContext";
 
 type Props = {
   state: AutomationState | null;
@@ -85,6 +87,7 @@ const formatUsd = (value: number) =>
   }).format(value);
 
 const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) => {
+  const wallet = useWalletContext();
   const [amountUsd, setAmountUsd] = useState(10000);
   const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
   const [loading, setLoading] = useState(false);
@@ -168,10 +171,13 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
       const decisionId = `decision_${crypto.randomUUID()}`;
       const predictedApyBps = Math.round(allocation.blendedPredictedApy * 100);
 
-      const logResponse = await fetch(`${API_BASE_URL}/decisions`, {
+      await signedJsonFetch({
+        ownerEoa,
+        signMessage: wallet.signMessage,
+        url: `${API_BASE_URL}/decisions`,
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: {
+          ownerEoa,
           decisionId,
           agentAddress: NEURALRATE_AGENT_SMART_WALLET,
           requestedBy: ownerEoa,
@@ -191,12 +197,8 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
             ...allocation.rationale,
             automationEligibility: allocation.automationEligibility,
           }),
-        }),
+        },
       });
-
-      if (!logResponse.ok) {
-        throw new Error(`Decision log failed: ${logResponse.status}`);
-      }
 
       setNotice(
         allocation.automationEligibility.eligible
@@ -226,10 +228,20 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
         decision.data_snapshot_hash ||
         `vault-${state.vault?.vault_id || "unknown"}-${decision.decision_id.slice(-6)}`;
 
-      const response = await fetch(`${EXECUTOR_BASE_URL}/v1/automation/benchmark-jobs`, {
+      const json = await signedJsonFetch<{
+        success: boolean;
+        benchmarkJob: {
+          benchmark_job_id: string;
+          status: string;
+          failure_reason?: string | null;
+        };
+        executionCapable: boolean;
+      }>({
+        ownerEoa,
+        signMessage: wallet.signMessage,
+        url: `${EXECUTOR_BASE_URL}/v1/automation/benchmark-jobs`,
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: {
           decisionId: decision.decision_id,
           ownerEoa,
           sessionId: state.activeSession.session_id,
@@ -240,37 +252,17 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
             benchmarkContract: NEURALRATE_BENCHMARK_CONTRACT,
             agentRegistry: ERC8004_IDENTITY_REGISTRY,
             agentId: ERC8004_AGENT_ID,
+            predictedApyBps: decision.predicted_apy_bps,
+            settlementHorizonHours: decision.settlement_horizon_hours,
           },
-        }),
+        },
       });
 
-      if (!response.ok) {
-        throw new Error(`Benchmark queue failed: ${response.status}`);
-      }
-
-      const json = await response.json() as {
-        success: boolean;
-        benchmarkJob: {
-          benchmark_job_id: string;
-          status: string;
-        };
-      };
-
-      await fetch(`${API_BASE_URL}/decisions/${encodeURIComponent(decision.decision_id)}/benchmark`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          benchmarkStatus: "pending",
-          requestedBy: ownerEoa,
-          agentAddress: NEURALRATE_AGENT_SMART_WALLET,
-          userId: state.userId,
-          vaultId: state.vault?.vault_id,
-          policyVersion: state.config?.policy_version,
-          dataSnapshotHash,
-        }),
-      });
-
-      setNotice(`Benchmark job ${truncate(json.benchmarkJob.benchmark_job_id)} queued for this user vault.`);
+      setNotice(
+        json.executionCapable
+          ? `Benchmark job ${truncate(json.benchmarkJob.benchmark_job_id)} submitted and awaiting confirmation.`
+          : `Benchmark job ${truncate(json.benchmarkJob.benchmark_job_id)} recorded, but execution is unavailable for the current signer mode.`
+      );
       await onRefreshAutomation();
       await fetchHistory();
     } catch (err) {
@@ -439,6 +431,24 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
                   <div style={{ fontSize: "0.76rem", color: "var(--text-secondary)" }}>
                     Applied restrictions: {String(constraints.policyVersion || decision.policy_version || "vault-v1")} · max action ${String(constraints.maxActionUsd || state?.config?.max_action_usd || "n/a")}
                   </div>
+
+                  {(decision.tx_hash || job?.tx_hash || job?.onchain_decision_id) && (
+                    <div style={{ fontSize: "0.76rem", color: "var(--text-secondary)", display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+                      {(job?.tx_hash || decision.tx_hash) && (
+                        <a
+                          href={`${MANTLE_EXPLORER_BASE_URL}/tx/${job?.tx_hash || decision.tx_hash}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ color: "var(--color-lime)" }}
+                        >
+                          Tx {truncate(job?.tx_hash || decision.tx_hash || "")}
+                        </a>
+                      )}
+                      {job?.onchain_decision_id && (
+                        <span>On-chain Decision #{job.onchain_decision_id}</span>
+                      )}
+                    </div>
+                  )}
 
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
                     <div style={{ fontSize: "0.76rem", color: job?.failure_reason ? "var(--color-warning)" : "var(--text-secondary)" }}>

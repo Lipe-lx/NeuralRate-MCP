@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  DEMO_TARGET_ASSET,
   MANAGED_SIGNER_PROVIDER,
   MANTLE_EXPLORER_BASE_URL,
   ONBOARDING_PROVIDER,
@@ -20,6 +21,7 @@ type Props = {
   onFundingIntent: (amountUsd: number) => Promise<void>;
   onEnableAutomation: () => Promise<void>;
   onRevokeAutomation: () => Promise<void>;
+  onQueueDemoStrategy: () => Promise<void>;
   onReviewOwnership: () => void;
   controlWalletLabel: string;
 };
@@ -77,7 +79,7 @@ const getRecordString = (record: Record<string, unknown> | null | undefined, key
 const humanize = (value: string | null | undefined) =>
   value
     ? value
-        .split(/[_-]/g)
+        .split(/[:_-]/g)
         .filter(Boolean)
         .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
         .join(" ")
@@ -137,6 +139,19 @@ const rowStyle: React.CSSProperties = {
 const truncate = (value: string | null | undefined) =>
   value ? `${value.slice(0, 8)}...${value.slice(-6)}` : "n/a";
 
+const parsePayloadJson = (value: string | null | undefined) => {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
 const MetricCard: React.FC<{
   eyebrow: string;
   value: string;
@@ -163,6 +178,7 @@ const VaultPanel: React.FC<Props> = ({
   onFundingIntent,
   onEnableAutomation,
   onRevokeAutomation,
+  onQueueDemoStrategy,
   onReviewOwnership,
   controlWalletLabel,
 }) => {
@@ -198,6 +214,11 @@ const VaultPanel: React.FC<Props> = ({
   const fundingStatus = humanize(vault?.funding_status ?? "not-created");
   const policyPreset = humanize(config?.restriction_preset ?? "not-set");
   const riskProfile = humanize(config?.risk_profile ?? "medium");
+  const consentRecordedAt = session?.consent_verified_at ?? null;
+  const consentDigest = session?.consent_digest ?? session?.permission_id ?? null;
+  const onchainGrantStatus = session?.grant_tx_hash ? "Executed" : "Not used";
+  const automationJobs = state?.automationJobs ?? [];
+  const latestJobs = automationJobs.slice(0, 3);
 
   return (
     <section className="glass-panel animate-enter vault-panel">
@@ -254,6 +275,12 @@ const VaultPanel: React.FC<Props> = ({
             <div style={rowStyle}>
               <span>Automation</span>
               <strong style={{ color: "var(--text-primary)" }}>{automationStatus}</strong>
+            </div>
+            <div style={rowStyle}>
+              <span>Signed Consent</span>
+              <strong style={{ color: consentRecordedAt ? "var(--color-lime)" : "var(--text-primary)" }}>
+                {consentRecordedAt ? "Recorded" : "Pending"}
+              </strong>
             </div>
             <div style={rowStyle}>
               <span>Automation Ready</span>
@@ -330,11 +357,19 @@ const VaultPanel: React.FC<Props> = ({
           </div>
 
           {vault && ownershipAcknowledged && (
-            <ActionButton
-              label="Review Wallet Ownership"
-              onClick={onReviewOwnership}
-              disabled={busy}
-            />
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.65rem" }}>
+              <ActionButton
+                label="Review Wallet Ownership"
+                onClick={onReviewOwnership}
+                disabled={busy}
+              />
+              <ActionButton
+                label={busy ? "Queueing Demo..." : `Queue ${DEMO_TARGET_ASSET} Demo`}
+                tone="primary"
+                onClick={onQueueDemoStrategy}
+                disabled={busy || !session || session.session_status === "revoked"}
+              />
+            </div>
           )}
 
           {(notice || error) && (
@@ -418,9 +453,106 @@ const VaultPanel: React.FC<Props> = ({
                 <span>Funding intent</span>
                 <strong>{fundingIntentUsd > 0 ? formatUsd(fundingIntentUsd) : "None"}</strong>
               </div>
-              <div className="vault-info-caption">
-                {fundingIntentUsd > 0 ? `Last funding source: ${fundingIntentSource}` : "Create a funding intent to stage the first deposit into the vault."}
+              <div className="vault-info-row">
+                <span>Signed consent</span>
+                <strong>{consentRecordedAt ? formatDateTime(consentRecordedAt) : "Pending"}</strong>
               </div>
+              <div className="vault-info-row">
+                <span>On-chain grant</span>
+                <strong>{onchainGrantStatus}</strong>
+              </div>
+              <div className="vault-info-caption">
+                {consentDigest
+                  ? `Consent digest ${truncate(consentDigest)}${fundingIntentUsd > 0 ? ` • last funding source: ${fundingIntentSource}` : ""}`
+                  : fundingIntentUsd > 0
+                    ? `Last funding source: ${fundingIntentSource}`
+                    : "Create a funding intent to stage the first deposit into the vault."}
+              </div>
+            </div>
+
+            <div className="vault-info-card">
+              <div className="vault-swiss-kicker">Execution Trail</div>
+              {latestJobs.length ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem" }}>
+                  {latestJobs.map((job) => {
+                    const payload = parsePayloadJson(job.payload_json);
+                    const targetAsset =
+                      typeof payload?.targetAsset === "string" ? payload.targetAsset : DEMO_TARGET_ASSET;
+                    const validationStatus =
+                      typeof payload?.validationStatus === "string" ? payload.validationStatus : null;
+                    const protocolId =
+                      typeof payload?.protocolId === "string" ? payload.protocolId : null;
+                    const resolvedContract =
+                      typeof payload?.resolvedContract === "string" ? payload.resolvedContract : null;
+                    const executionSummary =
+                      typeof payload?.executionSummary === "string" ? payload.executionSummary : null;
+
+                    return (
+                      <div
+                        key={job.job_id}
+                        style={{
+                          border: "1px solid var(--border-subtle)",
+                          borderRadius: "12px",
+                          padding: "0.8rem",
+                          background: "rgba(255,255,255,0.02)",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "0.35rem",
+                        }}
+                      >
+                        <div className="vault-info-row">
+                          <span>{humanize(job.job_type)}</span>
+                          <strong>{humanize(job.status)}</strong>
+                        </div>
+                        <div style={{ fontSize: "0.74rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
+                          {targetAsset} · {humanize(job.execution_domain)} · {protocolId ? humanize(protocolId) : "Registry-pinned strategy"}
+                        </div>
+                        {validationStatus && (
+                          <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)" }}>
+                            Validation {humanize(validationStatus)}
+                          </div>
+                        )}
+                        {executionSummary && (
+                          <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
+                            {executionSummary}
+                          </div>
+                        )}
+                        {resolvedContract && (
+                          <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)" }}>
+                            Contract {truncate(resolvedContract)}
+                          </div>
+                        )}
+                        <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)" }}>
+                          {job.confirmed_at
+                            ? `Confirmed ${formatDateTime(job.confirmed_at)}`
+                            : job.created_at
+                              ? `Created ${formatDateTime(job.created_at)}`
+                              : "Awaiting execution update"}
+                        </div>
+                        {job.tx_hash && (
+                          <a
+                            href={`${MANTLE_EXPLORER_BASE_URL}/tx/${job.tx_hash}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ color: "var(--color-lime)", textDecoration: "none", fontSize: "0.74rem" }}
+                          >
+                            View tx {truncate(job.tx_hash)}
+                          </a>
+                        )}
+                        {job.failure_reason && (
+                          <div style={{ fontSize: "0.72rem", color: "var(--color-warning)", lineHeight: 1.45 }}>
+                            {job.failure_reason}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="vault-info-caption">
+                  No execution jobs recorded yet. Queue the {DEMO_TARGET_ASSET} demo after enabling automation to populate the audit trail.
+                </div>
+              )}
             </div>
           </div>
         </aside>

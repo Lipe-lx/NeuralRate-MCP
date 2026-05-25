@@ -6,6 +6,8 @@ workers_dev = true
 
 [vars]
 NEURALRATE_BENCHMARK_CONTRACT = "0xc51560a5512d2A5756435d87319aeaE1bA480165"
+# Must match the executor/root NEURALRATE_INTERNAL_API_TOKEN during local/dev writes.
+INTERNAL_API_TOKEN = "local-neuralrate-internal"
 
 
 

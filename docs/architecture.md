@@ -1,6 +1,6 @@
 # System Architecture
 
-NeuralRate MCP is built using a modern, decentralized micro-architecture designed for maximum speed, security, and developer interoperability. It bridges raw blockchain opportunities, traditional macroeconomic indicators, and institutional flow data into a unified, agent-driven interface.
+NeuralRate MCP is built as an AI trust and execution layer for Mantle. It bridges raw blockchain opportunities, traditional macroeconomic indicators, and institutional flow data into a unified, policy-constrained, agent-driven interface.
 
 ---
 
@@ -8,10 +8,10 @@ NeuralRate MCP is built using a modern, decentralized micro-architecture designe
 
 The platform consists of five primary layers:
 1. **Frontend Benchmark Terminal:** A Vite React Single Page Application (SPA) leveraging premium glassmorphism aesthetics, EIP-1193 wallet integration, per-user vault bootstrap, explicit wallet-ownership handoff, and personalized agent controls.
-2. **Backend & MCP Server:** A unified Cloudflare Worker acting as both a REST API for the frontend and a Model Context Protocol (MCP) Server for AI agents over Server-Sent Events (SSE).
+2. **Backend & MCP Server:** A unified Cloudflare Worker acting as both a signed-mutation REST API for the frontend and a Model Context Protocol (MCP) Server for AI agents over Server-Sent Events (SSE).
 3. **Database & Cache Layer:** Cloudflare D1 (SQLite) for persistent decision, user, vault, policy, and job records; Cloudflare KV for indexing caching metrics.
-4. **Executor Service:** A dedicated automation runtime that prepares vault-scoped permissions, tracks activation / revocation, and manages autonomous benchmark and execution jobs.
-5. **On-Chain Benchmark Contract (Mantle Network):** A Solidity benchmark contract that acts as an immutable ledger for explicitly confirmed benchmark decisions and is prepared for a configurable agent smart wallet benchmark writer.
+4. **Executor Service:** A dedicated automation runtime that validates signed user intent, prepares vault-scoped permissions, tracks activation / revocation, and manages benchmark and execution jobs.
+5. **On-Chain Contracts (Mantle Network):** A Solidity benchmark contract for immutable decision benchmarking and a pinned USDY strategy adapter for tightly scoped execution.
 
 ```mermaid
 graph TB
@@ -42,6 +42,7 @@ graph TB
 
     subgraph Blockchain [Mantle Sepolia Network]
         SC[NeuralRateDecisionBenchmark.sol]
+        SA[NeuralRateUsdYStrategyAdapter.sol]
         USA[Per-User Vault]
         ASW[Agent Smart Wallet]
     end
@@ -56,7 +57,8 @@ graph TB
     API -->|Cache Queries| KV
     EX -->|Persist Policies + Jobs| API
     EX -->|Autonomous Benchmark Writes| ASW
-    EX -->|Vault-Scoped Execution| USA
+    EX -->|Pinned Strategy Call| SA
+    SA -->|Execution Surface| USA
     ASW -->|Benchmark Writes| SC
     
     API -->|Fetch Yields| DL
@@ -74,10 +76,12 @@ graph TB
 ## 🔌 API & Integration Protocol
 
 To achieve a clean separation of concerns:
-* **The Frontend** communicates with the Backend via standard JSON over HTTP REST endpoints (`/api/*`).
+* **The Frontend** communicates with the Backend via signed JSON mutations over HTTP REST endpoints (`/api/*`).
 * **AI Agents** communicate with the Backend using the **Model Context Protocol (MCP) over Server-Sent Events (SSE)** at `/mcp`. Under the hood, a Cloudflare Durable Object (`NeuralRateMcpAgent`) manages stateful SSE channels.
-* **Automation** is orchestrated by the dedicated executor service rather than the Cloudflare Worker. Users sign consent from the frontend, while the executor manages vault-scoped session state and job queues.
+* **Automation** is orchestrated by the dedicated executor service rather than the Cloudflare Worker. Users sign nonce-backed mutations and a canonical consent message from the frontend, while the executor manages vault-scoped session state and job queues.
 * **Ownership handoff** is tracked in D1 per vault, so funding and automation remain gated until the user acknowledges the distinction between the Safe vault and the controlling wallet.
+* **Benchmark writes** are only considered complete after the executor receives a receipt, parses `DecisionCreated`, and writes the real on-chain `decisionId` back into D1.
+* **Strategy execution** is only considered eligible after the executor resolves the repo-pinned deployment manifest, checks `chainId`, fetches runtime bytecode from Mantle Sepolia, and confirms the observed hash matches the pinned manifest.
 * **Recommendations** consume global market data but resolve user-specific policy, presets, and limits from D1 before ranking pools.
 * **Smart Contracts** are targeted on the **Mantle Sepolia Testnet** (Chain ID `5003`). The benchmark contract remains global, while user execution is always isolated to a dedicated vault per user.
 

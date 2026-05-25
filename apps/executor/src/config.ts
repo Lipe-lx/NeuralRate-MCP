@@ -29,6 +29,7 @@ export const config = {
   agentSmartWallet: requiredAddress("NEURALRATE_AGENT_SMART_WALLET"),
   agentSessionSignerAddress: requiredAddress("NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS"),
   sessionPolicyVersion: required("NEURALRATE_SESSION_POLICY_VERSION", "v1"),
+  internalApiToken: required("NEURALRATE_INTERNAL_API_TOKEN", "local-neuralrate-internal"),
   managedSignerUrl: optional("NEURALRATE_MANAGED_SIGNER_URL"),
   managedSignerToken: optional("NEURALRATE_MANAGED_SIGNER_TOKEN"),
   turnkeyApiBaseUrl: required("TURNKEY_API_BASE_URL", "https://api.turnkey.com"),

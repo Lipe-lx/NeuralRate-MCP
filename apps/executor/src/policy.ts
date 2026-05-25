@@ -1,3 +1,5 @@
+import { getApprovedStrategySurface } from "./executionPlanner.js";
+
 export type PolicyRequest = {
   ownerEoa: string;
   vaultAddress: string;
@@ -14,18 +16,22 @@ export type PolicyRequest = {
   allowedProtocols?: string[];
 };
 
-export const DEFAULT_ALLOWED_CONTRACTS = [
-  "0xc51560a5512d2A5756435d87319aeaE1bA480165",
-];
-
-export const DEFAULT_ALLOWED_SELECTORS = [
-  "0xdce483dd",
-  "0x6a108f39",
-];
-
 export function buildExecutionPolicy(input: PolicyRequest, policyVersion: string) {
-  const allowedContracts = DEFAULT_ALLOWED_CONTRACTS.map((value) => value.toLowerCase());
-  const allowedSelectors = DEFAULT_ALLOWED_SELECTORS.map((value) => value.toLowerCase());
+  const approvedSurface = getApprovedStrategySurface();
+  const allowedContracts = approvedSurface.allowedContracts.map((value) => value.toLowerCase());
+  const allowedSelectors = approvedSurface.allowedSelectors.map((value) => value.toLowerCase());
+  const approvedAssets = new Set(approvedSurface.allowedAssets.map((value) => value.toUpperCase()));
+  const approvedProtocols = new Set(approvedSurface.allowedProtocols.map((value) => value.toUpperCase()));
+  const requestedAssets = (input.allowedAssets ?? []).map((value) => value.trim().toUpperCase()).filter(Boolean);
+  const requestedProtocols = (input.allowedProtocols ?? []).map((value) => value.trim().toUpperCase()).filter(Boolean);
+  const allowedAssets = (requestedAssets.length
+    ? requestedAssets.filter((value) => approvedAssets.has(value))
+    : approvedSurface.allowedAssets
+  ).map((value) => value.toUpperCase());
+  const allowedProtocols = (requestedProtocols.length
+    ? requestedProtocols.filter((value) => approvedProtocols.has(value))
+    : approvedSurface.allowedProtocols
+  );
   const validAfter = input.validAfter ?? new Date().toISOString();
   const validUntil =
     input.validUntil ??
@@ -36,8 +42,8 @@ export function buildExecutionPolicy(input: PolicyRequest, policyVersion: string
     domain: "execution" as const,
     allowedContracts,
     allowedSelectors,
-    allowedAssets: input.allowedAssets ?? [],
-    allowedProtocols: input.allowedProtocols ?? [],
+    allowedAssets,
+    allowedProtocols,
     spendToken: input.spendToken ?? "USDC",
     spendLimitPerUse: input.spendLimitPerUse ?? "1000",
     spendLimitDaily: input.spendLimitDaily ?? "2500",
@@ -46,13 +52,14 @@ export function buildExecutionPolicy(input: PolicyRequest, policyVersion: string
     validAfter,
     validUntil,
     humanSummary:
-      "Delegated execution on Mantle Sepolia with whitelisted contracts, selectors, spend caps, and bounded lifetime.",
+      "Delegated execution on Mantle Sepolia with registry-pinned strategy contracts, selectors, spend caps, and bounded lifetime.",
     rawPolicy: {
       allowedChains: [5003],
+      approvedStrategyKeys: approvedSurface.strategyKeys,
       allowedContracts,
       allowedSelectors,
-      allowedAssets: input.allowedAssets ?? [],
-      allowedProtocols: input.allowedProtocols ?? [],
+      allowedAssets,
+      allowedProtocols,
       spendToken: input.spendToken ?? "USDC",
       spendLimitPerUse: input.spendLimitPerUse ?? "1000",
       spendLimitDaily: input.spendLimitDaily ?? "2500",

@@ -1,7 +1,7 @@
 {
   "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
   "name": "NeuralRate MCP Agent",
-  "description": "Verifiable RWA yield intelligence, global benchmark identity, and per-user isolated vault automation on Mantle Sepolia",
+  "description": "AI trust and execution layer for RWA allocation on Mantle with signed user policy, benchmark registry, MCP access, and isolated per-user vault flow",
   "image": "ipfs://QmQGKMZUpYJSJjzU1kiVrpMZ9jqTTW3aPoQBsunUShcTqC",
   "services": [
     {

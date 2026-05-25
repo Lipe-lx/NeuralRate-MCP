@@ -33,6 +33,8 @@ const publicSessionPolicyVersion = import.meta.env.VITE_PUBLIC_SESSION_POLICY_VE
 const publicVaultProviderStrategy = import.meta.env.VITE_PUBLIC_NEURALRATE_VAULT_PROVIDER_STRATEGY?.trim();
 const publicOnboardingProvider = import.meta.env.VITE_PUBLIC_NEURALRATE_ONBOARDING_PROVIDER?.trim();
 const publicManagedSignerProvider = import.meta.env.VITE_PUBLIC_NEURALRATE_MANAGED_SIGNER_PROVIDER?.trim();
+const publicDemoStrategyKey = import.meta.env.VITE_PUBLIC_NEURALRATE_DEMO_STRATEGY_KEY?.trim();
+const publicDemoTargetAsset = import.meta.env.VITE_PUBLIC_NEURALRATE_DEMO_TARGET_ASSET?.trim();
 
 const workerOrigin = isLocal
   ? defaultLocalOrigin
@@ -73,3 +75,5 @@ export const PRIVY_APP_ID = publicPrivyAppId || '';
 export const PRIVY_CLIENT_ID = publicPrivyClientId || '';
 export const PRIVY_ENABLED = Boolean(PRIVY_APP_ID);
 export const SAFE_SALT_NONCE = publicSafeSaltNonce || '49';
+export const DEMO_STRATEGY_KEY = publicDemoStrategyKey || 'usdy-stable-allocation';
+export const DEMO_TARGET_ASSET = publicDemoTargetAsset || 'USDY';

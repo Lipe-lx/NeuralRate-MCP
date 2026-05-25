@@ -1,14 +1,16 @@
-# NeuralRate MCP — Verifiable RWA Yield Intelligence on Mantle
+# NeuralRate MCP — AI Trust and Execution Layer for RWA Allocation on Mantle
 
-NeuralRate MCP is a verifiable RWA yield intelligence layer for autonomous agents on the **Mantle Network**.
+NeuralRate MCP is an AI trust and execution layer for policy-constrained RWA allocation on the **Mantle Network**.
 
-It leverages real-time yields data, macroeconomic indicators, and institutional orderflow signals to assess risk deterministically using a **6-factor Risk Assessment Model** and calculate optimal allocations. Built for AI-agent interoperability, NeuralRate exposes its capabilities directly to Large Language Models (LLMs) via the **Model Context Protocol (MCP)**, includes an operator-facing benchmark terminal, and now ships a **non-custodial per-user vault automation foundation** on Mantle Sepolia:
+It leverages real-time yields data, macroeconomic indicators, and institutional orderflow signals to assess risk deterministically using a **6-factor Risk Assessment Model** and calculate optimal allocations. Built for AI-agent interoperability, NeuralRate exposes its capabilities directly to Large Language Models (LLMs) via the **Model Context Protocol (MCP)**, includes an operator-facing benchmark terminal, and now ships a **signed-consent, per-user benchmark and automation flow** on Mantle Sepolia:
 
+* **Wallet-first signed mutations for every state-changing user action**
 * **User control wallet for consent, ownership, and revocation**
 * **Dedicated vault / smart account per user**
 * **Personalized agent configuration per user**
 * **Global NeuralRate benchmark identity kept separate from user funds**
 * **Dedicated executor service for vault-scoped automation orchestration**
+* **On-chain benchmark writes with local-to-chain audit trail**
 
 The public benchmark contract remains global, while user funds and execution policies are isolated inside a dedicated vault for each user. This prevents shared-balance blast radius and keeps recommendations scoped to the user’s own configuration.
 
@@ -56,16 +58,23 @@ graph TD
 
 The project is structured as a monorepo containing the following components:
 
-* **`/apps/worker`**: The Cloudflare Worker backend. Exposes a CORS-enabled REST API for the operator-facing web app and runs the stateful Model Context Protocol (MCP) server over Server-Sent Events (SSE). Integrates Cloudflare KV caching and D1 SQLite storage.
+* **`/apps/worker`**: The Cloudflare Worker backend. Exposes a signed-mutation REST API for the operator-facing web app and runs the stateful Model Context Protocol (MCP) server over Server-Sent Events (SSE). Integrates Cloudflare KV caching and D1 SQLite storage.
 * **`/apps/web`**: The Vite React frontend benchmark terminal, featuring dark glassmorphism styling, custom OKLCH colors, native EIP-1193 wallet integration, per-user vault bootstrap, wallet-ownership handoff, personalized agent settings, and vault-scoped automation consent on Mantle Sepolia.
 * **`/apps/executor`**: The dedicated automation service. Prepares vault-scoped permissions, tracks activation / revocation, and owns the autonomous job queue without ever holding user keys.
-* **`/contracts`**: The Hardhat development workspace containing `NeuralRateDecisionBenchmark.sol`, a Solidity benchmark contract prepared for a configurable benchmark writer such as the NeuralRate agent smart wallet.
+* **`/contracts`**: The Hardhat development workspace containing `NeuralRateDecisionBenchmark.sol` and `NeuralRateUsdYStrategyAdapter.sol`, the pinned strategy surface used by the executor on Mantle Sepolia.
 * **`/docs`**: Comprehensive, zero-speculation technical documentation of the entire platform:
   1. [System Architecture Guide](docs/architecture.md) — Structural layout, data flow, and caching strategy.
   2. [MCP Server Specifications](docs/mcp-server.md) — 7 tools definitions and the complete formulas for the 6-factor Risk Model.
   3. [Smart Contract Documentation](docs/smart-contract.md) — Functions, modifiers, variables, and events.
   4. [Frontend UI Reference](docs/frontend.md) — Component architecture, EIP-1193 Mantle Sepolia hook, and glassmorphism styling.
   5. [Database Schema](docs/database.md) — SQLite Cloudflare D1 schema columns and tables representation.
+  6. [Hackathon Submission Pack](docs/hackathon-submission.md) — One-liner, demo script, trust model, architecture slide outline, and feature matrix.
+
+## 🔗 Live Mantle Sepolia Deployments
+
+* **Benchmark Registry:** [`0xc51560a5512d2A5756435d87319aeaE1bA480165`](https://sepolia.mantlescan.xyz/address/0xc51560a5512d2A5756435d87319aeaE1bA480165)
+* **USDY Strategy Adapter:** [`0xFeE16FAd13789e9bBA4779D025186341e58799a3`](https://sepolia.mantlescan.xyz/address/0xFeE16FAd13789e9bBA4779D025186341e58799a3)
+* **USDY Adapter Deploy Tx:** [`0xee3a1caa73baaa8d3adcd103d44d9bf424b5612b660fc642bc40e11287a9e3c8`](https://sepolia.mantlescan.xyz/tx/0xee3a1caa73baaa8d3adcd103d44d9bf424b5612b660fc642bc40e11287a9e3c8)
 
 ---
 
@@ -85,9 +94,17 @@ VITE_PUBLIC_ERC8004_IDENTITY_REGISTRY="0x8004A818BFB912233c491871b3d84c89A494BD9
 VITE_PUBLIC_EXECUTOR_BASE_URL="http://127.0.0.1:8788"
 VITE_PUBLIC_NEURALRATE_AGENT_SMART_WALLET="0xYourAgentSmartWallet"
 NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS="0xYourAgentSessionSigner"
+NEURALRATE_USDY_STRATEGY_EXECUTOR_ADDRESS="0xYourTurnkeyOrSessionSigner"
 VITE_PUBLIC_NEURALRATE_VAULT_PROVIDER_STRATEGY="safe-primary"
 VITE_PUBLIC_NEURALRATE_ONBOARDING_PROVIDER="privy"
 VITE_PUBLIC_NEURALRATE_MANAGED_SIGNER_PROVIDER="turnkey"
+NEURALRATE_INTERNAL_API_TOKEN="local-neuralrate-internal"
+NEURALRATE_DEMO_STRATEGY_KEY="usdy-stable-allocation"
+NEURALRATE_DEMO_TARGET_ASSET="USDY"
+# Legacy fallback only. The primary strategy path resolves the approved adapter
+# from the repo-pinned registry after deployment to Mantle Sepolia.
+NEURALRATE_DEMO_TARGET_CONTRACT=""
+NEURALRATE_DEMO_CALLDATA=""
 ```
 
 ### 2. Run the Cloudflare Worker Backend
@@ -99,6 +116,7 @@ npx wrangler dev
 ```
 * The backend will boot at `http://localhost:8787` (CORS headers enabled for local frontend requests).
 * Exposes REST endpoints under `/api/*` and the stateful SSE agent connection stream at `/mcp`.
+* Mutating browser requests use wallet-signed nonces; executor-to-worker writes use the internal API token configured as `INTERNAL_API_TOKEN` in `wrangler.toml` / `.dev.vars`, and it must match the root/executor `NEURALRATE_INTERNAL_API_TOKEN`.
 
 ### 3. Run the Vite React Frontend
 In a new terminal window, navigate to the web app directory, install dependencies, and launch Vite's HMR dev server:
@@ -110,6 +128,7 @@ npm run dev
 * The frontend app will open at `http://localhost:5173`.
 * Standardizes to Mantle Sepolia (Chain ID `5003`).
 * The benchmark terminal can run entirely on the built-in Sepolia defaults, or read the public contract / explorer / executor overrides from `apps/web/.env.example`.
+* The primary USDY execution path now resolves through the repo-pinned strategy registry and validates the deployed adapter bytecode before execution. If deployment or bytecode checks fail, the UI records the strategy job as blocked with an explicit audit reason instead of claiming live execution.
 
 ### 4. Run the Executor Service
 In a third terminal window, launch the automation executor:
@@ -128,6 +147,6 @@ npm run dev
 1. **6-Factor Deterministic Risk Engine:** Evaluates protocols based on TVL, Volume utilization (detecting lending pools automatically), APY sustainability, Yield Composition (base vs reward incentives), IL risk, and Nansen Smart Money flows.
 2. **Per-User Vault Isolation:** Every user gets a dedicated vault / smart account, so no user funds are pooled behind a shared agent treasury.
 3. **Personalized Agent Settings:** Recommendations are ranked from global market data but filtered and capped by the user’s own vault policy, presets, allowlists, and automation limits.
-4. **Vault-Scoped Automation Flow:** The frontend bootstraps a dedicated vault, performs an explicit wallet-ownership handoff, records funding intents, enables revocable automation, and keeps benchmark identity separate from execution funds.
-5. **Executor-Based Benchmark Orchestration:** Decisions are generated and stored locally in D1 first, then queued into a dedicated executor that manages autonomous benchmark jobs under a revocable user-vault policy model.
+4. **Signed Consent and Policy Verification:** The frontend bootstraps a dedicated vault, records signed consent, performs an explicit wallet-ownership handoff, and keeps benchmark identity separate from execution funds.
+5. **Executor-Based Benchmark Orchestration:** Decisions are generated and stored locally in D1 first, then queued into a dedicated executor that writes on-chain benchmarks, parses receipts, and closes the audit trail under a revocable user-vault policy model.
 6. **Agent-Access MCP Portal:** Connects AI agents directly to our DeFi tools in 1-click using SSE and standard JSON configurations.

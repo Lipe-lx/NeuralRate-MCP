@@ -1,37 +1,46 @@
+import { createPublicClient, encodeFunctionData, http, parseEventLogs, defineChain } from "viem";
 import { type ManagedSigner } from "./managedSigner.js";
 import { config } from "./config.js";
 
-const CREATE_DECISION_SELECTOR = "0xdce483dd";
+const mantleSepolia = defineChain({
+  id: 5003,
+  name: "Mantle Sepolia",
+  nativeCurrency: { name: "MNT", symbol: "MNT", decimals: 18 },
+  rpcUrls: {
+    default: { http: [config.mantleSepoliaRpcUrl] },
+  },
+});
 
-const stripHexPrefix = (value: string) => value.replace(/^0x/i, "");
-const padHex = (value: string, length = 64) => stripHexPrefix(value).padStart(length, "0");
-const padRightHex = (value: string, length: number) => stripHexPrefix(value).padEnd(length, "0");
-const bigintToHex = (value: bigint) => value.toString(16);
+const benchmarkAbi = [
+  {
+    type: "function",
+    name: "createDecision",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "_requestedBy", type: "address" },
+      { name: "_dataSnapshotHash", type: "string" },
+      { name: "_predictedApyBps", type: "int256" },
+      { name: "_settlementHorizonHours", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "event",
+    name: "DecisionCreated",
+    inputs: [
+      { indexed: true, name: "decisionId", type: "uint256" },
+      { indexed: true, name: "requestedBy", type: "address" },
+      { indexed: false, name: "dataSnapshotHash", type: "string" },
+      { indexed: false, name: "predictedApyBps", type: "int256" },
+      { indexed: false, name: "settlementHorizonHours", type: "uint256" },
+    ],
+  },
+] as const;
 
-function encodeUint256(value: bigint) {
-  if (value < 0n) throw new Error("Unsigned integer cannot be negative");
-  return padHex(bigintToHex(value));
-}
-
-function encodeInt256(value: bigint) {
-  const maxUint256 = 1n << 256n;
-  const encoded = value < 0n ? maxUint256 + value : value;
-  return padHex(bigintToHex(encoded));
-}
-
-function encodeAddress(address: string) {
-  const normalized = stripHexPrefix(address).toLowerCase();
-  if (normalized.length !== 40) throw new Error(`Invalid address: ${address}`);
-  return padHex(normalized);
-}
-
-function encodeString(value: string) {
-  const bytes = new TextEncoder().encode(value);
-  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-  const byteLength = encodeUint256(BigInt(bytes.length));
-  const paddedLength = Math.ceil(hex.length / 64) * 64;
-  return `${byteLength}${padRightHex(hex, paddedLength)}`;
-}
+const publicClient = createPublicClient({
+  chain: mantleSepolia,
+  transport: http(config.mantleSepoliaRpcUrl),
+});
 
 export function buildCreateDecisionCalldata(args: {
   requestedBy: string;
@@ -39,17 +48,34 @@ export function buildCreateDecisionCalldata(args: {
   predictedApyBps: number;
   settlementHorizonHours: number;
 }) {
-  const dynamicOffset = 32n * 4n;
-  const head = [
-    encodeAddress(args.requestedBy),
-    encodeUint256(dynamicOffset),
-    encodeInt256(BigInt(args.predictedApyBps)),
-    encodeUint256(BigInt(args.settlementHorizonHours)),
-  ].join("");
+  return encodeFunctionData({
+    abi: benchmarkAbi,
+    functionName: "createDecision",
+    args: [
+      args.requestedBy as `0x${string}`,
+      args.dataSnapshotHash,
+      BigInt(args.predictedApyBps),
+      BigInt(args.settlementHorizonHours),
+    ],
+  });
+}
 
-  const tail = encodeString(args.dataSnapshotHash);
+export function extractDecisionCreated(logs: readonly unknown[]) {
+  const parsedLogs = parseEventLogs({
+    abi: benchmarkAbi,
+    eventName: "DecisionCreated",
+    logs: logs as any,
+  });
 
-  return `${CREATE_DECISION_SELECTOR}${head}${tail}`;
+  const match = parsedLogs.find((log) => log.address.toLowerCase() === config.benchmarkContract.toLowerCase());
+  if (!match) {
+    throw new Error("DecisionCreated event not found in benchmark receipt.");
+  }
+
+  return {
+    onchainDecisionId: match.args.decisionId?.toString() ?? "",
+    requestedBy: String(match.args.requestedBy ?? "").toLowerCase(),
+  };
 }
 
 export async function executeBenchmarkJob(
@@ -67,12 +93,23 @@ export async function executeBenchmarkJob(
   }
 
   const calldata = buildCreateDecisionCalldata(payload);
-
   const txHash = await signer.signAndSendTransaction({
     to: config.benchmarkContract,
-    data: "0x" + calldata.replace(/^0x/, ""),
+    data: calldata,
     chainId: 5003,
   });
 
-  return txHash;
+  const receipt = await publicClient.waitForTransactionReceipt({
+    hash: txHash as `0x${string}`,
+  });
+  const event = extractDecisionCreated(receipt.logs);
+  const block = await publicClient.getBlock({
+    blockHash: receipt.blockHash,
+  });
+
+  return {
+    txHash,
+    onchainDecisionId: event.onchainDecisionId,
+    confirmedAt: new Date(Number(block.timestamp) * 1000).toISOString(),
+  };
 }

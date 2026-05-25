@@ -7,11 +7,12 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "cf-typegen": "wrangler types",
-    "test": "node --import tsx --test src/services/nansen.test.ts"
+    "test": "node --import tsx --test src/auth.test.ts src/services/nansen.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "agents": "^0.12.4",
+    "viem": "^2.50.4",
     "zod": "^3.23.0"
   },
   "devDependencies": {

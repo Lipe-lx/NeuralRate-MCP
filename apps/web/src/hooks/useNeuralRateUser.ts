@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import type { EIP1193Provider } from "viem";
 import {
   API_BASE_URL,
+  DEMO_STRATEGY_KEY,
+  DEMO_TARGET_ASSET,
   EXECUTOR_BASE_URL,
   SESSION_POLICY_VERSION,
   VAULT_PROVIDER_STRATEGY,
@@ -11,6 +13,7 @@ import {
   resolveUserSafeVault,
   type PreparedAutomationSession,
 } from "../lib/automation";
+import { signedJsonFetch } from "../lib/auth";
 import type { AutomationState } from "../lib/userState";
 
 const fetchJson = async <T>(url: string, options?: RequestInit) => {
@@ -101,10 +104,12 @@ export const useNeuralRateUser = ({
         vaultAddress = predicted.safeAddress.toLowerCase();
       }
 
-      const response = await fetchJson<{ success: boolean; state: AutomationState }>(`${API_BASE_URL}/users/bootstrap`, {
+      const response = await signedJsonFetch<{ success: boolean; state: AutomationState }>({
+        ownerEoa,
+        signMessage,
+        url: `${API_BASE_URL}/users/bootstrap`,
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: {
           ownerEoa,
           externalWallet: externalWalletAddress ?? ownerEoa,
           embeddedWallet: embeddedWalletAddress,
@@ -118,7 +123,7 @@ export const useNeuralRateUser = ({
           vaultStatus: vaultAddress ? "predicted" : "provisioning",
           safeDeploymentStatus: vaultAddress ? "predicted" : "pending",
           chainId: 5003,
-        }),
+        },
       });
 
       setState(response.state);
@@ -141,16 +146,18 @@ export const useNeuralRateUser = ({
     setBusy(true);
     setError(null);
     try {
-      const response = await fetchJson<{ success: boolean; config: unknown }>(`${API_BASE_URL}/agent-config`, {
+      const response = await signedJsonFetch<{ success: boolean; config: unknown }>({
+        ownerEoa,
+        signMessage,
+        url: `${API_BASE_URL}/agent-config`,
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: {
           ownerEoa,
           userId: state?.userId,
           vaultId: state?.vault?.vault_id,
           policyVersion: state?.config?.policy_version ?? SESSION_POLICY_VERSION,
           ...patch,
-        }),
+        },
       });
 
       await refresh(ownerEoa);
@@ -173,14 +180,16 @@ export const useNeuralRateUser = ({
     setBusy(true);
     setError(null);
     try {
-      await fetchJson(`${API_BASE_URL}/vault/funding-intent`, {
+      await signedJsonFetch({
+        ownerEoa,
+        signMessage,
+        url: `${API_BASE_URL}/vault/funding-intent`,
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: {
           ownerEoa,
           amountUsd,
           source: externalWalletAddress ? "external-wallet" : "embedded-wallet",
-        }),
+        },
       });
       await refresh(ownerEoa);
       setNotice("Funding intent recorded. Send funds to the vault deposit address shown below.");
@@ -201,14 +210,16 @@ export const useNeuralRateUser = ({
     setBusy(true);
     setError(null);
     try {
-      const response = await fetchJson<{ success: boolean; state: AutomationState }>(`${API_BASE_URL}/vault/ownership-ack`, {
+      const response = await signedJsonFetch<{ success: boolean; state: AutomationState }>({
+        ownerEoa,
+        signMessage,
+        url: `${API_BASE_URL}/vault/ownership-ack`,
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: {
           ownerEoa,
           userId: state.userId,
           vaultId: state.vault.vault_id,
-        }),
+        },
       });
 
       setState(response.state);
@@ -236,7 +247,7 @@ export const useNeuralRateUser = ({
     setBusy(true);
     setError(null);
     try {
-      const prepared = await fetchJson<{
+      const prepared = await signedJsonFetch<{
         success: boolean;
         sessionId: string;
         policyId: string;
@@ -250,17 +261,19 @@ export const useNeuralRateUser = ({
         benchmarkContract: string;
         chainId: number;
         executionPolicy: PreparedAutomationSession["executionPolicy"];
-      }>(`${EXECUTOR_BASE_URL}/v1/automation/prepare`, {
+      }>({
+        ownerEoa,
+        signMessage,
+        url: `${EXECUTOR_BASE_URL}/v1/automation/prepare`,
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: {
           ownerEoa,
           vaultAddress: current.vault.vault_address,
           spendLimitPerUse: String(current.config?.max_action_usd ?? 1000),
           spendLimitDaily: String(current.config?.max_daily_usd ?? 2500),
           spendLimitTotal: String(current.config?.max_automation_usd ?? 10000),
           usageLimit: 25,
-        }),
+        },
       });
 
       const activated = await authorizeAutomationSession({
@@ -285,28 +298,32 @@ export const useNeuralRateUser = ({
         walletProvider,
       });
 
-      await fetchJson(`${EXECUTOR_BASE_URL}/v1/automation/activate`, {
+      await signedJsonFetch({
+        ownerEoa,
+        signMessage,
+        url: `${EXECUTOR_BASE_URL}/v1/automation/activate`,
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: {
           sessionId: prepared.sessionId,
           policyId: prepared.policyId,
           ownerEoa,
           vaultAddress: activated.userSmartAccount,
-          grantTxHash: activated.grantTxHash,
+          grantTxHash: null,
           permissionId: activated.permissionId,
           sessionDetails: activated.sessionDetails,
           validAfter: activated.validAfter,
           validUntil: activated.validUntil,
           consentMessage: activated.consentMessage,
           consentSignature: activated.consentSignature,
+          consentDigest: activated.consentDigest,
+          consentVerifiedAt: new Date().toISOString(),
           providerSessionRef: activated.providerSessionRef,
           providerPermissionRef: activated.providerPermissionRef,
-        }),
+        },
       });
 
       await refresh(ownerEoa);
-      setNotice("Automation enabled for this dedicated Safe vault.");
+      setNotice("Signed consent recorded and automation activated for this dedicated Safe vault.");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to enable automation.";
       setError(message);
@@ -324,10 +341,12 @@ export const useNeuralRateUser = ({
     setBusy(true);
     setError(null);
     try {
-      await fetchJson(`${EXECUTOR_BASE_URL}/v1/automation/revoke`, {
+      await signedJsonFetch({
+        ownerEoa,
+        signMessage,
+        url: `${EXECUTOR_BASE_URL}/v1/automation/revoke`,
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: {
           sessionId: state.activeSession.session_id,
           policyId: state.activeSession.policy_id,
           ownerEoa,
@@ -338,12 +357,63 @@ export const useNeuralRateUser = ({
             revokedAt: new Date().toISOString(),
             providerSessionRef: providerUserId ? `${walletProvider}:${providerUserId}` : null,
           },
-        }),
+        },
       });
       await refresh(ownerEoa);
       setNotice("Automation revoked for this vault.");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to revoke automation.";
+      setError(message);
+      throw err;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const queueDemoStrategy = async () => {
+    if (!ownerEoa || !state?.activeSession || !state?.vault?.vault_address) {
+      throw new Error("Enable automation before queueing the USDY stable demo strategy.");
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await signedJsonFetch<{
+        success: boolean;
+        executionCapable: boolean;
+        job?: {
+          status?: string;
+        };
+      }>({
+        ownerEoa,
+        signMessage,
+        url: `${EXECUTOR_BASE_URL}/v1/automation/jobs`,
+        method: "POST",
+        body: {
+          sessionId: state.activeSession.session_id,
+          ownerEoa,
+          vaultAddress: state.vault.vault_address,
+          executionDomain: "execution",
+          jobType: "strategy-execution",
+          strategyKey: DEMO_STRATEGY_KEY,
+          intent: {
+            targetAsset: DEMO_TARGET_ASSET,
+            amountUsd: state.config?.max_action_usd ?? 1000,
+            slippageBps: 50,
+          },
+        },
+      });
+
+      await refresh(ownerEoa);
+      setNotice(
+        response.job?.status === "blocked"
+          ? "USDY stable strategy was recorded but blocked by policy or deployment validation. Check the execution trail for the exact reason."
+          : response.executionCapable
+            ? "USDY stable strategy queued for execution inside the dedicated vault."
+            : "USDY stable strategy was accepted, but the managed signer is not execution-capable in this environment.",
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to queue the USDY stable demo strategy.";
       setError(message);
       throw err;
     } finally {
@@ -366,5 +436,6 @@ export const useNeuralRateUser = ({
     acknowledgeOwnership,
     enableAutomation,
     revokeAutomation,
+    queueDemoStrategy,
   };
 };

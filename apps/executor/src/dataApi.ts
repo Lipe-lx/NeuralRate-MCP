@@ -1,16 +1,22 @@
 type RequestOptions = {
   method?: "GET" | "POST" | "PATCH";
   body?: unknown;
+  headers?: Record<string, string>;
 };
 
 export class DataApiClient {
-  constructor(private baseUrl: string) {}
+  constructor(
+    private baseUrl: string,
+    private internalToken: string | null = null,
+  ) {}
 
   private async request<T>(path: string, options: RequestOptions = {}) {
     const response = await fetch(`${this.baseUrl}${path}`, {
       method: options.method ?? "GET",
       headers: {
         "Content-Type": "application/json",
+        ...(this.internalToken ? { "X-NeuralRate-Internal-Token": this.internalToken } : {}),
+        ...(options.headers ?? {}),
       },
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     });
@@ -29,6 +35,10 @@ export class DataApiClient {
 
   bootstrapUser(body: Record<string, unknown>) {
     return this.request("/users/bootstrap", { method: "POST", body });
+  }
+
+  verifyMutationAuth(body: Record<string, unknown>) {
+    return this.request("/auth/verify", { method: "POST", body, headers: {} });
   }
 
   getAgentConfig(ownerEoa: string) {

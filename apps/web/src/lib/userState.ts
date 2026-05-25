@@ -110,6 +110,11 @@ export interface AutomationSession {
   permission_id: string | null;
   valid_after: string | null;
   valid_until: string | null;
+  consent_message: string | null;
+  consent_signature: string | null;
+  consent_digest: string | null;
+  consent_verified_at: string | null;
+  grant_tx_hash: string | null;
 }
 
 export interface BenchmarkJob {
@@ -118,6 +123,23 @@ export interface BenchmarkJob {
   status: string;
   failure_reason: string | null;
   tx_hash: string | null;
+  onchain_decision_id: string | null;
+  confirmed_at: string | null;
+}
+
+export interface AutomationJob {
+  job_id: string;
+  session_id: string | null;
+  execution_domain: string | null;
+  job_type: string;
+  target_contract: string | null;
+  target_selector: string | null;
+  payload_json: string | null;
+  status: string;
+  tx_hash: string | null;
+  confirmed_at: string | null;
+  failure_reason: string | null;
+  created_at: string | null;
 }
 
 export interface AutomationState {
@@ -130,6 +152,7 @@ export interface AutomationState {
   activePermission: VaultPermission | null;
   sessions: AutomationSession[];
   activeSession: AutomationSession | null;
+  automationJobs: AutomationJob[];
   benchmarkJobs: BenchmarkJob[];
   automationReady: boolean;
 }

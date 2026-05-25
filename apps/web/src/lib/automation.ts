@@ -21,13 +21,14 @@ export type PreparedAutomationSession = {
 
 export type SessionActivationResult = {
   userSmartAccount: string;
-  grantTxHash: string;
+  grantTxHash: string | null;
   sessionDetails: Record<string, unknown>;
   permissionId: string | null;
   validAfter: string;
   validUntil: string;
   consentMessage: string;
   consentSignature: string;
+  consentDigest: string;
   providerSessionRef: string;
   providerPermissionRef: string | null;
 };
@@ -156,10 +157,11 @@ export async function authorizeAutomationSession(args: {
 
   return {
     userSmartAccount: args.preparedSession.userSmartAccount.toLowerCase(),
-    grantTxHash: consentHash,
+    grantTxHash: null,
     sessionDetails: {
       consentMessage,
       consentSignature,
+      consentDigest: consentHash,
       providerSessionRef,
       providerPermissionRef,
       automationModel: 'privy-safe-turnkey',
@@ -169,6 +171,7 @@ export async function authorizeAutomationSession(args: {
     validUntil: args.preparedSession.executionPolicy.validUntil,
     consentMessage,
     consentSignature,
+    consentDigest: consentHash,
     providerSessionRef,
     providerPermissionRef,
   } satisfies SessionActivationResult;

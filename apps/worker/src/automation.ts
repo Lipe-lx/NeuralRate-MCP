@@ -162,6 +162,8 @@ export type AutomationSessionInput = {
   providerPermissionRef?: string | null;
   consentMessage?: string | null;
   consentSignature?: string | null;
+  consentDigest?: string | null;
+  consentVerifiedAt?: string | null;
   turnkeySignerRef?: string | null;
   userId?: string | null;
   vaultId?: string | null;
@@ -180,6 +182,7 @@ export type AutomationJobInput = {
   payload?: Record<string, unknown>;
   status?: string;
   txHash?: string | null;
+  confirmedAt?: string | null;
   failureReason?: string | null;
   providerJobRef?: string | null;
   userId?: string | null;
@@ -196,6 +199,7 @@ export type BenchmarkJobInput = {
   status?: string;
   txHash?: string | null;
   onchainDecisionId?: string | null;
+  confirmedAt?: string | null;
   dataSnapshotHash?: string | null;
   payload?: Record<string, unknown>;
   failureReason?: string | null;
@@ -871,8 +875,9 @@ export class AutomationStore {
           session_id, policy_id, owner_eoa, user_smart_account, agent_session_signer, chain_id,
           session_status, grant_tx_hash, revoke_tx_hash, permission_id, session_details_json,
           valid_after, valid_until, revoked_at, user_id, vault_id, policy_version,
-          provider_session_ref, provider_permission_ref, consent_message, consent_signature, turnkey_signer_ref
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          provider_session_ref, provider_permission_ref, consent_message, consent_signature, consent_digest,
+          consent_verified_at, turnkey_signer_ref
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(session_id) DO UPDATE SET
           policy_id = excluded.policy_id,
           owner_eoa = excluded.owner_eoa,
@@ -894,6 +899,8 @@ export class AutomationStore {
           provider_permission_ref = excluded.provider_permission_ref,
           consent_message = excluded.consent_message,
           consent_signature = excluded.consent_signature,
+          consent_digest = excluded.consent_digest,
+          consent_verified_at = excluded.consent_verified_at,
           turnkey_signer_ref = excluded.turnkey_signer_ref,
           updated_at = datetime('now')
       `)
@@ -919,6 +926,8 @@ export class AutomationStore {
         input.providerPermissionRef ?? null,
         input.consentMessage ?? null,
         input.consentSignature ?? null,
+        input.consentDigest ?? null,
+        input.consentVerifiedAt ?? null,
         input.turnkeySignerRef ?? null
       )
       .run();
@@ -961,9 +970,9 @@ export class AutomationStore {
       .prepare(`
         INSERT INTO automation_jobs (
           job_id, session_id, owner_eoa, user_smart_account, execution_domain, job_type,
-          target_contract, target_selector, payload_json, status, tx_hash, failure_reason,
+          target_contract, target_selector, payload_json, status, tx_hash, confirmed_at, failure_reason,
           user_id, vault_id, policy_version, provider_job_ref
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(job_id) DO UPDATE SET
           session_id = excluded.session_id,
           owner_eoa = excluded.owner_eoa,
@@ -975,6 +984,7 @@ export class AutomationStore {
           payload_json = excluded.payload_json,
           status = excluded.status,
           tx_hash = excluded.tx_hash,
+          confirmed_at = excluded.confirmed_at,
           failure_reason = excluded.failure_reason,
           user_id = excluded.user_id,
           vault_id = excluded.vault_id,
@@ -994,6 +1004,7 @@ export class AutomationStore {
         JSON.stringify(input.payload ?? {}),
         input.status ?? "queued",
         input.txHash ?? null,
+        input.confirmedAt ?? null,
         input.failureReason ?? null,
         userId,
         vaultId,
@@ -1033,9 +1044,9 @@ export class AutomationStore {
       .prepare(`
         INSERT INTO benchmark_jobs (
           benchmark_job_id, decision_id, owner_eoa, agent_smart_wallet, session_id, status,
-          tx_hash, onchain_decision_id, data_snapshot_hash, payload_json, failure_reason,
+          tx_hash, onchain_decision_id, confirmed_at, data_snapshot_hash, payload_json, failure_reason,
           user_id, vault_id, policy_version, provider_job_ref
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(benchmark_job_id) DO UPDATE SET
           decision_id = excluded.decision_id,
           owner_eoa = excluded.owner_eoa,
@@ -1044,6 +1055,7 @@ export class AutomationStore {
           status = excluded.status,
           tx_hash = excluded.tx_hash,
           onchain_decision_id = excluded.onchain_decision_id,
+          confirmed_at = excluded.confirmed_at,
           data_snapshot_hash = excluded.data_snapshot_hash,
           payload_json = excluded.payload_json,
           failure_reason = excluded.failure_reason,
@@ -1062,6 +1074,7 @@ export class AutomationStore {
         input.status ?? "queued",
         input.txHash ?? null,
         input.onchainDecisionId ?? null,
+        input.confirmedAt ?? null,
         input.dataSnapshotHash ?? null,
         JSON.stringify(input.payload ?? {}),
         input.failureReason ?? null,

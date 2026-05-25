@@ -20,6 +20,8 @@ interface ImportMetaEnv {
   readonly VITE_PUBLIC_PRIVY_APP_ID?: string;
   readonly VITE_PUBLIC_PRIVY_CLIENT_ID?: string;
   readonly VITE_PUBLIC_NEURALRATE_SAFE_SALT_NONCE?: string;
+  readonly VITE_PUBLIC_NEURALRATE_DEMO_STRATEGY_KEY?: string;
+  readonly VITE_PUBLIC_NEURALRATE_DEMO_TARGET_ASSET?: string;
 }
 
 interface ImportMeta {

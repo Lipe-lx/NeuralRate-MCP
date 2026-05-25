@@ -67,7 +67,7 @@ export class RemoteManagedSigner implements ManagedSigner {
 
   getCapabilities(): ManagedSignerCapabilities {
     return {
-      canExecute: true,
+      canExecute: false,
       mode: "remote",
     };
   }

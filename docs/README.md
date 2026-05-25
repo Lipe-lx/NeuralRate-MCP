@@ -36,6 +36,9 @@ Documentation of the Vite React user interface, details on the glassmorphism lay
 ### [5. D1 Database Schema (`docs/database.md`)](database.md)
 Database schema definition for the SQLite Cloudflare D1 instance. Focuses on the structural layout of logged decisions, historical yield metrics, and settlement details.
 
+### [6. Hackathon Submission Pack (`docs/hackathon-submission.md`)](hackathon-submission.md)
+Submission-ready positioning materials covering the official one-liner, demo scope, architecture slide outline, trust model, 60-90 second script, and competitive feature matrix.
+
 ---
 
 ## 🛠️ Tech Stack at a Glance

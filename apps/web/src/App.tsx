@@ -174,6 +174,7 @@ function AppContent() {
                       onFundingIntent={neuralRateUser.createFundingIntent}
                       onEnableAutomation={neuralRateUser.enableAutomation}
                       onRevokeAutomation={neuralRateUser.revokeAutomation}
+                      onQueueDemoStrategy={neuralRateUser.queueDemoStrategy}
                       onReviewOwnership={() => setIsOwnershipModalOpen(true)}
                       controlWalletLabel={controlWalletLabel}
                     />
