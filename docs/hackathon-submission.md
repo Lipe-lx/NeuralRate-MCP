@@ -1,83 +1,71 @@
 # Hackathon Submission Pack
 
-## Positioning
+**Status:** Canonical doc
 
-**NeuralRate MCP is the AI trust and execution layer for policy-constrained RWA allocation on Mantle.**
-
-Instead of acting like a generic yield router, NeuralRate combines wallet-signed user control, a dedicated vault per user, policy-aware execution, MCP-native agent access, and an on-chain benchmark registry that turns AI recommendations into verifiable records.
+This file is intentionally factual. It describes the current codebase behavior and demoable scope, not future intent.
 
 ## One-Liner
 
-NeuralRate MCP helps AI agents allocate into Mantle RWA and stable yield opportunities with signed user consent, vault-scoped policies, and benchmarkable on-chain decision records.
+NeuralRate MCP is a Mantle Sepolia worker and MCP server that benchmarks agent decisions on-chain, stores per-user vault policy in D1, and dispatches real Safe-module execution jobs under owner-signed grants.
 
-## Demo Scope
+## What the Demo Actually Shows
 
-The official demo path is intentionally narrow:
-
-1. User connects a wallet on Mantle Sepolia.
-2. User bootstraps a dedicated vault.
-3. User signs policy and automation consent.
-4. NeuralRate scans yields and filters candidates to a stable / RWA-safe profile.
-5. NeuralRate can still reason about USDY, but will explicitly block execution if no canonical Sepolia venue is validated.
-6. The operator can queue the dedicated MNT Safe-module demo job from the vault panel.
-7. The benchmark decision is written on-chain.
-8. The UI shows the local record, tx hash, on-chain decision id, consent audit trail, and execution trail.
+1. The user connects a wallet on Mantle Sepolia.
+2. The web app bootstraps a dedicated user vault through the worker.
+3. The user acknowledges vault ownership context in the UI.
+4. The user signs a canonical automation grant.
+5. The worker stores the grant and creates a short-lived MCP mutation session.
+6. The web app enables the Safe module on the user vault and stores a separate automation consent record.
+7. A decision can be logged locally and queued for benchmark.
+8. The executor writes the benchmark transaction on-chain and the worker stores the resulting tx hash and on-chain decision ID.
+9. The default live execution demo queues a real `MNT` transfer through the Safe module.
 
 ## Architecture Slide
 
-- `Web app`: user-facing benchmark terminal and vault control surface
-- `Worker`: signed-mutation API, MCP tools, D1 persistence, cached market data
-- `Executor`: signed-consent verification, benchmark writer, vault job orchestration
-- `Benchmark contract`: public Mantle Sepolia registry for decision performance tracking
-- `Vault module`: repo-pinned Safe module deployed on Mantle Sepolia and validated by runtime bytecode hash
-- `Trust split`: user wallet controls consent; NeuralRate benchmark identity stays separate from user funds
+- **Worker**
+  Public REST and MCP surface. Validates auth, stores state, issues grants and sessions, and queues jobs.
+- **Executor**
+  Internal service. Validates execution plans and submits benchmark or vault-module transactions.
+- **Web**
+  User/operator panel. Shows state and gathers signatures.
+- **Benchmark registry**
+  `NeuralRateDecisionBenchmark.sol` on Mantle Sepolia.
+- **Vault module**
+  `NeuralRateVaultModule.sol` on Mantle Sepolia.
 
 ## Trust Model Slide
 
-- Every state-changing user mutation is protected by `nonce + wallet signature`.
-- Browser actions are authorized by the wallet owner, not by a frontend-only session.
-- Nonces are short-lived and single-use to prevent replay.
-- Signed consent is stored separately from optional on-chain grant execution.
-- Benchmark writes capture `txHash`, parse the real `DecisionCreated` event, and persist the on-chain id locally.
-- The `USDY` strategy path fails closed on Sepolia unless a canonical venue is explicitly validated.
-- The default Sepolia execution path uses a real native `MNT` transfer through the repo-pinned Safe module.
-- User vault execution and global benchmark identity are intentionally separated to reduce blast radius.
+- State-changing owner actions use a signed nonce envelope.
+- Agent mutation sessions come from a separate canonical automation grant.
+- Grants are domain-scoped and time-bounded.
+- The worker is the public authorization layer.
+- The executor is internal and only accepts worker-authenticated requests.
+- Benchmark identity is separate from user vault execution.
+- The live Sepolia demo uses a real Safe module and a real on-chain transaction.
 
-## 60-90s Demo Script
+## Current Strategy Truth
 
-“NeuralRate is the trust and execution layer for AI-managed RWA allocation on Mantle. Here the user connects a wallet and bootstraps a dedicated vault, so their funds are not mixed with any shared agent balance. Next, the user signs a policy-constrained consent message. That signature is verified server-side with a nonce, stored as an audit record, and can later be revoked by the same wallet owner.
+- `mnt-native-transfer`
+  - live default demo
+  - real native `MNT` transfer through the Safe module
+- `usdy-stable-allocation`
+  - preserved in code
+  - not the default demo
+  - blocked on Sepolia when no canonical venue is configured
 
-Now NeuralRate scans Mantle yield opportunities and focuses the policy to stable and RWA-safe candidates. In this demo we intentionally keep the scope narrow. If a strategy depends on a canonical venue that is not validated on Mantle Sepolia, NeuralRate blocks it explicitly instead of simulating execution. For the live execution demo, the agent uses the Safe module to submit a real native MNT transfer from the user vault. When the benchmark is submitted, the executor writes the decision to Mantle Sepolia, waits for confirmation, parses the real `DecisionCreated` event, and stores both the tx hash and the on-chain decision id back into the ledger.
+## Claims That Match the Current Code
 
-So the result is not just an AI recommendation. It is a signed, policy-scoped, benchmarkable decision trail that can be audited across the UI, the backend ledger, and the chain.” 
+- The MCP server exposes analytics tools and mutation-capable tools.
+- User policy and vault state are persisted in D1.
+- The worker issues automation grants and short-lived mutation sessions.
+- Benchmark writes are real Mantle Sepolia transactions.
+- The worker stores the resulting benchmark tx hash and on-chain decision ID.
+- The live Sepolia execution demo routes through a deployed Safe module.
+- Unsupported Sepolia venues fail closed with an explicit reason.
 
-## Feature Matrix
+## Claims This Repository Does Not Prove by Default
 
-| Capability | NeuralRate MCP | Generic AI Yield Router |
-| --- | --- | --- |
-| MCP-native agent interface | Yes | Usually no |
-| Wallet-signed user mutations | Yes | Rare |
-| Dedicated vault per user | Yes | Often shared or abstracted |
-| Signed consent audit trail | Yes | Rare |
-| On-chain benchmark registry | Yes | Rare |
-| Local-to-chain decision traceability | Yes | Rare |
-| Per-user policy controls | Yes | Sometimes partial |
-| Narrow institutional trust model | Yes | Usually pitch-level only |
-
-## Claims Checklist
-
-Use these claims in the submission only if the deployed environment still matches them:
-
-- Wallet-signed authorization is required for state-changing user actions.
-- Signed consent is recorded and visible in the UI.
-- Benchmark writes produce a real Mantle Sepolia transaction hash.
-- The ledger stores the real on-chain decision id parsed from the contract event.
-- User vault scope is separated from the global benchmark writer identity.
-- The Safe module is pinned by `address + runtime bytecode hash`, not discovered dynamically at runtime.
-- Unsupported Sepolia venues fail closed with an explicit audit reason.
-
-Avoid stronger claims unless they are live and demonstrable:
-
-- “Fully autonomous multi-strategy vault execution”
-- “Generalized cross-protocol execution engine”
-- “On-chain grant execution for every session”
+- generalized Sepolia USDY execution against a canonical third-party venue
+- universal cross-protocol execution for arbitrary assets
+- mainnet deployment by default
+- on-chain grant issuance for every automation session

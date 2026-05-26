@@ -1,162 +1,97 @@
-# Smart Contract
+# Smart Contracts
 
-To enforce trust and transparency, NeuralRate MCP supports benchmark registration on-chain using a Solidity smart contract deployed on the **Mantle Sepolia Testnet** (Chain ID `5003`):
+**Status:** Canonical doc
 
-*   **Canonical Contract Address:** `0xc51560a5512d2A5756435d87319aeaE1bA480165`
-*   **Mantle Sepolia Explorer Link:** [0xc51560a5512d2A5756435d87319aeaE1bA480165](https://sepolia.mantlescan.xyz/address/0xc51560a5512d2A5756435d87319aeaE1bA480165)
+NeuralRate currently relies on three Solidity contracts in the repository.
 
-The contract acts as an immutable registry for benchmark decisions and performance outcomes. The public ERC-8004 agent identity is tracked separately in the Mantle identity registry; this contract does **not** embed `agentId` in each event.
+## Contract Inventory
 
-The contract is configured with the **Turnkey Smart Wallet** (`0xc57130F28f3d670cA75AD9a78784966B767E55e3`) as the canonical `benchmarkWriter`, enforcing that only the autonomous agent can post performance benchmark metrics.
+### 1. `NeuralRateDecisionBenchmark.sol`
 
+- file: `contracts/contracts/NeuralRateDecisionBenchmark.sol`
+- role: public benchmark registry on Mantle Sepolia
+- deployed address:
+  [`0xc51560a5512d2A5756435d87319aeaE1bA480165`](https://sepolia.mantlescan.xyz/address/0xc51560a5512d2A5756435d87319aeaE1bA480165)
 
----
+What it does:
 
-## 📄 Contract Specifications
+- stores benchmark decisions
+- lets the configured benchmark writer create decisions
+- lets the configured benchmark writer settle decisions
+- emits `DecisionCreated` and `DecisionSettled`
 
-* **Contract File:** `NeuralRateDecisionBenchmark.sol`
-* **Solidity Compiler Version:** `^0.8.20`
-* **License:** `MIT`
+Important state:
 
----
+- `owner`
+- `benchmarkWriter`
+- `nextDecisionId`
+- `decisions`
 
-## 💾 State Variables and Structs
+Important functions:
 
-### State Variables
-1. **`address public owner`**
-   Administrative owner allowed to rotate the benchmark writer.
-2. **`address public benchmarkWriter`**
-   Stores the authorized account allowed to write decision data and settle outcomes. This is designed for the NeuralRate agent smart wallet rather than a fixed user EOA.
-3. **`uint256 public nextDecisionId = 1`**
-   An auto-incrementing ID assigned to newly created decision records.
-4. **`mapping(uint256 => DecisionMeta) public decisions`**
-   Maps an integer ID to its respective metadata record on-chain.
+- `agent()`
+- `setBenchmarkWriter(address)`
+- `createDecision(address,string,int256,uint256)`
+- `settleDecision(uint256,int256,int256)`
 
-### Struct `DecisionMeta`
-Represents the structural data of an autonomous recommendation:
-```solidity
-struct DecisionMeta {
-    uint256 decisionId;
-    address requestedBy;
-    string dataSnapshotHash;
-    int256 predictedApyBps;
-    uint256 settlementHorizonHours;
-    uint256 createdAt;
-    bool isSettled;
-}
-```
+The executor uses this contract for real on-chain benchmark writes.
 
----
+### 2. `NeuralRateVaultModule.sol`
 
-## 🔒 Modifiers
+- file: `contracts/contracts/NeuralRateVaultModule.sol`
+- role: Safe module for real vault execution
+- deployed address:
+  [`0xDAbB583bDE28241F1e3C61B423CF456D07f4DA11`](https://sepolia.mantlescan.xyz/address/0xDAbB583bDE28241F1e3C61B423CF456D07f4DA11)
 
-### `onlyOwner()`
-Restricts function execution exclusively to the contract owner.
-```solidity
-modifier onlyOwner() {
-    require(msg.sender == owner, "Only owner can call this");
-    _;
-}
-```
+What it does:
 
-### `onlyBenchmarkWriter()`
-Restricts function execution exclusively to the configured benchmark writer.
-```solidity
-modifier onlyBenchmarkWriter() {
-    require(msg.sender == benchmarkWriter, "Only benchmark writer can call this");
-    _;
-}
-```
+- stores an `authorizedExecutor`
+- receives real execution requests from that executor
+- calls the Safe using `execTransactionFromModule`
+- supports native-value and calldata-based execution
+- emits `VaultCallExecuted`
 
----
+Important functions:
 
-## 📢 Events
+- `authorizedExecutor()`
+- `setAuthorizedExecutor(address)`
+- `executeVaultCall(address safe,address target,uint256 value,bytes calldata data,uint8 operation,bytes32 intentHash)`
 
-### `BenchmarkWriterUpdated`
-Fired when the owner rotates the benchmark writer.
-```solidity
-event BenchmarkWriterUpdated(
-    address indexed previousWriter,
-    address indexed newWriter
-);
-```
+This is the contract used by the live Sepolia `MNT` demo path.
 
-### `DecisionCreated`
-Fired when a new yield allocation recommendation is registered on-chain.
-```solidity
-event DecisionCreated(
-    uint256 indexed decisionId,
-    address indexed requestedBy,
-    string dataSnapshotHash,
-    int256 predictedApyBps,
-    uint256 settlementHorizonHours
-);
-```
+### 3. `NeuralRateUsdYStrategyAdapter.sol`
 
-### `DecisionSettled`
-Fired when the investment horizon matures, logging performance metrics.
-```solidity
-event DecisionSettled(
-    uint256 indexed decisionId,
-    int256 realizedApyBps,
-    int256 predictionErrorBps,
-    int256 outperformanceBps
-);
-```
+- file: `contracts/contracts/NeuralRateUsdYStrategyAdapter.sol`
+- role: preserved USDY-specific execution surface
+- deployed address:
+  [`0xFeE16FAd13789e9bBA4779D025186341e58799a3`](https://sepolia.mantlescan.xyz/address/0xFeE16FAd13789e9bBA4779D025186341e58799a3)
 
----
+Current status in the codebase:
 
-## ⚙️ External Functions
+- preserved and deployable
+- not the default strategy path
+- not treated as a canonical Sepolia venue by the executor
 
-### `constructor`
-Initializes the owner and sets the first benchmark writer.
-```solidity
-constructor(address initialBenchmarkWriter)
-```
+This contract remains part of the repository, but the executor now fails closed for `usdy-stable-allocation` unless a canonical Sepolia venue is explicitly configured.
 
-### `agent()`
-Compatibility getter that returns the current benchmark writer.
-```solidity
-function agent() external view returns (address)
-```
+## Execution Truth on Sepolia
 
-### `setBenchmarkWriter`
-Allows the owner to rotate the benchmark writer to a new smart wallet.
-```solidity
-function setBenchmarkWriter(address newBenchmarkWriter) external onlyOwner
-```
+- **Real benchmark path:** yes
+- **Real Safe-module execution path:** yes
+- **Default live demo:** `mnt-native-transfer`
+- **Default live asset:** native `MNT`
+- **USDY path on Sepolia:** preserved but blocked without a canonical venue
 
-### `createDecision`
-Logs a benchmark decision on-chain. Only executable by the configured benchmark writer.
-```solidity
-function createDecision(
-    address _requestedBy,
-    string calldata _dataSnapshotHash,
-    int256 _predictedApyBps,
-    uint256 _settlementHorizonHours
-) external onlyBenchmarkWriter returns (uint256)
-```
-* **Logic:**
-  1. Captures the auto-incremented ID: `id = nextDecisionId++`.
-  2. Creates and maps a new `DecisionMeta` struct with `isSettled: false` and `createdAt: block.timestamp`.
-  3. Emits a `DecisionCreated` event.
-  4. Returns the decision ID.
+## Pinned Deployment Behavior
 
-### `settleDecision`
-Flags a decision as completed, evaluating the accuracy of the prediction and outperformance compared to risk-free US Treasury Rates. Only executable by the configured benchmark writer.
-```solidity
-function settleDecision(
-    uint256 _decisionId,
-    int256 _realizedApyBps,
-    int256 _tbillApyBps
-) external onlyBenchmarkWriter
-```
-* **Logic:**
-  1. Fetches the mapped decision from storage.
-  2. Requires that the decision exists and has not yet been settled.
-  3. Sets `isSettled = true`.
-  4. Calculates APY prediction error in basis points:
-     $$\text{predictionErrorBps} = \text{realizedApyBps} - \text{predictedApyBps}$$
-  5. Calculates outperformance relative to Treasury yield in basis points:
-     $$\text{outperformanceBps} = \text{realizedApyBps} - \text{tbillApyBps}$$
-  6. Emits a `DecisionSettled` event.
+The executor consumes the generated module manifest in:
+
+- `apps/executor/src/generated/vaultModuleDeployment.ts`
+
+The planner validates:
+
+- chain ID
+- module address
+- pinned runtime bytecode hash
+
+This validation happens before vault execution is submitted.

@@ -1,51 +1,32 @@
-# NeuralRate MCP Documentation Portal
+# Documentation Portal
 
-Welcome to the official documentation portal for **NeuralRate MCP** — a verifiable RWA yield intelligence layer for autonomous agents built for the **Mantle Network**.
+**Status:** Canonical doc
 
-NeuralRate MCP bridges decentralized finance (DeFi), institutional-grade risk models, and Large Language Model (LLM) agents via the **Model Context Protocol (MCP)**, while providing an operator-facing benchmark terminal and a non-custodial **per-user vault automation path** on Mantle Sepolia with explicit wallet-ownership handoff.
+This directory contains the current documentation split into two groups:
 
----
+- **Canonical docs**
+  These describe the codebase as it is implemented now.
+- **Historical/derived docs**
+  These remain in the repo for context, but are not the source of truth.
 
-## 📂 Document Navigation
+## Canonical Docs
 
-Select a document below to explore the technical details of the NeuralRate MCP implementation:
+- [architecture.md](architecture.md)
+  Runtime topology, service boundaries, flows, cache, and trust model.
+- [mcp-server.md](mcp-server.md)
+  Public MCP endpoint, tool catalog, and grant/session rules.
+- [database.md](database.md)
+  D1 schema derived from migrations `0001` through `0008`.
+- [smart-contract.md](smart-contract.md)
+  Benchmark registry, vault module, and preserved USDY adapter.
+- [frontend.md](frontend.md)
+  Role of the web app and the current Mantle Sepolia demo surface.
+- [hackathon-submission.md](hackathon-submission.md)
+  Factual submission notes aligned to the current repository state.
 
-```mermaid
-graph TD
-    A[README.md] --> B[architecture.md]
-    A --> C[mcp-server.md]
-    A --> D[smart-contract.md]
-    A --> E[frontend.md]
-    A --> F[database.md]
+## Historical/Derived Docs
 
-    style A fill:#DFF651,stroke:#333,stroke-width:2px,color:#000
-```
+- [SPRINT_PLAN.md](SPRINT_PLAN.md)
+- [neuralrate-mcp-consolidated.md](neuralrate-mcp-consolidated.md)
 
-### [1. System Architecture (`docs/architecture.md`)](architecture.md)
-Comprehensive outline of the micro-architecture, describing the connection between the Vite React frontend, the Cloudflare Worker backend, the executor service, the D1 SQLite Database, and the Mantle Sepolia smart contract.
-
-### [2. Cloudflare Worker & MCP Server (`docs/mcp-server.md`)](mcp-server.md)
-Detailed specification of the Model Context Protocol (MCP) server running inside the Worker. Documents the 7 active MCP tools, their JSON schemas, parameters, caching strategy, the **6-factor Risk Assessment Model**, and the **Optimal Allocation Algorithm**.
-
-### [3. Smart Contract (`docs/smart-contract.md`)](smart-contract.md)
-Technical details of the Solidity benchmark registry contract `NeuralRateDecisionBenchmark.sol` deployed on the Mantle Sepolia Network, detailing variables, modifiers, external functions, events, and performance tracking.
-
-### [4. Frontend Benchmark Terminal (`docs/frontend.md`)](frontend.md)
-Documentation of the Vite React user interface, details on the glassmorphism layout design system, the dynamic components (`YieldScanner`, `RiskPanel`, `NansenRadar`, `VaultPanel`, `WalletOwnershipModal`, `AgentSettingsPanel`, `DecisionLedger`), the **EIP-1193 Mantle Sepolia wallet connection hook**, the dedicated vault flow, the ownership handoff, and the MCP integration modal.
-
-### [5. D1 Database Schema (`docs/database.md`)](database.md)
-Database schema definition for the SQLite Cloudflare D1 instance. Focuses on the structural layout of logged decisions, historical yield metrics, and settlement details.
-
-### [6. Hackathon Submission Pack (`docs/hackathon-submission.md`)](hackathon-submission.md)
-Submission-ready positioning materials covering the official one-liner, demo scope, architecture slide outline, trust model, 60-90 second script, and competitive feature matrix.
-
----
-
-## 🛠️ Tech Stack at a Glance
-
-* **Backend / MCP Server:** Cloudflare Workers, TypeScript, `@modelcontextprotocol/sdk`
-* **Database & Cache:** Cloudflare D1 (SQLite), Cloudflare KV Namespace
-* **Executor / Automation:** Node.js, TypeScript, vault-scoped policy orchestration, managed signer adapter
-* **Frontend:** Vite, React, TypeScript, Vanilla CSS (OKLCH, Glassmorphism), EIP-1193, Biconomy AbstractJS
-* **Smart Contracts:** Solidity `^0.8.20`, Hardhat, Ethers, Mantle Sepolia Testnet (Chain ID 5003)
-* **DeFi Integrations:** DefiLlama Yields API, FRED (Federal Reserve Economic Data) API, Nansen Smart Money API
+These files are preserved for planning history and narrative context only.

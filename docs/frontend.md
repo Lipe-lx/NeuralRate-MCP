@@ -1,105 +1,123 @@
-# Frontend Benchmark Terminal
+# Frontend
 
-The NeuralRate Frontend is built as a highly optimized Vite React SPA leveraging advanced styling tokens, responsive layouts, zero-dependency wallet connectivity, and a **per-user vault flow** on Mantle Sepolia.
+**Status:** Canonical doc
 
----
+The frontend lives in `apps/web` and is a Vite React application. It is a panel for state inspection and manual actions; it is not the public control plane.
 
-## 🎨 Design System and Aesthetics
+## What the Web App Does
 
-The interface is built entirely with **Vanilla CSS** and customized inline layout systems, targeting premium cyber-aesthetics:
-* **Typography:** Integrated **Google Fonts Outfit** as the primary font family for modern, clean reading.
-* **Glassmorphism Panels (`.glass-panel`):** Utilizes `color-mix` with `oklch` dark-mode colors, combined with heavy `backdrop-filter: blur(16px)` and thin `oklch(100% 0 0 / 0.1)` borders for a premium depth effect.
-* **Responsive Layout:** Arranged in a strict 3-column grid structure (`300px 370px 1fr`) designed to fit entirely inside the viewport (`height: 100vh`, `overflow: hidden`) with internal custom-scrollbar scrolling inside panels to prevent generic body-level scrolling.
+- connects a browser wallet on Mantle Sepolia
+- bootstraps a user profile and vault through the worker
+- requests nonce signatures for owner-authorized actions
+- requests canonical grant signatures for MCP mutation sessions
+- shows benchmark history and automation jobs
+- queues benchmark and strategy actions through the worker
 
----
+The frontend should call the worker, not the executor.
 
-## 🔌 Zero-Dependency Web3 Wallet Integration
+## Manual Automation Flow
 
-Located in `useWallet.ts` and `WalletContext.tsx`, NeuralRate implements a native, zero-dependency **EIP-1193 Web3 provider bridge** that connects to browser wallets (MetaMask, Rabby, Coinbase, etc.):
+The current web flow combines worker-side grant/session state with Safe-side module enablement:
 
-* **Target Network:** **Mantle Sepolia Testnet**
-  * Chain ID: `5003` (`0x138b` hex)
-  * RPC Endpoint: `https://rpc.sepolia.mantle.xyz`
-  * Block Explorer: `https://sepolia.mantlescan.xyz`
-* **Features:**
-  * **Auto Chain Check:** Displays a glowing red warn button if the wallet is on the wrong chain.
-  * **Network Switcher (`switchToMantle`):** Programmatically calls `wallet_switchEthereumChain` or `wallet_addEthereumChain` to add and switch the user's browser wallet to Mantle Sepolia.
-  * **Event Listeners:** Active tracking for `accountsChanged` and `chainChanged` events.
+1. request a nonce for owner-authenticated mutations when needed
+2. request a grant challenge from the worker
+3. sign the canonical automation grant
+4. issue the grant through the worker and receive the mutation-session context
+5. resolve or deploy the user Safe
+6. enable `NeuralRateVaultModule` on the Safe
+7. sign the separate `NeuralRate Vault Automation Consent` message used for `automation_sessions`
 
----
+These are distinct backend records:
 
-## 🛸 Premium Header Buttons Redesign
+- `automation_grants` and `mcp_mutation_sessions`
+- `automation_sessions`
 
-The top right header houses two highly polished interactive buttons:
+## Network Defaults
 
-1. **AGENT ACCESS Button (`.btn-premium-agent`):**
-   * Features a pulsing green status dot (`agent-dot-active`) powered by infinite CSS keyframe scaling.
-   * Houses an overlaying *gloss shimmer* animation sweep on hover.
-2. **Connect Wallet Button (`.btn-premium-wallet` & `.btn-premium-connected`):**
-   * *Disconnected:* Displays a cybernetic gradient border with a rotating SVG wallet icon that fills with neon green on hover.
-   * *Connected:* Displays the shortened hex address (`0x...`) in monospace font with a glowing active dot. Hovering shifts the text to "Disconnect" and turns the button danger-red using smooth transitions.
+Current frontend defaults in code target Mantle Sepolia:
 
----
+- chain ID: `5003`
+- RPC: `https://rpc.sepolia.mantle.xyz`
+- explorer: `https://sepolia.mantlescan.xyz`
 
-## 🧩 Terminal Panels
+Relevant public envs include:
 
-The UI is divided into six modular components:
+- `VITE_PUBLIC_NEURALRATE_BENCHMARK_CONTRACT`
+- `VITE_PUBLIC_NEURALRATE_VAULT_MODULE_ADDRESS`
+- `VITE_PUBLIC_MANTLE_RPC_URL`
+- `VITE_PUBLIC_ERC8004_AGENT_ID`
+- `VITE_PUBLIC_ERC8004_IDENTITY_REGISTRY`
 
-### 1. `YieldScanner`
-* **Purpose:** Displays high-yield pool opportunities on Mantle fetched directly from DefiLlama.
-* **Logic:** Automatically sorts the fetched pools by **APY descending** (`b.apy - a.apy`).
-* **UI:** Rendered as interactive cards with live state feedback and active green selection borders.
+## Main UI Areas
 
-### 2. `RiskPanel`
-* **Purpose:** Renders the quantitative breakdown of the **6-factor Risk Assessment Model** for the selected pool.
-* **Logic:** Requests `/api/risk-assess` on the backend when a pool is selected, generating a color-coded classification score:
-  * **`LOW` Risk:** Green text and borders.
-  * **`MEDIUM` Risk:** Orange text and borders.
-  * **`HIGH` / `CRITICAL` Risk:** Red text and borders.
-* **Features:** Includes custom rendering for DEX vs. Lending pools (suppressing volume metrics for lending markets) and direct pool-specific links to DefiLlama yields (`/yields/pool/${pool.pool}`).
+### Yield and analytics panels
 
-### 3. `NansenRadar`
-* **Purpose:** Summarizes Smart Money flows for the selected pool's tokens.
-* **Features:** Implements a graceful fallback container that guides the user on how to enable full flow features if the Nansen API key is missing.
+The app displays:
 
-### 4. `VaultPanel`
-* **Purpose:** Explains and controls the dedicated user vault that the agent may operate.
-* **Features:**
-  * Shows vault identity, provider strategy, onboarding provider, managed signer mode, and deposit address.
-  * Bootstraps a new vault for the connected user.
-  * Records funding intents and enables or revokes automation without implying any shared treasury.
-  * Gates funding and automation until the user explicitly acknowledges the wallet-ownership handoff for that vault.
-  * Uses **control wallet** wording rather than assuming the controlling signer is always an external browser wallet.
+- yield scan results
+- risk assessment details
+- Nansen context when available
 
-### 4.1 `WalletOwnershipModal`
-* **Purpose:** Performs the post-bootstrap ownership handoff after a Safe vault is created or predicted.
-* **Features:**
-  * Shows the Safe vault address that receives user funds.
-  * Shows the controlling wallet address that owns/administers that Safe.
-  * Explains that the Safe itself does **not** have a seed phrase or private key export flow.
-  * Allows copying both addresses.
-  * Opens Privy's secure export UI for the controlling embedded wallet when available.
-  * Prompts the user to configure recovery when the embedded wallet is still using Privy-managed recovery.
-  * Requires explicit acknowledgment before funding and automation actions are unlocked.
+These are read-only views backed by worker endpoints.
 
-### 5. `AgentSettingsPanel`
-* **Purpose:** Personalizes the agent per user.
-* **Features:**
-  * Simple settings for objective, risk, horizon, automation mode, and restriction preset.
-  * Advanced drawer for allowlists, deny lists, spend limits, caps, slippage, and manual-approval thresholds.
+### `VaultPanel`
 
-### 6. `DecisionLedger`
-* **Purpose:** Displays the benchmark ledger for historical recommendations logged in D1 and routed through the autonomous benchmark flow.
-* **Features:**
-  * **Generate Decision:** Builds a recommendation using global market data but filters it through the connected user's vault policy.
-  * **Queue Auto Benchmark:** Sends a vault-scoped benchmark job to the executor once automation is active.
-  * **Benchmark State:** Tracks `Local`, `Pending`, and `On-Chain` states, plus vault ID, policy version, benchmark job status, and explorer links for the benchmark contract and ERC-8004 registry.
+This is the main automation and vault status surface.
 
----
+It shows:
 
-## 🌀 Agent MCP Access Modal
+- vault identity and address
+- funding status
+- automation status
+- current policy-derived limits
+- active grant and mutation session state
+- Safe module execution readiness
 
-Accessed by clicking the **AGENT ACCESS** button:
-* Opens a customized glass portal overlay (`McpConnectModal.tsx`).
-* Provides a **1-click SSE connection string** (`mcp+sse://localhost:8787/mcp`) for browser-based agents.
-* Offers a single-button **"Copy Config"** function that formats the standard MCP client config JSON block for tools integration.
+It also lets the user:
+
+- bootstrap the vault
+- acknowledge wallet ownership
+- enable automation
+- revoke automation
+- queue the default demo strategy
+
+### `AgentSettingsPanel`
+
+This panel updates the stored per-user policy through the worker.
+
+Policy fields exposed in the UI include:
+
+- objective
+- risk profile
+- automation mode
+- restriction preset
+- allowlists and deny lists
+- action, daily, and total automation limits
+- slippage and manual-review thresholds
+
+### `DecisionLedger`
+
+This panel:
+
+- logs and displays decisions
+- shows benchmark status
+- queues benchmark jobs through the worker
+- renders tx hashes and on-chain IDs when available
+
+## Current Sepolia Demo Truth
+
+The default strategy demo in the frontend is:
+
+- strategy key: `mnt-native-transfer`
+- target asset: `MNT`
+
+The preserved USDY path is not presented as a live canonical Sepolia strategy. When the backend marks that venue as unavailable, the UI shows the explicit failure reason coming back from the worker/executor flow.
+
+## Agent Access
+
+The frontend includes an MCP access modal. Its purpose is informational:
+
+- show the MCP endpoint
+- help the user copy MCP connection details
+
+The MCP server itself is still the worker endpoint advertised in `agent-card.json`.

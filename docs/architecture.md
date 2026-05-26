@@ -1,95 +1,196 @@
 # System Architecture
 
-NeuralRate MCP is built as an AI trust and execution layer for Mantle. It bridges raw blockchain opportunities, traditional macroeconomic indicators, and institutional flow data into a unified, policy-constrained, agent-driven interface.
+**Status:** Canonical doc
 
----
+This document describes the architecture implemented in the repository as of the current codebase state.
 
-## 🏗️ Structural Overview
+## Topology
 
-The platform consists of five primary layers:
-1. **Frontend Benchmark Terminal:** A Vite React Single Page Application (SPA) leveraging premium glassmorphism aesthetics, EIP-1193 wallet integration, per-user vault bootstrap, explicit wallet-ownership handoff, and personalized agent controls.
-2. **Backend & MCP Server:** A unified Cloudflare Worker acting as both a signed-mutation REST API for the frontend and a Model Context Protocol (MCP) Server for AI agents over Server-Sent Events (SSE).
-3. **Database & Cache Layer:** Cloudflare D1 (SQLite) for persistent decision, user, vault, policy, and job records; Cloudflare KV for indexing caching metrics.
-4. **Executor Service:** A dedicated automation runtime that validates signed user intent, prepares vault-scoped permissions, tracks activation / revocation, and manages benchmark and execution jobs.
-5. **On-Chain Contracts (Mantle Network):** A Solidity benchmark contract for immutable decision benchmarking and a pinned USDY strategy adapter for tightly scoped execution.
+NeuralRate has three runtime services plus on-chain contracts:
+
+1. `apps/worker`
+   Public surface for REST and MCP.
+2. `apps/executor`
+   Internal dispatch service for benchmark and strategy jobs.
+3. `apps/web`
+   User and operator panel.
+4. Mantle Sepolia contracts
+   Benchmark registry, Safe vault module, and preserved USDY adapter.
 
 ```mermaid
-graph TB
-    subgraph Frontend [Client Layer: Vite React]
-        UI[NeuralRate Benchmark Terminal]
-        WC[Wallet Provider: EIP-1193]
-        VP[Vault + Settings Panels]
-        MC[MCP Connection Modal]
-    end
-
-    subgraph Backend [Server Layer: Cloudflare Worker]
-        API[REST API /api/*]
-        MCP[MCP SSE Server /mcp]
-        KV[(Cloudflare KV)]
-        D1[(Cloudflare D1 Database)]
-    end
-
-    subgraph Executor [Automation Layer]
-        EX[Executor Service]
-        MS[Managed Signer Adapter]
-    end
-
-    subgraph External [Data Providers]
-        DL[DefiLlama API]
-        FR[FRED Treasury API]
-        NS[Nansen Smart Money API]
-    end
-
-    subgraph Blockchain [Mantle Sepolia Network]
-        SC[NeuralRateDecisionBenchmark.sol]
-        SA[NeuralRateUsdYStrategyAdapter.sol]
-        USA[Per-User Vault]
-        ASW[Agent Smart Wallet]
-    end
-
-    %% Interactions
-    UI -->|HTTP GET/POST| API
-    UI -->|Bootstrap / Enable / Revoke| EX
-    WC -->|Web3 Connection| UI
-    MCP <-->|SSE Protocol| Agent[LLM AI Agent]
-    
-    API -->|Read/Write Decisions| D1
-    API -->|Cache Queries| KV
-    EX -->|Persist Policies + Jobs| API
-    EX -->|Autonomous Benchmark Writes| ASW
-    EX -->|Pinned Strategy Call| SA
-    SA -->|Execution Surface| USA
-    ASW -->|Benchmark Writes| SC
-    
-    API -->|Fetch Yields| DL
-    API -->|Fetch T-Bill Rates| FR
-    API -->|Smart Money Flows| NS
-
-    style UI fill:#222,stroke:#DFF651,stroke-width:2px,color:#fff
-    style MCP fill:#111,stroke:#DFF651,stroke-width:1px,color:#fff
-    style SC fill:#1b1b1b,stroke:#00F0FF,stroke-width:2px,color:#fff
-    style D1 fill:#1a1a1a,stroke:#8A2BE2,stroke-width:1px,color:#fff
+graph TD
+    Web[Web Panel] -->|REST| Worker[Cloudflare Worker]
+    Agent[MCP Agent] -->|SSE MCP /mcp| Worker
+    Worker --> D1[(D1)]
+    Worker --> KV[(KV)]
+    Worker -->|x-neuralrate-internal-token| Executor[Executor]
+    Executor --> Benchmark[NeuralRateDecisionBenchmark.sol]
+    Executor --> Module[NeuralRateVaultModule.sol]
+    Module --> Safe[User Safe Vault]
 ```
 
----
+## Public vs Internal Boundaries
 
-## 🔌 API & Integration Protocol
+- **Public**
+  - worker REST endpoints under `/api/*`
+  - worker MCP endpoint at `/mcp`
+  - web frontend
+- **Internal**
+  - executor HTTP API
+  - worker-to-executor token-authenticated calls
 
-To achieve a clean separation of concerns:
-* **The Frontend** communicates with the Backend via signed JSON mutations over HTTP REST endpoints (`/api/*`).
-* **AI Agents** communicate with the Backend using the **Model Context Protocol (MCP) over Server-Sent Events (SSE)** at `/mcp`. Under the hood, a Cloudflare Durable Object (`NeuralRateMcpAgent`) manages stateful SSE channels.
-* **Automation** is orchestrated by the dedicated executor service rather than the Cloudflare Worker. Users sign nonce-backed mutations and a canonical consent message from the frontend, while the executor manages vault-scoped session state and job queues.
-* **Ownership handoff** is tracked in D1 per vault, so funding and automation remain gated until the user acknowledges the distinction between the Safe vault and the controlling wallet.
-* **Benchmark writes** are only considered complete after the executor receives a receipt, parses `DecisionCreated`, and writes the real on-chain `decisionId` back into D1.
-* **Strategy execution** is only considered eligible after the executor resolves the repo-pinned deployment manifest, checks `chainId`, fetches runtime bytecode from Mantle Sepolia, and confirms the observed hash matches the pinned manifest.
-* **Recommendations** consume global market data but resolve user-specific policy, presets, and limits from D1 before ranking pools.
-* **Smart Contracts** are targeted on the **Mantle Sepolia Testnet** (Chain ID `5003`). The benchmark contract remains global, while user execution is always isolated to a dedicated vault per user.
+The browser should not call the executor directly.
 
----
+## Responsibility Split
 
-## 🗄️ Caching and Resilience Strategy
+### Worker
 
-To remain highly responsive during hackathon presentations and avoid third-party API rate-limits:
-1. **DefiLlama Service:** Cached in Cloudflare KV for **5 minutes** (300 seconds). If cache misses, the worker fetches all yields from `https://yields.llama.fi/pools`, filters for Mantle pools, and stores them back in KV.
-2. **FRED macroeconomic data:** Cached in Cloudflare KV for **1 hour** (3600 seconds) since Treasury Bill interest rates fluctuate slowly. Falls back dynamically across the 5 most recent observations if holidays return null values.
-3. **Nansen Flow Signal:** Cached in Cloudflare KV for **10 minutes** (600 seconds). Gracefully disables smart money signals and returns structured fallbacks if API keys are not configured.
+The worker is the control plane.
+
+- serves market data endpoints and deterministic analytics
+- stores user state in D1
+- caches provider responses in KV
+- verifies wallet-signed auth nonces for state-changing owner actions
+- issues automation grants and short-lived MCP mutation sessions
+- validates domain-scoped session usage
+- forwards benchmark and execution jobs to the executor
+
+### Executor
+
+The executor is the dispatch layer.
+
+- requires `x-neuralrate-internal-token`
+- prepares benchmark and execution policies
+- validates pinned strategy configuration
+- checks the vault module deployment manifest and runtime bytecode
+- submits benchmark transactions with the managed signer
+- submits vault execution transactions through the Safe module
+- reports job status back to the worker
+
+### Web
+
+The web app is not the control plane.
+
+- connects the user wallet on Mantle Sepolia
+- bootstraps user and vault state through the worker
+- gathers nonce signatures and grant signatures
+- shows settings, vault state, grants, sessions, jobs, and benchmark history
+- queues benchmark and execution actions through the worker
+
+## Main Flows
+
+### 1. Analytics Flow
+
+1. Web or agent calls the worker.
+2. Worker reads cache or fetches from upstream providers.
+3. Worker computes deterministic scoring and allocation output.
+4. Worker returns structured JSON.
+
+External provider usage in code:
+
+- DefiLlama yields
+- FRED Treasury data
+- Nansen smart money data when configured
+
+### 2. Owner-Signed Mutation Flow
+
+For mutations without an MCP session token:
+
+1. Client requests `/api/auth/nonce`.
+2. Owner wallet signs the nonce envelope.
+3. Worker verifies signature and nonce freshness.
+4. Worker executes the requested mutation.
+
+This is used by the web app and can also be used by MCP mutation tools when no `sessionToken` is supplied.
+
+### 3. Grant and MCP Session Flow
+
+1. Owner signs the canonical automation grant message.
+2. Worker verifies the signature against the owner EOA.
+3. Worker stores an `automation_grant`.
+4. Worker creates a short-lived `mcp_mutation_session`.
+5. Worker returns a `sessionToken`.
+6. Mutation tools accept that `sessionToken` and resolve access from the stored session instead of trusting arbitrary `ownerEoa` input.
+
+This grant/session flow is separate from the vault automation consent stored in `automation_sessions`.
+
+Allowed grant domains in code:
+
+- `state`
+- `config`
+- `benchmark`
+- `execution`
+
+### 4. Manual Enable-Automation Flow in the Web App
+
+When the user enables automation from the web panel, the current code performs additional steps beyond the MCP grant:
+
+1. The web app resolves or deploys the user Safe if needed.
+2. The web app enables `NeuralRateVaultModule` on that Safe.
+3. The web app builds a separate `NeuralRate Vault Automation Consent` message.
+4. The owner signs that consent message.
+5. The resulting consent payload is stored in `automation_sessions`.
+
+### 5. Benchmark Flow
+
+1. A decision is logged in D1.
+2. The worker queues a benchmark job.
+3. The executor submits `createDecision` on `NeuralRateDecisionBenchmark.sol`.
+4. The executor confirms the transaction and parses `DecisionCreated`.
+5. The worker persists `tx_hash`, `onchain_decision_id`, and job status.
+
+### 6. Strategy Execution Flow
+
+1. The worker validates access and policy scope.
+2. The worker forwards a strategy job to the executor.
+3. The executor resolves the strategy plan from the registry.
+4. The executor validates target contract, selector, config, and pinned deployment metadata.
+5. The executor calls `NeuralRateVaultModule`.
+6. The module executes the real Safe call with `execTransactionFromModule`.
+
+## Strategy State on Mantle Sepolia
+
+- `mnt-native-transfer`
+  - live default demo
+  - real native `MNT` transfer
+  - executed through the Safe module
+- `usdy-stable-allocation`
+  - preserved in the executor registry
+  - not the default path
+  - blocked when no canonical Sepolia venue is configured
+
+The code intentionally fails closed instead of simulating a USDY venue on Sepolia.
+
+## Persistence and Cache
+
+### D1
+
+The worker stores:
+
+- decisions
+- user profiles and configs
+- vaults and permissions
+- automation policies and sessions
+- automation jobs and benchmark jobs
+- auth nonces
+- automation grants
+- MCP mutation sessions
+
+See [database.md](database.md) for the current schema.
+
+### KV
+
+Current TTL behavior implemented in code:
+
+- DefiLlama yields: `300s`
+- FRED T-Bill data: `3600s`
+- Nansen positive cache: soft `600s`, hard `1800s`
+- Nansen negative cache: `300s`
+
+## Trust Boundaries
+
+- The benchmark registry is global and separate from user vault funds.
+- The user vault is isolated per owner.
+- Automation authority is represented by a signed grant plus a short-lived mutation session.
+- The executor is not the source of user authorization; the worker is.
+- The Safe module address is pinned and verified before execution.

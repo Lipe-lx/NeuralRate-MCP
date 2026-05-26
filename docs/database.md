@@ -1,100 +1,393 @@
-# D1 Database Schema
+# Database Schema
 
-To maintain persistent, verifiable, and historical decision-making logs for both the operator-facing benchmark terminal and autonomous agents, NeuralRate MCP utilizes **Cloudflare D1**, a native serverless SQLite database. D1 stores the local recommendation record first, then tracks which **user vault** and **policy version** produced that record, and finally records whether it has been benchmarked on Mantle Sepolia.
+**Status:** Canonical doc
 
----
+NeuralRate stores persistent state in Cloudflare D1. This document reflects the migrations present in `apps/worker/migrations/0001_initial.sql` through `0008_mcp_grants.sql`.
 
-## 📋 Database Specifications
+## Migration Set
 
-* **Binding Name:** `DECISIONS_DB`
-* **Local Location:** `.wrangler/state/v3/d1`
-* **Database Name:** `neuralrate-decisions`
-* **Primary Tables:** `decisions`, `user_profiles`, `user_agent_configs`, `user_vaults`, `vault_permissions`, `user_accounts`, `automation_policies`, `automation_sessions`, `automation_jobs`, `benchmark_jobs`
+- `0001_initial.sql`
+- `0002_benchmark_status.sql`
+- `0003_automation_foundation.sql`
+- `0004_user_vault_personalization.sql`
+- `0005_live_provider_refs.sql`
+- `0006_vault_ownership_ack.sql`
+- `0007_auth_and_audit.sql`
+- `0008_mcp_grants.sql`
 
----
+## Table Inventory
 
-## 🗄️ Table Schema: `decisions`
+Current tables created by migrations:
 
-The `decisions` table maps all fields required to perform auditing and tracking for autonomous yields:
+- `decisions`
+- `user_accounts`
+- `automation_policies`
+- `automation_sessions`
+- `automation_jobs`
+- `benchmark_jobs`
+- `user_profiles`
+- `user_agent_configs`
+- `user_vaults`
+- `vault_permissions`
+- `auth_nonces`
+- `automation_grants`
+- `mcp_mutation_sessions`
 
-| Column Name | SQL Data Type | Attributes | Description |
-| :--- | :--- | :--- | :--- |
-| `id` | `INTEGER` | `PRIMARY KEY AUTOINCREMENT` | Auto-incrementing internal unique sequence ID. |
-| `decision_id` | `TEXT` | `UNIQUE NOT NULL` | Structured unique decision identifier (e.g. `dec_<uuid>`). |
-| `agent_address` | `TEXT` | `NOT NULL` | The public address of the AI Agent node committing the decision. |
-| `requested_by` | `TEXT` | `DEFAULT '0x0'` | The public address of the end user or smart contract requesting the allocation. |
-| `data_snapshot_hash` | `TEXT` | - | IPFS or content hash of the yields data snapshot used for evaluation. |
-| `predicted_apy_bps` | `INTEGER` | `NOT NULL` | The expected blended yield rate computed by the agent in basis points (1% = 100 bps). |
-| `risk_adjusted_apy_bps` | `INTEGER` | - | The yield rate adjusted by our 6-factor risk penalty in basis points. |
-| `benchmark_rate_bps` | `INTEGER` | - | The US 3-Month Treasury Bill rate fetched from FRED at decision time, in basis points. |
-| `risk_profile` | `TEXT` | `DEFAULT 'conservative'` | Investor risk preference: `"low"`, `"medium"`, or `"high"`. |
-| `allocation_json` | `TEXT` | - | JSON string of the exact distributed assets, protocols, and weights. |
-| `settlement_horizon_hours`| `INTEGER` | `DEFAULT 24` | The horizon period in hours before evaluating APY accuracy on-chain. |
-| `settlement_due_at` | `TEXT` | - | ISO string date indicating the scheduled time of maturity. |
-| `realized_apy_bps` | `INTEGER` | - | The actual blended yield rate evaluated at maturity, in basis points. |
-| `prediction_error_bps` | `INTEGER` | - | Difference between realized and predicted APY: $\text{realized} - \text{predicted}$. |
-| `outperformance_bps` | `INTEGER` | - | Blended yield outperformance over US T-Bills in basis points: $\text{realized} - \text{tbill}$. |
-| `is_settled` | `INTEGER` | `DEFAULT 0` | SQLite Boolean Flag (`0` for false/open, `1` for true/settled). |
-| `created_at` | `TEXT` | `DEFAULT (datetime('now'))` | Auto-generated UTC timestamp of record creation. |
-| `settled_at` | `TEXT` | - | UTC timestamp when the decision was finalized. |
-| `benchmark_status` | `TEXT` | `DEFAULT 'local'` | Current benchmark state: `"local"`, `"pending"`, or `"onchain"`. |
-| `tx_hash` | `TEXT` | - | EVM transaction hash of the on-chain creation event. |
-| `onchain_decision_id` | `TEXT` | - | Decision ID emitted by `DecisionCreated` when the benchmark registration confirms on-chain. |
-| `settlement_tx_hash` | `TEXT` | - | EVM transaction hash of the on-chain settlement event. |
-| `automation_session_id` | `TEXT` | - | Associated smart-session identifier when the benchmark was queued through delegated automation. |
-| `benchmark_job_id` | `TEXT` | - | Executor-managed job identifier for autonomous benchmark routing. |
-| `user_id` | `TEXT` | - | Internal user identifier tying the decision to the user profile. |
-| `vault_id` | `TEXT` | - | Dedicated vault identifier used for isolation and executor scoping. |
-| `policy_version` | `TEXT` | - | Version of the user’s active vault policy when the decision was generated. |
-| `objective` | `TEXT` | `DEFAULT 'income'` | High-level recommendation objective: preserve, income, or growth. |
-| `automation_mode` | `TEXT` | `DEFAULT 'recommend-only'` | Whether the decision was advisory-only or eligible for automation. |
-| `applied_constraints_json` | `TEXT` | - | Serialized user-specific constraints, limits, allowlists, and caps. |
-| `rationale_json` | `TEXT` | - | Serialized explanation of why the recommendation was selected. |
+## Core Tables
 
-## 📁 Migration SQL Definition
+### `decisions`
 
-The current schema reflects the combined result of Wrangler migrations `0001_initial.sql`, `0002_benchmark_status.sql`, `0003_automation_foundation.sql`, `0004_user_vault_personalization.sql`, `0005_live_provider_refs.sql`, and `0006_vault_ownership_ack.sql`.
+Primary decision ledger used by the MCP tools and the benchmark flow.
 
+Key columns:
 
-```sql
-CREATE TABLE IF NOT EXISTS decisions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  decision_id TEXT UNIQUE NOT NULL,
-  agent_address TEXT NOT NULL,
-  requested_by TEXT DEFAULT '0x0',
-  data_snapshot_hash TEXT,
-  predicted_apy_bps INTEGER NOT NULL,
-  risk_adjusted_apy_bps INTEGER,
-  benchmark_rate_bps INTEGER,
-  risk_profile TEXT DEFAULT 'conservative',
-  allocation_json TEXT,
-  settlement_horizon_hours INTEGER DEFAULT 24,
-  settlement_due_at TEXT,
-  realized_apy_bps INTEGER,
-  prediction_error_bps INTEGER,
-  outperformance_bps INTEGER,
-  is_settled INTEGER DEFAULT 0,
-  created_at TEXT DEFAULT (datetime('now')),
-  settled_at TEXT,
-  benchmark_status TEXT DEFAULT 'local',
-  tx_hash TEXT,
-  onchain_decision_id TEXT,
-  settlement_tx_hash TEXT,
-  automation_session_id TEXT,
-  benchmark_job_id TEXT
-);
-```
+- identity and provenance
+  - `decision_id`
+  - `agent_address`
+  - `requested_by`
+  - `data_snapshot_hash`
+- predicted and realized metrics
+  - `predicted_apy_bps`
+  - `risk_adjusted_apy_bps`
+  - `benchmark_rate_bps`
+  - `realized_apy_bps`
+  - `prediction_error_bps`
+  - `outperformance_bps`
+- recommendation metadata
+  - `risk_profile`
+  - `allocation_json`
+  - `settlement_horizon_hours`
+  - `settlement_due_at`
+  - `objective`
+  - `automation_mode`
+  - `applied_constraints_json`
+  - `rationale_json`
+- benchmark and automation linkage
+  - `benchmark_status`
+  - `tx_hash`
+  - `onchain_decision_id`
+  - `settlement_tx_hash`
+  - `automation_session_id`
+  - `benchmark_job_id`
+  - `user_id`
+  - `vault_id`
+  - `policy_version`
+- timestamps
+  - `created_at`
+  - `settled_at`
 
-## 🧠 Automation Tables
+### `user_profiles`
 
-NeuralRate now persists delegated automation separately from benchmark decisions:
+User identity and onboarding state.
 
-* **`user_profiles`** stores the user identity layer and onboarding model (including Privy details: `privy_user_id`, `provider_user_ref`, `wallet_provider`).
-* **`user_agent_configs`** stores personalized objectives, presets, allowlists, limits, and automation preferences.
-* **`user_vaults`** stores the dedicated vault for each user, including funding and automation status (plus Safe attributes: `safe_deployment_status`, `safe_salt_nonce`, `provider_vault_ref`, `safe_vault_address`) and the explicit wallet-possession acknowledgment timestamp `ownership_acknowledged_at`.
-* **`vault_permissions`** stores the human-readable and machine-readable execution boundaries for that vault (plus Turnkey signer reference: `turnkey_signer_ref`, `provider_permission_ref`).
-* **`user_accounts`** remains as a compatibility mapping between the user's EOA and the resolved smart account address.
-* **`automation_policies`** stores executor-facing policy records, mirrored into `vault_permissions`.
-* **`automation_sessions`** stores activation state, grant / revoke transaction hashes, permission IDs, Turnkey references (`turnkey_signer_ref`, `provider_session_ref`, `provider_permission_ref`), and raw session consent signatures.
-* **`automation_jobs`** stores delegated execution jobs scoped to a specific `user_id`, `vault_id`, and `provider_job_ref`.
-* **`benchmark_jobs`** stores benchmark-specific jobs executed by the NeuralRate agent smart wallet using Turnkey so benchmark identity remains isolated from user fund execution (`provider_job_ref`).
+Key columns:
+
+- `user_id`
+- `owner_eoa`
+- `auth_strategy`
+- `external_wallet`
+- `embedded_wallet`
+- `display_name`
+- `onboarding_status`
+- `privy_user_id`
+- `provider_user_ref`
+- `wallet_provider`
+
+### `user_agent_configs`
+
+Stored user policy defaults and limits.
+
+Key columns:
+
+- identity
+  - `user_id`
+  - `owner_eoa`
+  - `vault_id`
+- policy fields
+  - `objective`
+  - `risk_profile`
+  - `horizon_hours`
+  - `automation_mode`
+  - `restriction_preset`
+- lists
+  - `allowed_assets_json`
+  - `denied_assets_json`
+  - `allowed_protocols_json`
+  - `denied_protocols_json`
+- limits
+  - `max_protocol_weight_bps`
+  - `max_asset_weight_bps`
+  - `max_action_usd`
+  - `max_daily_usd`
+  - `max_automation_usd`
+  - `max_slippage_bps`
+  - `rebalance_cadence_hours`
+  - `min_apy_bps`
+  - `min_spread_over_tbill_bps`
+  - `require_manual_above_usd`
+  - `pause_on_risk_event`
+- versioning
+  - `policy_version`
+
+### `user_vaults`
+
+Per-user vault state. The code treats this as the main vault record exposed to the frontend.
+
+Key columns:
+
+- `vault_id`
+- `user_id`
+- `owner_eoa`
+- `vault_address`
+- `vault_kind`
+- `vault_provider`
+- `agent_scope_wallet`
+- `chain_id`
+- `status`
+- `funding_status`
+- `automation_status`
+- `balance_usd`
+- `deposit_address`
+- `last_funding_intent_json`
+- `safe_deployment_status`
+- `safe_salt_nonce`
+- `provider_vault_ref`
+- `safe_vault_address`
+- `ownership_acknowledged_at`
+
+### `vault_permissions`
+
+Human-readable and machine-readable execution boundaries for a vault.
+
+Key columns:
+
+- identity
+  - `permission_id`
+  - `user_id`
+  - `vault_id`
+  - `owner_eoa`
+  - `scope`
+  - `status`
+- policy content
+  - `allowed_contracts_json`
+  - `allowed_selectors_json`
+  - `allowed_assets_json`
+  - `allowed_protocols_json`
+  - `spend_token`
+  - `spend_limit_per_use`
+  - `spend_limit_daily`
+  - `spend_limit_total`
+  - `usage_limit`
+  - `valid_after`
+  - `valid_until`
+  - `human_summary`
+  - `raw_policy_json`
+- provider references
+  - `provider_permission_ref`
+  - `turnkey_signer_ref`
+
+## Automation Tables
+
+### `automation_policies`
+
+Executor-facing policy records stored by the worker.
+
+Key columns:
+
+- `policy_id`
+- `owner_eoa`
+- `user_smart_account`
+- `chain_id`
+- `policy_version`
+- `domain`
+- `status`
+- `allowed_contracts_json`
+- `allowed_selectors_json`
+- `allowed_assets_json`
+- `allowed_protocols_json`
+- `spend_token`
+- `spend_limit_per_use`
+- `spend_limit_daily`
+- `spend_limit_total`
+- `usage_limit`
+- `valid_after`
+- `valid_until`
+- `human_summary`
+- `raw_policy_json`
+- `user_id`
+- `vault_id`
+
+### `automation_sessions`
+
+Worker-side record of automation activation state.
+
+Key columns:
+
+- identity and scope
+  - `session_id`
+  - `policy_id`
+  - `owner_eoa`
+  - `user_smart_account`
+  - `agent_session_signer`
+  - `chain_id`
+  - `user_id`
+  - `vault_id`
+  - `policy_version`
+- status and validity
+  - `session_status`
+  - `valid_after`
+  - `valid_until`
+  - `revoked_at`
+- linkage and provider refs
+  - `grant_tx_hash`
+  - `revoke_tx_hash`
+  - `permission_id`
+  - `provider_session_ref`
+  - `provider_permission_ref`
+  - `turnkey_signer_ref`
+- stored consent fields
+  - `consent_message`
+  - `consent_signature`
+  - `consent_digest`
+  - `consent_verified_at`
+  - `session_details_json`
+
+### `automation_jobs`
+
+Execution job queue and receipts.
+
+Key columns:
+
+- `job_id`
+- `session_id`
+- `owner_eoa`
+- `user_smart_account`
+- `execution_domain`
+- `job_type`
+- `target_contract`
+- `target_selector`
+- `payload_json`
+- `status`
+- `tx_hash`
+- `confirmed_at`
+- `failure_reason`
+- `provider_job_ref`
+- `user_id`
+- `vault_id`
+- `policy_version`
+
+### `benchmark_jobs`
+
+Benchmark-specific queue and receipts.
+
+Key columns:
+
+- `benchmark_job_id`
+- `decision_id`
+- `owner_eoa`
+- `agent_smart_wallet`
+- `session_id`
+- `status`
+- `tx_hash`
+- `onchain_decision_id`
+- `confirmed_at`
+- `data_snapshot_hash`
+- `payload_json`
+- `failure_reason`
+- `provider_job_ref`
+- `user_id`
+- `vault_id`
+- `policy_version`
+
+## Auth and MCP Grant Tables
+
+### `auth_nonces`
+
+Single-use nonce envelopes for signed owner actions.
+
+Columns:
+
+- `owner_eoa`
+- `nonce`
+- `statement`
+- `issued_at`
+- `expires_at`
+- `used_at`
+
+### `automation_grants`
+
+Canonical owner-signed automation grants.
+
+Columns:
+
+- `grant_id`
+- `owner_eoa`
+- `user_id`
+- `vault_id`
+- `vault_address`
+- `agent_subject`
+- `policy_version`
+- `allowed_domains_json`
+- `nonce`
+- `signature`
+- `grant_message`
+- `issued_via`
+- `status`
+- `issued_at`
+- `expires_at`
+- `revoked_at`
+- `session_id`
+
+### `mcp_mutation_sessions`
+
+Short-lived mutation sessions derived from an automation grant.
+
+Columns:
+
+- `session_id`
+- `grant_id`
+- `owner_eoa`
+- `user_id`
+- `vault_id`
+- `vault_address`
+- `agent_subject`
+- `policy_version`
+- `allowed_domains_json`
+- `session_token_hash`
+- `issued_via`
+- `status`
+- `issued_at`
+- `expires_at`
+- `last_used_at`
+- `revoked_at`
+
+## Compatibility Table
+
+### `user_accounts`
+
+Legacy account mapping retained by the worker.
+
+Columns:
+
+- `owner_eoa`
+- `user_smart_account`
+- `chain_id`
+- `account_provider`
+- `account_kind`
+- `deployment_status`
+
+## Frontend-Visible State
+
+The worker normalizes these records into the `AutomationState` returned to the frontend. The top-level shape includes:
+
+- profile and config
+- current vault
+- permissions
+- automation sessions
+- automation grants
+- MCP mutation sessions
+- benchmark jobs
+- automation jobs
+- an `automationReady` boolean
+
+The TypeScript source of truth for that shape is `apps/web/src/lib/userState.ts`.
