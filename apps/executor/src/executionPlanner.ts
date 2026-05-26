@@ -1,8 +1,13 @@
 import {
+  buildVaultExecutionModuleCalldata,
+  CANONICAL_SEPOLIA_USDY_VENUE_REASON,
   buildUsdYStableAllocationCalldata,
+  safeModuleStatusAbi,
   getApprovedExecutionPolicySurface,
   makeIntentHash,
   protocolRegistry,
+  resolveNativeMntVaultTransfer,
+  resolveUsdYVaultTransfer,
   resolveTokenManifest,
   strategyRegistry,
   type BytecodeValidationResult,
@@ -25,11 +30,18 @@ type ScopedExecutionContext = {
 
 type PublicClientLike = {
   getCode(args: { address: Address }): Promise<Hex | undefined>;
+  readContract?(args: {
+    address: Address;
+    abi: readonly unknown[];
+    functionName: string;
+    args: readonly unknown[];
+  }): Promise<unknown>;
 };
 
 const normalizeList = (values: string[]) => values.map((value) => value.trim().toUpperCase()).filter(Boolean);
 
 const unique = (values: string[]) => Array.from(new Set(values));
+const isInternalProtocol = (protocolId: string) => protocolId.trim().toLowerCase().startsWith("neuralrate-");
 
 const makePolicyCheck = (check: string, ok: boolean, detail: string): PolicyCheckResult => ({
   check,
@@ -142,6 +154,7 @@ export const resolveExecutionPlan = async (
   const normalizedAllowedProtocols = unique(normalizeList(context.allowedProtocols));
   const normalizedTargetAsset = token.symbol.toUpperCase();
   const amountUsd = Number(intent.amountUsd);
+  const amountToken = intent.amountToken ?? null;
   const slippageBps = intent.slippageBps ?? 50;
   const policyChecks: PolicyCheckResult[] = [
     makePolicyCheck(
@@ -158,8 +171,12 @@ export const resolveExecutionPlan = async (
     ),
     makePolicyCheck(
       "policy-allowed-protocols",
-      normalizedAllowedProtocols.length === 0 || normalizedAllowedProtocols.includes(protocol.policyProtocolId.toUpperCase()),
-      normalizedAllowedProtocols.length === 0
+      isInternalProtocol(protocol.policyProtocolId) ||
+        normalizedAllowedProtocols.length === 0 ||
+        normalizedAllowedProtocols.includes(protocol.policyProtocolId.toUpperCase()),
+      isInternalProtocol(protocol.policyProtocolId)
+        ? `${protocol.policyProtocolId} is treated as internal NeuralRate execution infrastructure.`
+        : normalizedAllowedProtocols.length === 0
         ? "User policy does not narrow allowed protocols, so registry defaults apply."
         : `${protocol.policyProtocolId} ${normalizedAllowedProtocols.includes(protocol.policyProtocolId.toUpperCase()) ? "is" : "is not"} present in the user policy allowlist.`,
     ),
@@ -180,6 +197,23 @@ export const resolveExecutionPlan = async (
     ),
   ];
 
+  if (strategy.strategyKey === "usdy-stable-allocation") {
+    policyChecks.push(
+      makePolicyCheck(
+        "canonical-sepolia-venue-configured",
+        false,
+        CANONICAL_SEPOLIA_USDY_VENUE_REASON,
+      ),
+      makePolicyCheck(
+        "usdy-token-configured",
+        Boolean(token.address),
+        token.address
+          ? `USDY token address resolved to ${token.address}.`
+          : "USDY token address is not configured for real vault execution.",
+      ),
+    );
+  }
+
   const bytecodeValidation = await validateProtocolDeployment(publicClient, protocol.protocolId, context.chainId);
   policyChecks.push(
     makePolicyCheck(
@@ -199,22 +233,144 @@ export const resolveExecutionPlan = async (
     vaultAddress: context.vaultAddress.toLowerCase(),
     policyVersion: context.policyVersion,
   });
-  const resolvedArgs: readonly unknown[] = [
+  let resolvedArgs: readonly unknown[] = [
     context.ownerEoa.toLowerCase(),
     context.vaultAddress.toLowerCase(),
     parseUnits(String(amountUsd), 0),
     slippageBps,
     intentHash,
   ];
-  const calldata = validationFailure || !protocol.address
-    ? null
-    : buildUsdYStableAllocationCalldata({
+
+  let targetContract = protocol.address;
+  let targetSelector = action.selector;
+  let executionSummary = validationFailure
+    ? `Strategy ${strategy.label} is blocked until all policy and deployment checks pass.`
+    : `Strategy ${strategy.label} is ready to dispatch through ${protocol.displayName}.`;
+  let riskFlags: string[] = [token.riskClass, bytecodeValidation.status];
+  let calldata: Hex | null = null;
+
+  if (!validationFailure && protocol.address) {
+    if (strategy.strategyKey === "usdy-stable-allocation") {
+      const moduleEnabled = typeof publicClient.readContract === "function"
+        ? Boolean(await publicClient.readContract({
+            address: context.vaultAddress as Address,
+            abi: safeModuleStatusAbi,
+            functionName: "isModuleEnabled",
+            args: [protocol.address],
+          }))
+        : false;
+
+      policyChecks.push(
+        makePolicyCheck(
+          "safe-module-enabled",
+          moduleEnabled,
+          moduleEnabled
+            ? `Safe ${context.vaultAddress} has enabled the NeuralRate vault module.`
+            : `Safe ${context.vaultAddress} has not enabled the NeuralRate vault module.`,
+        ),
+      );
+
+      const latestFailure = policyChecks.find((check) => !check.ok);
+      if (!latestFailure) {
+        const routedTransfer = resolveUsdYVaultTransfer({
+          ownerEoa: context.ownerEoa.toLowerCase() as Address,
+          vaultAddress: context.vaultAddress.toLowerCase() as Address,
+          amountUsd,
+          intentHash,
+        });
+        targetContract = protocol.address;
+        targetSelector = action.selector;
+        calldata = buildVaultExecutionModuleCalldata({
+          ownerEoa: context.ownerEoa.toLowerCase() as Address,
+          vaultAddress: context.vaultAddress.toLowerCase() as Address,
+          targetContract: routedTransfer.targetContract,
+          value: 0n,
+          callData: routedTransfer.tokenCallData,
+          intentHash,
+        });
+        resolvedArgs = [
+          context.ownerEoa.toLowerCase(),
+          context.vaultAddress.toLowerCase(),
+          routedTransfer.targetContract,
+          0n,
+          routedTransfer.tokenCallData,
+          intentHash,
+        ];
+        executionSummary = `Strategy ${strategy.label} is ready to move ${amountUsd} USDY from the Safe to the configured recipient through the enabled NeuralRate module.`;
+        riskFlags = [
+          token.riskClass,
+          bytecodeValidation.status,
+          moduleEnabled ? "safe-module-enabled" : "safe-module-disabled",
+        ];
+      } else {
+        executionSummary = `Strategy ${strategy.label} is blocked until the Safe module and vault routing checks pass.`;
+      }
+    } else if (strategy.strategyKey === "mnt-native-transfer") {
+      const moduleEnabled = typeof publicClient.readContract === "function"
+        ? Boolean(await publicClient.readContract({
+            address: context.vaultAddress as Address,
+            abi: safeModuleStatusAbi,
+            functionName: "isModuleEnabled",
+            args: [protocol.address],
+          }))
+        : false;
+
+      policyChecks.push(
+        makePolicyCheck(
+          "safe-module-enabled",
+          moduleEnabled,
+          moduleEnabled
+            ? `Safe ${context.vaultAddress} has enabled the NeuralRate vault module.`
+            : `Safe ${context.vaultAddress} has not enabled the NeuralRate vault module.`,
+        ),
+      );
+
+      const latestFailure = policyChecks.find((check) => !check.ok);
+      if (!latestFailure) {
+        const routedTransfer = resolveNativeMntVaultTransfer({
+          ownerEoa: context.ownerEoa.toLowerCase() as Address,
+          amountUsd,
+          amountToken,
+        });
+        targetContract = protocol.address;
+        targetSelector = action.selector;
+        calldata = buildVaultExecutionModuleCalldata({
+          ownerEoa: context.ownerEoa.toLowerCase() as Address,
+          vaultAddress: context.vaultAddress.toLowerCase() as Address,
+          targetContract: routedTransfer.targetContract,
+          value: routedTransfer.value,
+          callData: routedTransfer.callData,
+          intentHash,
+        });
+        resolvedArgs = [
+          context.ownerEoa.toLowerCase(),
+          context.vaultAddress.toLowerCase(),
+          routedTransfer.targetContract,
+          routedTransfer.value,
+          routedTransfer.callData,
+          intentHash,
+        ];
+        executionSummary = `Strategy ${strategy.label} is ready to move ${amountToken ?? amountUsd} MNT from the Safe to ${routedTransfer.recipientAddress}.`;
+        riskFlags = [
+          token.riskClass,
+          bytecodeValidation.status,
+          moduleEnabled ? "safe-module-enabled" : "safe-module-disabled",
+        ];
+      } else {
+        executionSummary = `Strategy ${strategy.label} is blocked until the Safe module checks pass.`;
+      }
+    } else {
+      calldata = buildUsdYStableAllocationCalldata({
         ownerEoa: context.ownerEoa.toLowerCase() as Address,
         vaultAddress: context.vaultAddress.toLowerCase() as Address,
         amountUsd: parseUnits(String(amountUsd), 0),
         slippageBps,
         intentHash,
       });
+    }
+  }
+
+  const finalValidationFailure = policyChecks.find((check) => !check.ok);
 
   return {
     strategyKey,
@@ -222,21 +378,16 @@ export const resolveExecutionPlan = async (
     protocolId: protocol.policyProtocolId,
     actionId: action.actionId,
     targetAsset: normalizedTargetAsset,
-    targetContract: protocol.address,
-    targetSelector: action.selector,
+    targetContract,
+    targetSelector,
     resolvedArgs,
     calldata,
-    executionSummary: validationFailure
-      ? `Strategy ${strategy.label} is blocked until all policy and deployment checks pass.`
-      : `Strategy ${strategy.label} is ready to dispatch through ${protocol.displayName}.`,
-    riskFlags: [
-      token.riskClass,
-      bytecodeValidation.status,
-    ],
+    executionSummary,
+    riskFlags,
     policyChecks,
     bytecodeValidation,
-    validationStatus: validationFailure ? "blocked" : "ready",
-    validationReason: validationFailure?.detail ?? null,
+    validationStatus: finalValidationFailure ? "blocked" : "ready",
+    validationReason: finalValidationFailure?.detail ?? null,
     intent: {
       targetAsset: normalizedTargetAsset,
       amountUsd,

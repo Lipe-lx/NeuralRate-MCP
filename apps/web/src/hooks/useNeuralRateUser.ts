@@ -2,17 +2,15 @@ import { useCallback, useEffect, useState } from "react";
 import type { EIP1193Provider } from "viem";
 import {
   API_BASE_URL,
+  ERC8004_AGENT_ID,
   DEMO_STRATEGY_KEY,
   DEMO_TARGET_ASSET,
-  EXECUTOR_BASE_URL,
   SESSION_POLICY_VERSION,
+  VAULT_MODULE_ADDRESS,
+  VAULT_MODULE_ENABLED,
   VAULT_PROVIDER_STRATEGY,
 } from "../config";
-import {
-  authorizeAutomationSession,
-  resolveUserSafeVault,
-  type PreparedAutomationSession,
-} from "../lib/automation";
+import { disableVaultModule, ensureVaultModuleEnabled, resolveUserSafeVault } from "../lib/automation";
 import { signedJsonFetch } from "../lib/auth";
 import type { AutomationState } from "../lib/userState";
 
@@ -35,6 +33,20 @@ type WalletSessionContext = {
   canPredictVault: boolean;
   getEthereumProvider: () => Promise<EIP1193Provider>;
   signMessage: (message: string) => Promise<string>;
+};
+
+type AutomationGrantChallenge = {
+  ownerEoa: string;
+  userId: string;
+  vaultId: string;
+  vaultAddress: string;
+  agentSubject: string;
+  policyVersion: string;
+  allowedDomains: string[];
+  nonce: string;
+  issuedAt: string;
+  expiresAt: string;
+  message: string;
 };
 
 export const useNeuralRateUser = ({
@@ -247,83 +259,63 @@ export const useNeuralRateUser = ({
     setBusy(true);
     setError(null);
     try {
-      const prepared = await signedJsonFetch<{
+      if (!current.vault.ownership_acknowledged_at) {
+        throw new Error("Acknowledge vault ownership before issuing an automation grant.");
+      }
+
+      const agentSubject = `erc8004:${ERC8004_AGENT_ID}`;
+      const challengeResponse = await signedJsonFetch<{
         success: boolean;
-        sessionId: string;
-        policyId: string;
-        benchmarkPolicyId: string;
-        policyVersion: string;
-        userId: string;
-        vaultId: string;
-        vaultAddress: string;
-        agentSessionSigner: string;
-        agentSmartWallet: string;
-        benchmarkContract: string;
-        chainId: number;
-        executionPolicy: PreparedAutomationSession["executionPolicy"];
+        challenge: AutomationGrantChallenge;
       }>({
         ownerEoa,
         signMessage,
-        url: `${EXECUTOR_BASE_URL}/v1/automation/prepare`,
+        url: `${API_BASE_URL}/automation/grants/challenge`,
         method: "POST",
         body: {
           ownerEoa,
-          vaultAddress: current.vault.vault_address,
-          spendLimitPerUse: String(current.config?.max_action_usd ?? 1000),
-          spendLimitDaily: String(current.config?.max_daily_usd ?? 2500),
-          spendLimitTotal: String(current.config?.max_automation_usd ?? 10000),
-          usageLimit: 25,
+          agentSubject,
+          policyVersion: current.config?.policy_version ?? SESSION_POLICY_VERSION,
         },
       });
 
-      const activated = await authorizeAutomationSession({
-        ownerAddress: ownerEoa,
-        preparedSession: {
-          sessionId: prepared.sessionId,
-          policyId: prepared.policyId,
-          benchmarkPolicyId: prepared.benchmarkPolicyId,
-          policyVersion: prepared.policyVersion,
-          userSmartAccount: prepared.vaultAddress,
-          agentSessionSigner: prepared.agentSessionSigner,
-          agentSmartWallet: prepared.agentSmartWallet,
-          benchmarkContract: prepared.benchmarkContract,
-          chainId: prepared.chainId,
-          executionPolicy: prepared.executionPolicy,
-        },
-        wallet: {
+      const grantSignature = await signMessage(challengeResponse.challenge.message);
+      const result = await fetchJson<{
+        success: boolean;
+        requiresSignature: boolean;
+        grantId?: string;
+      }>(`${API_BASE_URL}/automation/grants/issue`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ownerEoa,
+          agentSubject,
+          allowedDomains: challengeResponse.challenge.allowedDomains,
+          policyVersion: challengeResponse.challenge.policyVersion,
+          issuedAt: challengeResponse.challenge.issuedAt,
+          expiresAt: challengeResponse.challenge.expiresAt,
+          nonce: challengeResponse.challenge.nonce,
+          signature: grantSignature,
+          issuedVia: "web",
+        }),
+      });
+      if (result.requiresSignature) {
+        throw new Error("Automation grant was not finalized after signing.");
+      }
+
+      let moduleMessage = "Grant recorded off-chain.";
+      if (VAULT_MODULE_ENABLED) {
+        const moduleResult = await ensureVaultModuleEnabled(ownerEoa, {
           getEthereumProvider,
           signMessage,
-        },
-        providerUserId,
-        walletProvider,
-      });
-
-      await signedJsonFetch({
-        ownerEoa,
-        signMessage,
-        url: `${EXECUTOR_BASE_URL}/v1/automation/activate`,
-        method: "POST",
-        body: {
-          sessionId: prepared.sessionId,
-          policyId: prepared.policyId,
-          ownerEoa,
-          vaultAddress: activated.userSmartAccount,
-          grantTxHash: null,
-          permissionId: activated.permissionId,
-          sessionDetails: activated.sessionDetails,
-          validAfter: activated.validAfter,
-          validUntil: activated.validUntil,
-          consentMessage: activated.consentMessage,
-          consentSignature: activated.consentSignature,
-          consentDigest: activated.consentDigest,
-          consentVerifiedAt: new Date().toISOString(),
-          providerSessionRef: activated.providerSessionRef,
-          providerPermissionRef: activated.providerPermissionRef,
-        },
-      });
+        }, VAULT_MODULE_ADDRESS);
+        moduleMessage = moduleResult.alreadyEnabled
+          ? "Safe module was already enabled on-chain."
+          : "Safe module enabled on-chain for real vault execution.";
+      }
 
       await refresh(ownerEoa);
-      setNotice("Signed consent recorded and automation activated for this dedicated Safe vault.");
+      setNotice(`Automation grant issued. ${moduleMessage}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to enable automation.";
       setError(message);
@@ -334,33 +326,41 @@ export const useNeuralRateUser = ({
   };
 
   const revokeAutomation = async () => {
-    if (!ownerEoa || !state?.activeSession || !state?.vault?.vault_address) {
-      throw new Error("No active automation session found.");
+    if (!ownerEoa || !state?.activeGrant) {
+      throw new Error("No active automation grant found.");
     }
 
     setBusy(true);
     setError(null);
     try {
+      let moduleMessage = "";
+      if (VAULT_MODULE_ENABLED && state.vault?.vault_address) {
+        const disableTxHash = await disableVaultModule(
+          ownerEoa,
+          {
+            getEthereumProvider,
+            signMessage,
+          },
+          state.vault.vault_address,
+          VAULT_MODULE_ADDRESS,
+        );
+        moduleMessage = disableTxHash
+          ? " Safe module disabled on-chain."
+          : " Safe module was already disabled on-chain.";
+      }
+
       await signedJsonFetch({
         ownerEoa,
         signMessage,
-        url: `${EXECUTOR_BASE_URL}/v1/automation/revoke`,
+        url: `${API_BASE_URL}/automation/grants/revoke`,
         method: "POST",
         body: {
-          sessionId: state.activeSession.session_id,
-          policyId: state.activeSession.policy_id,
           ownerEoa,
-          vaultAddress: state.vault.vault_address,
-          permissionId: state.activeSession.permission_id,
-          sessionDetails: {
-            revokedBy: ownerEoa.toLowerCase(),
-            revokedAt: new Date().toISOString(),
-            providerSessionRef: providerUserId ? `${walletProvider}:${providerUserId}` : null,
-          },
+          grantId: state.activeGrant.grant_id,
         },
       });
       await refresh(ownerEoa);
-      setNotice("Automation revoked for this vault.");
+      setNotice(`Automation revoked for this vault.${moduleMessage}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to revoke automation.";
       setError(message);
@@ -371,13 +371,14 @@ export const useNeuralRateUser = ({
   };
 
   const queueDemoStrategy = async () => {
-    if (!ownerEoa || !state?.activeSession || !state?.vault?.vault_address) {
-      throw new Error("Enable automation before queueing the USDY stable demo strategy.");
+    if (!ownerEoa || !state?.activeGrant || !state?.vault?.vault_address) {
+      throw new Error(`Enable automation before queueing the ${DEMO_TARGET_ASSET} demo strategy.`);
     }
 
     setBusy(true);
     setError(null);
     try {
+      const isNativeMntDemo = DEMO_TARGET_ASSET.toUpperCase() === "MNT";
       const response = await signedJsonFetch<{
         success: boolean;
         executionCapable: boolean;
@@ -387,19 +388,16 @@ export const useNeuralRateUser = ({
       }>({
         ownerEoa,
         signMessage,
-        url: `${EXECUTOR_BASE_URL}/v1/automation/jobs`,
+        url: `${API_BASE_URL}/automation/jobs`,
         method: "POST",
         body: {
-          sessionId: state.activeSession.session_id,
           ownerEoa,
-          vaultAddress: state.vault.vault_address,
-          executionDomain: "execution",
-          jobType: "strategy-execution",
           strategyKey: DEMO_STRATEGY_KEY,
           intent: {
             targetAsset: DEMO_TARGET_ASSET,
-            amountUsd: state.config?.max_action_usd ?? 1000,
-            slippageBps: 50,
+            amountUsd: isNativeMntDemo ? 1 : state.config?.max_action_usd ?? 1000,
+            amountToken: isNativeMntDemo ? 1 : undefined,
+            slippageBps: isNativeMntDemo ? 0 : 50,
           },
         },
       });
@@ -407,13 +405,13 @@ export const useNeuralRateUser = ({
       await refresh(ownerEoa);
       setNotice(
         response.job?.status === "blocked"
-          ? "USDY stable strategy was recorded but blocked by policy or deployment validation. Check the execution trail for the exact reason."
+          ? `${DEMO_TARGET_ASSET} demo strategy was recorded but blocked by policy or deployment validation. Check the execution trail for the exact reason.`
           : response.executionCapable
-            ? "USDY stable strategy queued for execution inside the dedicated vault."
-            : "USDY stable strategy was accepted, but the managed signer is not execution-capable in this environment.",
+            ? `${DEMO_TARGET_ASSET} demo strategy queued for execution inside the dedicated vault.`
+            : `${DEMO_TARGET_ASSET} demo strategy was accepted, but the managed signer is not execution-capable in this environment.`,
       );
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to queue the USDY stable demo strategy.";
+      const message = err instanceof Error ? err.message : `Failed to queue the ${DEMO_TARGET_ASSET} demo strategy.`;
       setError(message);
       throw err;
     } finally {

@@ -11,14 +11,32 @@ import {
   verifyMutationAuthEnvelope,
 } from "./auth";
 import {
+  createAutomationGrantChallenge,
+  issueAutomationGrant,
+  queueBenchmarkThroughExecutor,
+  queueStrategyThroughExecutor,
+  resolveAutomationAccessFromOwner,
+  resolveAutomationAccessFromSessionToken,
+  revokeAutomationGrant,
+  updateAgentPolicyFromScopedAccess,
+} from "./automationControl";
+import {
   McpToolHandlers,
+  bootstrapUserVaultSchema,
+  executeStrategySchema,
+  getDecisionsSchema,
+  getUserStateSchema,
   yieldScanSchema,
+  issueAutomationGrantSchema,
+  listJobsSchema,
   tbillSpreadSchema,
   nansenContextSchema,
+  queueBenchmarkSchema,
+  revokeAutomationGrantSchema,
   riskAssessSchema,
   optimalAllocationSchema,
   logDecisionSchema,
-  getDecisionsSchema
+  updateAgentPolicySchema,
 } from "./mcp/tools";
 
 export interface Env {
@@ -29,6 +47,7 @@ export interface Env {
   NANSEN_API_KEY: string;
   NEURALRATE_BENCHMARK_CONTRACT: string;
   INTERNAL_API_TOKEN?: string;
+  EXECUTOR_BASE_URL?: string;
 }
 
 const MCP_CANONICAL_ROUTE = "/mcp";
@@ -92,6 +111,34 @@ const assertMutationAuthorized = async (
   return { mode: "signed" as const, ownerEoa: verified.ownerEoa };
 };
 
+const resolveAutomationAccess = async (
+  request: Request,
+  env: Env,
+  automation: AutomationStore,
+  body: Record<string, unknown>,
+  requiredDomain: "state" | "config" | "benchmark" | "execution"
+) => {
+  if (isInternalMutationRequest(request, env.INTERNAL_API_TOKEN ?? null)) {
+    const ownerEoa = resolveMutationOwner(body);
+    if (!ownerEoa) {
+      throw new Error("ownerEoa is required for internal automation access.");
+    }
+    return resolveAutomationAccessFromOwner(automation, ownerEoa, requiredDomain);
+  }
+
+  if (typeof body.sessionToken === "string" && body.sessionToken.trim()) {
+    return resolveAutomationAccessFromSessionToken(automation, body.sessionToken, requiredDomain);
+  }
+
+  const ownerEoa = resolveMutationOwner(body);
+  if (!ownerEoa) {
+    throw new Error("ownerEoa or sessionToken is required.");
+  }
+
+  await assertMutationAuthorized(request, env, body, ownerEoa);
+  return resolveAutomationAccessFromOwner(automation, ownerEoa, requiredDomain);
+};
+
 export class NeuralRateMcpAgent extends McpAgent<Env, Record<string, never>> {
   server = new McpServer({
     name: "neuralrate-mcp",
@@ -104,6 +151,13 @@ export class NeuralRateMcpAgent extends McpAgent<Env, Record<string, never>> {
     const fred = new FredService(this.env.CACHE_KV, this.env.FRED_API_KEY);
     const nansen = new NansenService(this.env.CACHE_KV, this.env.NANSEN_API_KEY);
     const handlers = new McpToolHandlers(defillama, fred, nansen, this.env.DECISIONS_DB);
+    const automation = new AutomationStore(this.env.DECISIONS_DB);
+    const verifyMcpMutationAuth = async (ownerEoa: string, auth: MutationAuthEnvelope | undefined) => {
+      if (!auth) {
+        throw new Error("auth is required for this tool when no sessionToken is supplied.");
+      }
+      await verifyMutationAuthEnvelope(this.env.DECISIONS_DB, auth, ownerEoa);
+    };
 
     // Register Tools
     this.server.tool(
@@ -153,6 +207,215 @@ export class NeuralRateMcpAgent extends McpAgent<Env, Record<string, never>> {
       "Fetches the latest decisions from the database",
       getDecisionsSchema,
       handlers.handleGetDecisions.bind(handlers)
+    );
+
+    this.server.tool(
+      "get_user_state",
+      "Fetches the scoped user, vault, grant, session and job state",
+      getUserStateSchema,
+      async ({ ownerEoa, sessionToken }) => {
+        const scopedOwner = sessionToken
+          ? (await resolveAutomationAccessFromSessionToken(automation, sessionToken, "state")).ownerEoa
+          : ownerEoa;
+
+        if (!scopedOwner) {
+          throw new Error("ownerEoa or sessionToken is required.");
+        }
+
+        const state = await automation.getAutomationState(scopedOwner);
+        return {
+          content: [{ type: "text", text: JSON.stringify(state, null, 2) }],
+          structuredContent: state,
+        };
+      }
+    );
+
+    this.server.tool(
+      "bootstrap_user_vault",
+      "Bootstraps the dedicated user vault record inside NeuralRate",
+      bootstrapUserVaultSchema,
+      async (args) => {
+        await verifyMcpMutationAuth(args.ownerEoa, args.auth as MutationAuthEnvelope | undefined);
+        const state = await automation.bootstrapUser({
+          ownerEoa: args.ownerEoa,
+          externalWallet: args.externalWallet,
+          embeddedWallet: args.embeddedWallet,
+          authStrategy: args.authStrategy,
+          displayName: args.displayName,
+          privyUserId: args.privyUserId,
+          providerUserRef: args.providerUserRef,
+          walletProvider: args.walletProvider,
+          vaultAddress: args.vaultAddress,
+          vaultProvider: args.vaultProvider,
+          vaultKind: args.vaultKind,
+          vaultStatus: args.vaultStatus,
+          safeDeploymentStatus: args.safeDeploymentStatus,
+          safeSaltNonce: args.safeSaltNonce,
+          chainId: args.chainId,
+        });
+        return {
+          content: [{ type: "text", text: JSON.stringify(state, null, 2) }],
+          structuredContent: state,
+        };
+      }
+    );
+
+    this.server.tool(
+      "update_agent_policy",
+      "Updates the scoped NeuralRate agent policy for a user vault",
+      updateAgentPolicySchema,
+      async (args) => {
+        const access = args.sessionToken
+          ? await resolveAutomationAccessFromSessionToken(automation, args.sessionToken, "config")
+          : (() => {
+              if (!args.ownerEoa) {
+                throw new Error("ownerEoa is required when no sessionToken is supplied.");
+              }
+              return verifyMcpMutationAuth(args.ownerEoa, args.auth as MutationAuthEnvelope | undefined)
+                .then(() => resolveAutomationAccessFromOwner(automation, args.ownerEoa!, "config"));
+            })();
+
+        const scoped = await access;
+        const config = await updateAgentPolicyFromScopedAccess(automation, scoped, args as unknown as Record<string, unknown>);
+        return {
+          content: [{ type: "text", text: JSON.stringify(config, null, 2) }],
+          structuredContent: config as Record<string, unknown>,
+        };
+      }
+    );
+
+    this.server.tool(
+      "issue_automation_grant",
+      "Creates a canonical automation grant challenge or finalizes a signed grant into an MCP mutation session",
+      issueAutomationGrantSchema,
+      async (args) => {
+        const result = await issueAutomationGrant(automation, this.env, {
+          ownerEoa: args.ownerEoa,
+          agentSubject: args.agentSubject,
+          allowedDomains: args.allowedDomains,
+          policyVersion: args.policyVersion,
+          issuedAt: args.issuedAt,
+          expiresAt: args.expiresAt,
+          nonce: args.nonce,
+          signature: args.signature,
+          issuedVia: args.issuedVia ?? "mcp",
+        });
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          structuredContent: result as Record<string, unknown>,
+        };
+      }
+    );
+
+    this.server.tool(
+      "revoke_automation_grant",
+      "Revokes the currently active grant or a specific grant",
+      revokeAutomationGrantSchema,
+      async (args) => {
+        let grantId = args.grantId ?? null;
+        if (args.sessionToken) {
+          const access = await resolveAutomationAccessFromSessionToken(automation, args.sessionToken, "state");
+          grantId = access.grantId;
+        } else if (args.ownerEoa) {
+          await verifyMcpMutationAuth(args.ownerEoa, args.auth as MutationAuthEnvelope | undefined);
+          const activeGrant = await automation.getActiveAutomationGrant(args.ownerEoa);
+          grantId = activeGrant?.grant_id ? String(activeGrant.grant_id) : null;
+        }
+
+        if (!grantId) {
+          throw new Error("grantId, sessionToken, or ownerEoa with auth is required to revoke a grant.");
+        }
+
+        const result = await revokeAutomationGrant(automation, grantId);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          structuredContent: result as Record<string, unknown>,
+        };
+      }
+    );
+
+    this.server.tool(
+      "queue_benchmark",
+      "Queues a scoped benchmark job through the internal executor",
+      queueBenchmarkSchema,
+      async (args) => {
+        const access = args.sessionToken
+          ? await resolveAutomationAccessFromSessionToken(automation, args.sessionToken, "benchmark")
+          : (() => {
+              if (!args.ownerEoa) {
+                throw new Error("ownerEoa is required when no sessionToken is supplied.");
+              }
+              return verifyMcpMutationAuth(args.ownerEoa, args.auth as MutationAuthEnvelope | undefined)
+                .then(() => resolveAutomationAccessFromOwner(automation, args.ownerEoa!, "benchmark"));
+            })();
+
+        const scoped = await access;
+        const result = await queueBenchmarkThroughExecutor(this.env, scoped, {
+          decisionId: args.decisionId,
+          dataSnapshotHash: args.dataSnapshotHash,
+          payload: args.payload as Record<string, unknown> | undefined,
+        });
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          structuredContent: result as Record<string, unknown>,
+        };
+      }
+    );
+
+    this.server.tool(
+      "execute_strategy",
+      "Queues and dispatches a scoped strategy execution through the internal executor",
+      executeStrategySchema,
+      async (args) => {
+        const access = args.sessionToken
+          ? await resolveAutomationAccessFromSessionToken(automation, args.sessionToken, "execution")
+          : (() => {
+              if (!args.ownerEoa) {
+                throw new Error("ownerEoa is required when no sessionToken is supplied.");
+              }
+              return verifyMcpMutationAuth(args.ownerEoa, args.auth as MutationAuthEnvelope | undefined)
+                .then(() => resolveAutomationAccessFromOwner(automation, args.ownerEoa!, "execution"));
+            })();
+
+        const scoped = await access;
+        const result = await queueStrategyThroughExecutor(this.env, scoped, {
+          strategyKey: args.strategyKey,
+          intent: args.intent as Record<string, unknown>,
+          payload: args.payload as Record<string, unknown> | undefined,
+        });
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          structuredContent: result as Record<string, unknown>,
+        };
+      }
+    );
+
+    this.server.tool(
+      "list_jobs",
+      "Lists scoped benchmark and execution jobs for a user vault",
+      listJobsSchema,
+      async ({ sessionToken, ownerEoa }) => {
+        const scopedOwner = sessionToken
+          ? (await resolveAutomationAccessFromSessionToken(automation, sessionToken, "state")).ownerEoa
+          : ownerEoa;
+
+        if (!scopedOwner) {
+          throw new Error("ownerEoa or sessionToken is required.");
+        }
+
+        const [automationJobs, benchmarkJobs] = await Promise.all([
+          automation.listAutomationJobs(scopedOwner),
+          automation.listBenchmarkJobs(scopedOwner),
+        ]);
+        const structured = { automationJobs, benchmarkJobs };
+        return {
+          content: [{ type: "text", text: JSON.stringify(structured, null, 2) }],
+          structuredContent: structured,
+        };
+      }
     );
   }
 }
@@ -479,6 +742,80 @@ export default {
           return new Response(JSON.stringify(state), { headers: corsHeaders });
         }
 
+        if (url.pathname === "/api/automation/grants/challenge" && request.method === "POST") {
+          const body = await readJsonBody<Record<string, unknown>>(request);
+          const ownerEoa = resolveMutationOwner(body);
+          if (!ownerEoa) {
+            return new Response(JSON.stringify({ error: "ownerEoa is required" }), { status: 400, headers: corsHeaders });
+          }
+
+          await assertMutationAuthorized(request, env, body, ownerEoa);
+          const challenge = await createAutomationGrantChallenge(automation, {
+            ownerEoa,
+            agentSubject:
+              typeof body.agentSubject === "string" && body.agentSubject.trim()
+                ? body.agentSubject
+                : "erc8004:49",
+            allowedDomains: Array.isArray(body.allowedDomains) ? body.allowedDomains.map(String) : undefined,
+            policyVersion: typeof body.policyVersion === "string" ? body.policyVersion : undefined,
+            expiresAt: typeof body.expiresAt === "string" ? body.expiresAt : undefined,
+          });
+
+          return new Response(JSON.stringify({ success: true, challenge }), { headers: corsHeaders });
+        }
+
+        if (url.pathname === "/api/automation/grants/issue" && request.method === "POST") {
+          const body = await readJsonBody<Record<string, unknown>>(request);
+          const ownerEoa = resolveMutationOwner(body);
+          if (!ownerEoa) {
+            return new Response(JSON.stringify({ error: "ownerEoa is required" }), { status: 400, headers: corsHeaders });
+          }
+
+          const result = await issueAutomationGrant(automation, env, {
+            ownerEoa,
+            agentSubject:
+              typeof body.agentSubject === "string" && body.agentSubject.trim()
+                ? body.agentSubject
+                : "erc8004:49",
+            allowedDomains: Array.isArray(body.allowedDomains) ? body.allowedDomains.map(String) : undefined,
+            policyVersion: typeof body.policyVersion === "string" ? body.policyVersion : undefined,
+            issuedAt: typeof body.issuedAt === "string" ? body.issuedAt : undefined,
+            expiresAt: typeof body.expiresAt === "string" ? body.expiresAt : undefined,
+            nonce: typeof body.nonce === "string" ? body.nonce : undefined,
+            signature: typeof body.signature === "string" ? body.signature : undefined,
+            issuedVia: typeof body.issuedVia === "string" ? body.issuedVia : "web",
+          });
+
+          return new Response(JSON.stringify(result), { headers: corsHeaders });
+        }
+
+        if (url.pathname === "/api/automation/grants/revoke" && request.method === "POST") {
+          const body = await readJsonBody<Record<string, unknown>>(request);
+          let grantId = typeof body.grantId === "string" ? body.grantId : null;
+
+          if (typeof body.sessionToken === "string" && body.sessionToken.trim()) {
+            const access = await resolveAutomationAccessFromSessionToken(automation, body.sessionToken, "state");
+            grantId = access.grantId;
+          } else {
+            const ownerEoa = resolveMutationOwner(body);
+            if (!ownerEoa) {
+              return new Response(JSON.stringify({ error: "grantId, ownerEoa or sessionToken is required" }), { status: 400, headers: corsHeaders });
+            }
+            await assertMutationAuthorized(request, env, body, ownerEoa);
+            if (!grantId) {
+              const activeGrant = await automation.getActiveAutomationGrant(ownerEoa);
+              grantId = activeGrant?.grant_id ? String(activeGrant.grant_id) : null;
+            }
+          }
+
+          if (!grantId) {
+            return new Response(JSON.stringify({ error: "No active automation grant found to revoke." }), { status: 404, headers: corsHeaders });
+          }
+
+          const result = await revokeAutomationGrant(automation, grantId);
+          return new Response(JSON.stringify(result), { headers: corsHeaders });
+        }
+
         if (url.pathname === "/api/automation/accounts" && request.method === "POST") {
           const body = await readJsonBody<Record<string, unknown>>(request);
           const ownerEoa = resolveMutationOwner(body);
@@ -648,32 +985,49 @@ export default {
 
         if (url.pathname === "/api/automation/jobs" && request.method === "POST") {
           const body = await readJsonBody<Record<string, unknown>>(request);
-          const ownerEoa = resolveMutationOwner(body);
-          if (!ownerEoa) {
-            return new Response(JSON.stringify({ error: "ownerEoa is required" }), { status: 400, headers: corsHeaders });
+          if (isInternalMutationRequest(request, env.INTERNAL_API_TOKEN ?? null)) {
+            const ownerEoa = resolveMutationOwner(body);
+            if (!ownerEoa) {
+              return new Response(JSON.stringify({ error: "ownerEoa is required" }), { status: 400, headers: corsHeaders });
+            }
+
+            const job = await automation.upsertAutomationJob({
+              jobId: String(body.jobId),
+              sessionId: typeof body.sessionId === "string" ? body.sessionId : undefined,
+              ownerEoa,
+              userSmartAccount: typeof body.userSmartAccount === "string" ? body.userSmartAccount : undefined,
+              executionDomain: body.executionDomain as "benchmark" | "execution",
+              jobType: String(body.jobType),
+              targetContract: typeof body.targetContract === "string" ? body.targetContract : undefined,
+              targetSelector: typeof body.targetSelector === "string" ? body.targetSelector : undefined,
+              payload: typeof body.payload === "object" && body.payload ? body.payload as Record<string, unknown> : undefined,
+              status: typeof body.status === "string" ? body.status : undefined,
+              txHash: typeof body.txHash === "string" ? body.txHash : undefined,
+              confirmedAt: typeof body.confirmedAt === "string" ? body.confirmedAt : undefined,
+              failureReason: typeof body.failureReason === "string" ? body.failureReason : undefined,
+              providerJobRef: typeof body.providerJobRef === "string" ? body.providerJobRef : undefined,
+              userId: typeof body.userId === "string" ? body.userId : undefined,
+              vaultId: typeof body.vaultId === "string" ? body.vaultId : undefined,
+              policyVersion: typeof body.policyVersion === "string" ? body.policyVersion : undefined,
+            });
+
+            return new Response(JSON.stringify({ success: true, job }), { headers: corsHeaders });
           }
-          await assertMutationAuthorized(request, env, body, ownerEoa);
-          const job = await automation.upsertAutomationJob({
-            jobId: String(body.jobId),
-            sessionId: typeof body.sessionId === "string" ? body.sessionId : undefined,
-            ownerEoa,
-            userSmartAccount: typeof body.userSmartAccount === "string" ? body.userSmartAccount : undefined,
-            executionDomain: body.executionDomain as "benchmark" | "execution",
-            jobType: String(body.jobType),
-            targetContract: typeof body.targetContract === "string" ? body.targetContract : undefined,
-            targetSelector: typeof body.targetSelector === "string" ? body.targetSelector : undefined,
-            payload: typeof body.payload === "object" && body.payload ? body.payload as Record<string, unknown> : undefined,
-            status: typeof body.status === "string" ? body.status : undefined,
-            txHash: typeof body.txHash === "string" ? body.txHash : undefined,
-            confirmedAt: typeof body.confirmedAt === "string" ? body.confirmedAt : undefined,
-            failureReason: typeof body.failureReason === "string" ? body.failureReason : undefined,
-            providerJobRef: typeof body.providerJobRef === "string" ? body.providerJobRef : undefined,
-            userId: typeof body.userId === "string" ? body.userId : undefined,
-            vaultId: typeof body.vaultId === "string" ? body.vaultId : undefined,
-            policyVersion: typeof body.policyVersion === "string" ? body.policyVersion : undefined,
+
+          const access = await resolveAutomationAccess(request, env, automation, body, "execution");
+          const result = await queueStrategyThroughExecutor(env, access, {
+            strategyKey: String(body.strategyKey),
+            intent:
+              typeof body.intent === "object" && body.intent
+                ? body.intent as Record<string, unknown>
+                : {},
+            payload:
+              typeof body.payload === "object" && body.payload
+                ? body.payload as Record<string, unknown>
+                : undefined,
           });
 
-          return new Response(JSON.stringify({ success: true, job }), { headers: corsHeaders });
+          return new Response(JSON.stringify(result), { headers: corsHeaders });
         }
 
         const automationJobMatch = url.pathname.match(/^\/api\/automation\/jobs\/([^/]+)$/);
@@ -709,31 +1063,45 @@ export default {
 
         if (url.pathname === "/api/benchmark-jobs" && request.method === "POST") {
           const body = await readJsonBody<Record<string, unknown>>(request);
-          const ownerEoa = resolveMutationOwner(body);
-          if (!ownerEoa) {
-            return new Response(JSON.stringify({ error: "ownerEoa is required" }), { status: 400, headers: corsHeaders });
+          if (isInternalMutationRequest(request, env.INTERNAL_API_TOKEN ?? null)) {
+            const ownerEoa = resolveMutationOwner(body);
+            if (!ownerEoa) {
+              return new Response(JSON.stringify({ error: "ownerEoa is required" }), { status: 400, headers: corsHeaders });
+            }
+
+            const benchmarkJob = await automation.upsertBenchmarkJob({
+              benchmarkJobId: String(body.benchmarkJobId),
+              decisionId: String(body.decisionId),
+              ownerEoa,
+              agentSmartWallet: typeof body.agentSmartWallet === "string" ? body.agentSmartWallet : undefined,
+              sessionId: typeof body.sessionId === "string" ? body.sessionId : undefined,
+              status: typeof body.status === "string" ? body.status : undefined,
+              txHash: typeof body.txHash === "string" ? body.txHash : undefined,
+              onchainDecisionId: typeof body.onchainDecisionId === "string" ? body.onchainDecisionId : undefined,
+              confirmedAt: typeof body.confirmedAt === "string" ? body.confirmedAt : undefined,
+              dataSnapshotHash: typeof body.dataSnapshotHash === "string" ? body.dataSnapshotHash : undefined,
+              payload: typeof body.payload === "object" && body.payload ? body.payload as Record<string, unknown> : undefined,
+              failureReason: typeof body.failureReason === "string" ? body.failureReason : undefined,
+              providerJobRef: typeof body.providerJobRef === "string" ? body.providerJobRef : undefined,
+              userId: typeof body.userId === "string" ? body.userId : undefined,
+              vaultId: typeof body.vaultId === "string" ? body.vaultId : undefined,
+              policyVersion: typeof body.policyVersion === "string" ? body.policyVersion : undefined,
+            });
+
+            return new Response(JSON.stringify({ success: true, benchmarkJob }), { headers: corsHeaders });
           }
-          await assertMutationAuthorized(request, env, body, ownerEoa);
-          const benchmarkJob = await automation.upsertBenchmarkJob({
-            benchmarkJobId: String(body.benchmarkJobId),
+
+          const access = await resolveAutomationAccess(request, env, automation, body, "benchmark");
+          const result = await queueBenchmarkThroughExecutor(env, access, {
             decisionId: String(body.decisionId),
-            ownerEoa,
-            agentSmartWallet: typeof body.agentSmartWallet === "string" ? body.agentSmartWallet : undefined,
-            sessionId: typeof body.sessionId === "string" ? body.sessionId : undefined,
-            status: typeof body.status === "string" ? body.status : undefined,
-            txHash: typeof body.txHash === "string" ? body.txHash : undefined,
-            onchainDecisionId: typeof body.onchainDecisionId === "string" ? body.onchainDecisionId : undefined,
-            confirmedAt: typeof body.confirmedAt === "string" ? body.confirmedAt : undefined,
             dataSnapshotHash: typeof body.dataSnapshotHash === "string" ? body.dataSnapshotHash : undefined,
-            payload: typeof body.payload === "object" && body.payload ? body.payload as Record<string, unknown> : undefined,
-            failureReason: typeof body.failureReason === "string" ? body.failureReason : undefined,
-            providerJobRef: typeof body.providerJobRef === "string" ? body.providerJobRef : undefined,
-            userId: typeof body.userId === "string" ? body.userId : undefined,
-            vaultId: typeof body.vaultId === "string" ? body.vaultId : undefined,
-            policyVersion: typeof body.policyVersion === "string" ? body.policyVersion : undefined,
+            payload:
+              typeof body.payload === "object" && body.payload
+                ? body.payload as Record<string, unknown>
+                : undefined,
           });
 
-          return new Response(JSON.stringify({ success: true, benchmarkJob }), { headers: corsHeaders });
+          return new Response(JSON.stringify(result), { headers: corsHeaders });
         }
 
         const benchmarkJobMatch = url.pathname.match(/^\/api\/benchmark-jobs\/([^/]+)$/);

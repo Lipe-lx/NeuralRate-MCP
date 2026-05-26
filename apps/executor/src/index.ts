@@ -117,15 +117,13 @@ type MutationAuthPayload = {
   signature: string;
 };
 
-const requireSignedMutation = async (body: Record<string, unknown>, ownerEoa: string) => {
-  if (!body.auth || typeof body.auth !== "object") {
-    throw new Error("Missing signed mutation auth envelope.");
-  }
+const isInternalExecutorRequest = (request: IncomingMessage) =>
+  request.headers["x-neuralrate-internal-token"] === config.internalApiToken;
 
-  await dataApi.verifyMutationAuth({
-    ownerEoa,
-    auth: body.auth,
-  });
+const assertInternalExecutorRequest = (request: IncomingMessage) => {
+  if (!isInternalExecutorRequest(request)) {
+    throw new Error("Executor only accepts internal worker requests.");
+  }
 };
 
 const resolveScopedState = async (ownerEoa: string) => {
@@ -179,6 +177,8 @@ createServer(async (request, response) => {
       return;
     }
 
+    assertInternalExecutorRequest(request);
+
     if (url.pathname === "/v1/state" && request.method === "GET") {
       const ownerEoa = url.searchParams.get("ownerEoa");
       if (!ownerEoa) {
@@ -204,8 +204,6 @@ createServer(async (request, response) => {
         vaultStatus?: string | null;
         auth?: MutationAuthPayload;
       }>(request);
-      await requireSignedMutation(body as unknown as Record<string, unknown>, body.ownerEoa);
-
       const state = await dataApi.bootstrapUser({
         ownerEoa: body.ownerEoa,
         externalWallet: body.externalWallet ?? body.ownerEoa,
@@ -239,8 +237,6 @@ createServer(async (request, response) => {
         validUntil?: string | null;
         auth?: MutationAuthPayload;
       }>(request);
-      await requireSignedMutation(body as unknown as Record<string, unknown>, body.ownerEoa);
-
       const scoped = await resolveScopedState(body.ownerEoa);
       const policyId = makeId("policy");
       const benchmarkPolicyId = makeId("policy");
@@ -368,8 +364,6 @@ createServer(async (request, response) => {
         consentVerifiedAt?: string | null;
         auth?: MutationAuthPayload;
       }>(request);
-      await requireSignedMutation(body as unknown as Record<string, unknown>, body.ownerEoa);
-
       const scoped = await resolveScopedState(body.ownerEoa);
       const signerAddress = await managedSigner.getPublicAddress();
       const session = await dataApi.activateSession(body.sessionId, {
@@ -418,8 +412,6 @@ createServer(async (request, response) => {
         providerPermissionRef?: string | null;
         auth?: MutationAuthPayload;
       }>(request);
-      await requireSignedMutation(body as unknown as Record<string, unknown>, body.ownerEoa);
-
       const scoped = await resolveScopedState(body.ownerEoa);
       const signerAddress = await managedSigner.getPublicAddress();
       const session = await dataApi.revokeSession(body.sessionId, {
@@ -460,8 +452,6 @@ createServer(async (request, response) => {
         payload?: Record<string, unknown>;
         auth?: MutationAuthPayload;
       }>(request);
-      await requireSignedMutation(body as unknown as Record<string, unknown>, body.ownerEoa);
-
       const scoped = await resolveScopedState(body.ownerEoa);
       const capabilities = managedSigner.getCapabilities();
       const benchmarkJobId = makeId("benchmark");
@@ -583,8 +573,6 @@ createServer(async (request, response) => {
         payload?: Record<string, unknown>;
         auth?: MutationAuthPayload;
       }>(request);
-      await requireSignedMutation(body as unknown as Record<string, unknown>, body.ownerEoa);
-
       const scoped = await resolveScopedState(body.ownerEoa);
       const capabilities = managedSigner.getCapabilities();
       const jobId = makeId("job");

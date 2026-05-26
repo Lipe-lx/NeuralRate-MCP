@@ -44,6 +44,13 @@ type SafeInitArgs = {
   saltNonce?: string;
 };
 
+type VaultModuleResult = {
+  safeAddress: string;
+  deploymentTxHash: string | null;
+  moduleTxHash: string | null;
+  alreadyEnabled: boolean;
+};
+
 const buildPredictedSafe = async ({ ownerAddress, provider, saltNonce }: SafeInitArgs) =>
   Safe.init({
     provider: provider as any,
@@ -66,6 +73,37 @@ const normalizeValue = (value: unknown) => {
   }
   return value ?? '0x0';
 };
+
+const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+const waitForTransactionReceipt = async (
+  provider: EIP1193Provider,
+  txHash: string,
+  attempts = 40,
+  delayMs = 1500
+) => {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const receipt = await provider.request({
+      method: 'eth_getTransactionReceipt',
+      params: [txHash],
+    });
+
+    if (receipt) {
+      return receipt;
+    }
+
+    await wait(delayMs);
+  }
+
+  throw new Error(`Transaction ${txHash} was not confirmed in time.`);
+};
+
+const openSafeByAddress = async (ownerAddress: string, provider: EIP1193Provider, safeAddress: string) =>
+  Safe.init({
+    provider: provider as any,
+    signer: ownerAddress,
+    safeAddress,
+  });
 
 export async function resolveUserSafeVault(
   ownerAddress: string,
@@ -121,6 +159,61 @@ export async function deployUserSafeVault(
     txHash: String(txHash),
     alreadyDeployed: false,
   };
+}
+
+export async function ensureVaultModuleEnabled(
+  ownerAddress: string,
+  wallet: WalletAccess,
+  moduleAddress: string,
+  saltNonce?: string
+): Promise<VaultModuleResult> {
+  const provider = await wallet.getEthereumProvider();
+  const deployment = await deployUserSafeVault(ownerAddress, wallet, saltNonce);
+
+  if (deployment.txHash) {
+    await waitForTransactionReceipt(provider, deployment.txHash);
+  }
+
+  const safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
+  const alreadyEnabled = await safe.isModuleEnabled(moduleAddress);
+  if (alreadyEnabled) {
+    return {
+      safeAddress: deployment.safeAddress,
+      deploymentTxHash: deployment.txHash,
+      moduleTxHash: null,
+      alreadyEnabled: true,
+    };
+  }
+
+  const enableModuleTx = await safe.createEnableModuleTx(moduleAddress);
+  const result = await safe.executeTransaction(enableModuleTx);
+  await waitForTransactionReceipt(provider, result.hash);
+
+  return {
+    safeAddress: deployment.safeAddress,
+    deploymentTxHash: deployment.txHash,
+    moduleTxHash: result.hash,
+    alreadyEnabled: false,
+  };
+}
+
+export async function disableVaultModule(
+  ownerAddress: string,
+  wallet: WalletAccess,
+  safeAddress: string,
+  moduleAddress: string
+) {
+  const provider = await wallet.getEthereumProvider();
+  const safe = await openSafeByAddress(ownerAddress, provider, safeAddress);
+  const enabled = await safe.isModuleEnabled(moduleAddress);
+  if (!enabled) {
+    return null;
+  }
+
+  const disableModuleTx = await safe.createDisableModuleTx(moduleAddress);
+  const result = await safe.executeTransaction(disableModuleTx);
+  await waitForTransactionReceipt(provider, result.hash);
+  return result.hash;
 }
 
 const buildConsentMessage = (ownerAddress: string, preparedSession: PreparedAutomationSession) => [

@@ -7,8 +7,24 @@
     {
       "name": "NeuralRate-ModelContextProtocol",
       "endpoint": "https://neuralrate-worker.neuralrate.workers.dev/mcp",
-      "version": "2026-05-22",
-      "mcpTools": ["yield_scan", "tbill_spread", "nansen_context", "risk_assess", "optimal_allocation", "log_decision", "get_decisions"]
+      "version": "2026-05-25",
+      "mcpTools": [
+        "yield_scan",
+        "tbill_spread",
+        "nansen_context",
+        "risk_assess",
+        "optimal_allocation",
+        "log_decision",
+        "get_decisions",
+        "get_user_state",
+        "bootstrap_user_vault",
+        "update_agent_policy",
+        "issue_automation_grant",
+        "revoke_automation_grant",
+        "queue_benchmark",
+        "execute_strategy",
+        "list_jobs"
+      ]
     }
   ],
   "registrations": [

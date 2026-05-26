@@ -3,7 +3,6 @@ import {
   API_BASE_URL,
   ERC8004_AGENT_ID,
   ERC8004_IDENTITY_REGISTRY,
-  EXECUTOR_BASE_URL,
   MANTLE_EXPLORER_BASE_URL,
   NEURALRATE_AGENT_SMART_WALLET,
   NEURALRATE_BENCHMARK_CONTRACT,
@@ -215,7 +214,7 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
   };
 
   const queueBenchmark = async (decision: DecisionRecord) => {
-    if (!ownerEoa || !state?.activeSession) {
+    if (!ownerEoa || !state?.activeGrant) {
       setError("Enable automation before queueing benchmark execution.");
       return;
     }
@@ -239,12 +238,11 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
       }>({
         ownerEoa,
         signMessage: wallet.signMessage,
-        url: `${EXECUTOR_BASE_URL}/v1/automation/benchmark-jobs`,
+        url: `${API_BASE_URL}/benchmark-jobs`,
         method: "POST",
         body: {
           decisionId: decision.decision_id,
           ownerEoa,
-          sessionId: state.activeSession.session_id,
           dataSnapshotHash,
           payload: {
             vaultId: state.vault?.vault_id,

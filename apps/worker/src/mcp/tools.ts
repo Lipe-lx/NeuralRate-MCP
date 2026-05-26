@@ -93,6 +93,135 @@ export const getDecisionsSchema = {
   ownerEoa: z.string().optional()
 };
 
+export const getUserStateSchema = {
+  ownerEoa: z.string().optional().describe("Owner address when querying without a session token"),
+  sessionToken: z.string().optional().describe("Active MCP mutation session token"),
+};
+
+export const bootstrapUserVaultSchema = {
+  ownerEoa: z.string().describe("Owner EOA for the dedicated vault"),
+  externalWallet: z.string().optional(),
+  embeddedWallet: z.string().optional(),
+  authStrategy: z.string().optional(),
+  displayName: z.string().optional(),
+  privyUserId: z.string().optional(),
+  providerUserRef: z.string().optional(),
+  walletProvider: z.string().optional(),
+  vaultAddress: z.string().optional(),
+  vaultProvider: z.string().optional(),
+  vaultKind: z.string().optional(),
+  vaultStatus: z.string().optional(),
+  safeDeploymentStatus: z.string().optional(),
+  safeSaltNonce: z.string().optional(),
+  chainId: z.number().optional(),
+  auth: z.object({
+    ownerEoa: z.string(),
+    nonce: z.string(),
+    issuedAt: z.string(),
+    expiresAt: z.string(),
+    signature: z.string(),
+  }).describe("Signed mutation envelope from the owner wallet"),
+};
+
+export const updateAgentPolicySchema = {
+  sessionToken: z.string().optional(),
+  ownerEoa: z.string().optional(),
+  auth: z.object({
+    ownerEoa: z.string(),
+    nonce: z.string(),
+    issuedAt: z.string(),
+    expiresAt: z.string(),
+    signature: z.string(),
+  }).optional(),
+  objective: z.enum(["preserve", "income", "growth"]).optional(),
+  riskProfile: z.enum(["low", "medium", "high"]).optional(),
+  horizonHours: z.number().optional(),
+  automationMode: z.enum(["recommend-only", "auto-within-limits"]).optional(),
+  restrictionPreset: z.enum(["stable-only", "blue-chip-defi", "yield-maximizer", "rwa-focused"]).optional(),
+  allowedAssets: z.array(z.string()).optional(),
+  deniedAssets: z.array(z.string()).optional(),
+  allowedProtocols: z.array(z.string()).optional(),
+  deniedProtocols: z.array(z.string()).optional(),
+  maxProtocolWeightBps: z.number().optional(),
+  maxAssetWeightBps: z.number().optional(),
+  maxActionUsd: z.number().optional(),
+  maxDailyUsd: z.number().optional(),
+  maxAutomationUsd: z.number().optional(),
+  maxSlippageBps: z.number().optional(),
+  rebalanceCadenceHours: z.number().optional(),
+  minApyBps: z.number().optional(),
+  minSpreadOverTbillBps: z.number().optional(),
+  requireManualAboveUsd: z.number().optional(),
+  pauseOnRiskEvent: z.boolean().optional(),
+  policyVersion: z.string().optional(),
+};
+
+export const issueAutomationGrantSchema = {
+  ownerEoa: z.string(),
+  agentSubject: z.string().describe("Stable subject for the agent session, e.g. erc8004:49"),
+  allowedDomains: z.array(z.enum(["state", "config", "benchmark", "execution"])).optional(),
+  policyVersion: z.string().optional(),
+  issuedAt: z.string().optional(),
+  expiresAt: z.string().optional(),
+  nonce: z.string().optional(),
+  signature: z.string().optional().describe("Owner signature over the canonical grant message"),
+  issuedVia: z.string().optional(),
+};
+
+export const revokeAutomationGrantSchema = {
+  grantId: z.string().optional(),
+  sessionToken: z.string().optional(),
+  ownerEoa: z.string().optional(),
+  auth: z.object({
+    ownerEoa: z.string(),
+    nonce: z.string(),
+    issuedAt: z.string(),
+    expiresAt: z.string(),
+    signature: z.string(),
+  }).optional(),
+};
+
+export const queueBenchmarkSchema = {
+  sessionToken: z.string().optional(),
+  ownerEoa: z.string().optional(),
+  auth: z.object({
+    ownerEoa: z.string(),
+    nonce: z.string(),
+    issuedAt: z.string(),
+    expiresAt: z.string(),
+    signature: z.string(),
+  }).optional(),
+  decisionId: z.string(),
+  dataSnapshotHash: z.string().optional(),
+  payload: z.record(z.string(), z.unknown()).optional(),
+};
+
+export const executeStrategySchema = {
+  sessionToken: z.string().optional(),
+  ownerEoa: z.string().optional(),
+  auth: z.object({
+    ownerEoa: z.string(),
+    nonce: z.string(),
+    issuedAt: z.string(),
+    expiresAt: z.string(),
+    signature: z.string(),
+  }).optional(),
+  strategyKey: z.string(),
+  intent: z.object({
+    targetAsset: z.string(),
+    amountUsd: z.number(),
+    amountToken: z.number().optional(),
+    slippageBps: z.number().optional(),
+    notes: z.string().optional(),
+  }),
+  payload: z.record(z.string(), z.unknown()).optional(),
+};
+
+export const listJobsSchema = {
+  sessionToken: z.string().optional(),
+  ownerEoa: z.string().optional(),
+};
+
 const PRESET_RULES = {
   "stable-only": {
     stableOnly: true,

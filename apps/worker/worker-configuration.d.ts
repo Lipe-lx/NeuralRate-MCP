@@ -8,7 +8,9 @@ declare namespace Cloudflare {
 	interface Env {
 		CACHE_KV: KVNamespace;
 		DECISIONS_DB: D1Database;
+		EXECUTOR_BASE_URL: string;
 		FRED_API_KEY: string;
+		INTERNAL_API_TOKEN: string;
 		NANSEN_API_KEY: string;
 		NEURALRATE_BENCHMARK_CONTRACT: string;
 		MCP_OBJECT: DurableObjectNamespace<import("./src/index").NeuralRateMcpAgent>;
@@ -19,5 +21,5 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "FRED_API_KEY" | "NANSEN_API_KEY" | "NEURALRATE_BENCHMARK_CONTRACT">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "EXECUTOR_BASE_URL" | "FRED_API_KEY" | "INTERNAL_API_TOKEN" | "NANSEN_API_KEY" | "NEURALRATE_BENCHMARK_CONTRACT">> {}
 }

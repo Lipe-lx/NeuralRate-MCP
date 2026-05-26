@@ -117,6 +117,45 @@ export interface AutomationSession {
   grant_tx_hash: string | null;
 }
 
+export interface AutomationGrant {
+  grant_id: string;
+  owner_eoa: string;
+  user_id: string;
+  vault_id: string;
+  vault_address: string;
+  agent_subject: string;
+  policy_version: string;
+  allowed_domains: string[];
+  nonce: string;
+  signature: string;
+  grant_message: string;
+  issued_via: string | null;
+  status: string;
+  issued_at: string;
+  expires_at: string;
+  revoked_at: string | null;
+  session_id: string | null;
+}
+
+export interface McpMutationSession {
+  session_id: string;
+  grant_id: string;
+  owner_eoa: string;
+  user_id: string;
+  vault_id: string;
+  vault_address: string;
+  agent_subject: string;
+  policy_version: string;
+  allowed_domains: string[];
+  session_token_hash: string;
+  issued_via: string | null;
+  status: string;
+  issued_at: string;
+  expires_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+}
+
 export interface BenchmarkJob {
   benchmark_job_id: string;
   decision_id: string;
@@ -152,6 +191,10 @@ export interface AutomationState {
   activePermission: VaultPermission | null;
   sessions: AutomationSession[];
   activeSession: AutomationSession | null;
+  grants: AutomationGrant[];
+  activeGrant: AutomationGrant | null;
+  mcpSessions: McpMutationSession[];
+  activeMcpSession: McpMutationSession | null;
   automationJobs: AutomationJob[];
   benchmarkJobs: BenchmarkJob[];
   automationReady: boolean;

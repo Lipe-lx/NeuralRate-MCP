@@ -18,8 +18,8 @@ The official demo path is intentionally narrow:
 2. User bootstraps a dedicated vault.
 3. User signs policy and automation consent.
 4. NeuralRate scans yields and filters candidates to a stable / RWA-safe profile.
-5. NeuralRate highlights a USDY-oriented allocation thesis.
-6. The operator can queue the dedicated USDY stable demo job from the vault panel.
+5. NeuralRate can still reason about USDY, but will explicitly block execution if no canonical Sepolia venue is validated.
+6. The operator can queue the dedicated MNT Safe-module demo job from the vault panel.
 7. The benchmark decision is written on-chain.
 8. The UI shows the local record, tx hash, on-chain decision id, consent audit trail, and execution trail.
 
@@ -29,7 +29,7 @@ The official demo path is intentionally narrow:
 - `Worker`: signed-mutation API, MCP tools, D1 persistence, cached market data
 - `Executor`: signed-consent verification, benchmark writer, vault job orchestration
 - `Benchmark contract`: public Mantle Sepolia registry for decision performance tracking
-- `USDY strategy adapter`: repo-pinned execution surface deployed on Mantle Sepolia and validated by runtime bytecode hash
+- `Vault module`: repo-pinned Safe module deployed on Mantle Sepolia and validated by runtime bytecode hash
 - `Trust split`: user wallet controls consent; NeuralRate benchmark identity stays separate from user funds
 
 ## Trust Model Slide
@@ -39,14 +39,15 @@ The official demo path is intentionally narrow:
 - Nonces are short-lived and single-use to prevent replay.
 - Signed consent is stored separately from optional on-chain grant execution.
 - Benchmark writes capture `txHash`, parse the real `DecisionCreated` event, and persist the on-chain id locally.
-- The USDY strategy path resolves only through a repo-pinned deployment manifest and runtime bytecode validation.
+- The `USDY` strategy path fails closed on Sepolia unless a canonical venue is explicitly validated.
+- The default Sepolia execution path uses a real native `MNT` transfer through the repo-pinned Safe module.
 - User vault execution and global benchmark identity are intentionally separated to reduce blast radius.
 
 ## 60-90s Demo Script
 
 “NeuralRate is the trust and execution layer for AI-managed RWA allocation on Mantle. Here the user connects a wallet and bootstraps a dedicated vault, so their funds are not mixed with any shared agent balance. Next, the user signs a policy-constrained consent message. That signature is verified server-side with a nonce, stored as an audit record, and can later be revoked by the same wallet owner.
 
-Now NeuralRate scans Mantle yield opportunities and focuses the policy to stable and RWA-safe candidates. In this demo we intentionally keep the scope narrow and choose a USDY-oriented thesis. When the benchmark is submitted, the executor writes the decision to Mantle Sepolia, waits for confirmation, parses the real `DecisionCreated` event, and stores both the tx hash and the on-chain decision id back into the ledger.
+Now NeuralRate scans Mantle yield opportunities and focuses the policy to stable and RWA-safe candidates. In this demo we intentionally keep the scope narrow. If a strategy depends on a canonical venue that is not validated on Mantle Sepolia, NeuralRate blocks it explicitly instead of simulating execution. For the live execution demo, the agent uses the Safe module to submit a real native MNT transfer from the user vault. When the benchmark is submitted, the executor writes the decision to Mantle Sepolia, waits for confirmation, parses the real `DecisionCreated` event, and stores both the tx hash and the on-chain decision id back into the ledger.
 
 So the result is not just an AI recommendation. It is a signed, policy-scoped, benchmarkable decision trail that can be audited across the UI, the backend ledger, and the chain.” 
 
@@ -72,7 +73,8 @@ Use these claims in the submission only if the deployed environment still matche
 - Benchmark writes produce a real Mantle Sepolia transaction hash.
 - The ledger stores the real on-chain decision id parsed from the contract event.
 - User vault scope is separated from the global benchmark writer identity.
-- The USDY strategy adapter is pinned by `address + runtime bytecode hash`, not discovered dynamically at runtime.
+- The Safe module is pinned by `address + runtime bytecode hash`, not discovered dynamically at runtime.
+- Unsupported Sepolia venues fail closed with an explicit audit reason.
 
 Avoid stronger claims unless they are live and demonstrable:
 

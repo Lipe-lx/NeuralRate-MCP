@@ -4,7 +4,6 @@ interface ImportMetaEnv {
   readonly VITE_PUBLIC_API_BASE_URL?: string;
   readonly VITE_PUBLIC_MCP_HTTP_URL?: string;
   readonly VITE_PUBLIC_MCP_SSE_URL?: string;
-  readonly VITE_PUBLIC_EXECUTOR_BASE_URL?: string;
   readonly VITE_PUBLIC_MANTLE_RPC_URL?: string;
   readonly VITE_PUBLIC_MANTLE_EXPLORER_BASE_URL?: string;
   readonly VITE_PUBLIC_NEURALRATE_BENCHMARK_CONTRACT?: string;
@@ -22,6 +21,7 @@ interface ImportMetaEnv {
   readonly VITE_PUBLIC_NEURALRATE_SAFE_SALT_NONCE?: string;
   readonly VITE_PUBLIC_NEURALRATE_DEMO_STRATEGY_KEY?: string;
   readonly VITE_PUBLIC_NEURALRATE_DEMO_TARGET_ASSET?: string;
+  readonly VITE_PUBLIC_NEURALRATE_VAULT_MODULE_ADDRESS?: string;
 }
 
 interface ImportMeta {

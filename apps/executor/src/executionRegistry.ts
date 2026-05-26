@@ -1,5 +1,6 @@
-import { encodeFunctionData, keccak256, stringToHex, toFunctionSelector, type Address, type Hex } from "viem";
+import { encodeFunctionData, isAddress, keccak256, parseUnits, stringToHex, toFunctionSelector, type Address, type Hex } from "viem";
 import { usdyStrategyDeployment } from "./generated/usdyStrategyDeployment.js";
+import { vaultModuleDeployment } from "./generated/vaultModuleDeployment.js";
 
 const MANTLE_SEPOLIA_CHAIN_ID = 5003;
 
@@ -7,7 +8,9 @@ export type TokenManifest = {
   symbol: string;
   chainId: number;
   aliases: string[];
-  riskClass: "RWA_TBILL" | "STABLE" | "SYNTHETIC";
+  riskClass: "RWA_TBILL" | "STABLE" | "SYNTHETIC" | "NATIVE_GAS";
+  kind: "erc20" | "native";
+  decimals: number;
   address: Address | null;
 };
 
@@ -45,9 +48,24 @@ export type ProtocolManifest = {
 export type StrategyIntent = {
   targetAsset: string;
   amountUsd: number;
+  amountToken?: number | null;
   slippageBps?: number | null;
   notes?: string | null;
 };
+
+const runtimeAddress = (value: string | undefined | null) =>
+  value && isAddress(value) ? value : null;
+
+const runtimeEnv =
+  typeof globalThis !== "undefined" && "process" in globalThis
+    ? (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
+    : undefined;
+
+const configuredUsdYTokenAddress = runtimeAddress(runtimeEnv?.NEURALRATE_USDY_TOKEN_ADDRESS);
+const configuredUsdYRecipientAddress = runtimeAddress(runtimeEnv?.NEURALRATE_USDY_STRATEGY_RECIPIENT_ADDRESS);
+const configuredMntRecipientAddress = runtimeAddress(runtimeEnv?.NEURALRATE_MNT_STRATEGY_RECIPIENT_ADDRESS);
+export const CANONICAL_SEPOLIA_USDY_VENUE_REASON =
+  "Canonical Sepolia venue for USDY is not configured. NeuralRate will not simulate an Ondo venue on testnet.";
 
 export type StrategyManifest = {
   strategyKey: string;
@@ -99,6 +117,17 @@ export const tokenRegistry: Record<string, TokenManifest> = {
     chainId: MANTLE_SEPOLIA_CHAIN_ID,
     aliases: ["usdy", "ondo-usdy"],
     riskClass: "RWA_TBILL",
+    kind: "erc20",
+    decimals: 18,
+    address: configuredUsdYTokenAddress,
+  },
+  MNT: {
+    symbol: "MNT",
+    chainId: MANTLE_SEPOLIA_CHAIN_ID,
+    aliases: ["mnt", "mantle"],
+    riskClass: "NATIVE_GAS",
+    kind: "native",
+    decimals: 18,
     address: null,
   },
 };
@@ -115,6 +144,32 @@ const usdyStableAllocationAbi = [{
     { name: "intentHash", type: "bytes32" },
   ] as const,
   outputs: [] as const,
+}] as const;
+
+const vaultExecutionModuleAbi = [{
+  type: "function",
+  name: "executeVaultCall",
+  stateMutability: "nonpayable",
+  inputs: [
+    { name: "ownerEoa", type: "address" },
+    { name: "vaultAddress", type: "address" },
+    { name: "targetContract", type: "address" },
+    { name: "value", type: "uint256" },
+    { name: "callData", type: "bytes" },
+    { name: "intentHash", type: "bytes32" },
+  ] as const,
+  outputs: [{ name: "", type: "bool" }] as const,
+}] as const;
+
+const erc20TransferAbi = [{
+  type: "function",
+  name: "transfer",
+  stateMutability: "nonpayable",
+  inputs: [
+    { name: "to", type: "address" },
+    { name: "amount", type: "uint256" },
+  ] as const,
+  outputs: [{ name: "", type: "bool" }] as const,
 }] as const;
 
 export const protocolRegistry: Record<string, ProtocolManifest> = {
@@ -136,17 +191,35 @@ export const protocolRegistry: Record<string, ProtocolManifest> = {
       },
     },
   },
+  "neuralrate-vault-module-v1": {
+    protocolId: "neuralrate-vault-module-v1",
+    displayName: "NeuralRate Vault Execution Module",
+    policyProtocolId: "neuralrate-vault-module",
+    chainId: MANTLE_SEPOLIA_CHAIN_ID,
+    address: vaultModuleDeployment.address,
+    expectedBytecodeHash: vaultModuleDeployment.expectedBytecodeHash,
+    deploymentStatus: vaultModuleDeployment.deploymentStatus,
+    supportedAssets: ["USDY", "MNT"],
+    actions: {
+      "execute-vault-call": {
+        actionId: "execute-vault-call",
+        functionName: "executeVaultCall",
+        abi: vaultExecutionModuleAbi,
+        selector: toFunctionSelector("executeVaultCall(address,address,address,uint256,bytes,bytes32)"),
+      },
+    },
+  },
 };
 
 export const strategyRegistry: Record<string, StrategyManifest> = {
   "usdy-stable-allocation": {
     strategyKey: "usdy-stable-allocation",
-    label: "USDY Stable Allocation",
+    label: "USDY Safe Module Allocation",
     chainId: MANTLE_SEPOLIA_CHAIN_ID,
     supportedAssets: ["USDY"],
-    supportedProtocols: ["neuralrate-usdy-adapter"],
-    defaultProtocolId: "neuralrate-usdy-adapter-v1",
-    defaultActionId: "execute-usdy-stable-allocation",
+    supportedProtocols: ["neuralrate-vault-module"],
+    defaultProtocolId: "neuralrate-vault-module-v1",
+    defaultActionId: "execute-vault-call",
     maxSlippageBps: 100,
     validateIntent: (intent) => {
       const failures: string[] = [];
@@ -165,6 +238,41 @@ export const strategyRegistry: Record<string, StrategyManifest> = {
         (!Number.isInteger(intent.slippageBps) || intent.slippageBps < 0 || intent.slippageBps > 100)
       ) {
         failures.push("slippageBps must be an integer between 0 and 100.");
+      }
+      return failures;
+    },
+  },
+  "mnt-native-transfer": {
+    strategyKey: "mnt-native-transfer",
+    label: "MNT Safe Module Transfer",
+    chainId: MANTLE_SEPOLIA_CHAIN_ID,
+    supportedAssets: ["MNT"],
+    supportedProtocols: ["neuralrate-vault-module"],
+    defaultProtocolId: "neuralrate-vault-module-v1",
+    defaultActionId: "execute-vault-call",
+    maxSlippageBps: 0,
+    validateIntent: (intent) => {
+      const failures: string[] = [];
+      if (!Number.isFinite(intent.amountUsd) || intent.amountUsd <= 0) {
+        failures.push("amountUsd must be a positive number for policy accounting.");
+      }
+      if (
+        intent.amountToken !== null &&
+        intent.amountToken !== undefined &&
+        (!Number.isFinite(intent.amountToken) || intent.amountToken <= 0)
+      ) {
+        failures.push("amountToken must be a positive number when provided.");
+      }
+      const normalizedAsset = intent.targetAsset.trim().toUpperCase();
+      if (normalizedAsset !== "MNT") {
+        failures.push("MNT native transfer currently supports only the MNT asset.");
+      }
+      if (
+        intent.slippageBps !== null &&
+        intent.slippageBps !== undefined &&
+        intent.slippageBps !== 0
+      ) {
+        failures.push("slippageBps must be omitted or 0 for native MNT transfers.");
       }
       return failures;
     },
@@ -216,6 +324,14 @@ export const makeIntentHash = (payload: Record<string, unknown>) => {
   return keccak256(stringToHex(serialized));
 };
 
+export const safeModuleStatusAbi = [{
+  type: "function",
+  name: "isModuleEnabled",
+  stateMutability: "view",
+  inputs: [{ name: "module", type: "address" }] as const,
+  outputs: [{ name: "", type: "bool" }] as const,
+}] as const;
+
 export const buildUsdYStableAllocationCalldata = (args: {
   ownerEoa: Address;
   vaultAddress: Address;
@@ -234,4 +350,84 @@ export const buildUsdYStableAllocationCalldata = (args: {
       args.intentHash,
     ],
   });
+};
+
+export const buildErc20TransferCalldata = (args: {
+  recipient: Address;
+  amount: bigint;
+}) =>
+  encodeFunctionData({
+    abi: erc20TransferAbi,
+    functionName: "transfer",
+    args: [args.recipient, args.amount],
+  });
+
+export const buildVaultExecutionModuleCalldata = (args: {
+  ownerEoa: Address;
+  vaultAddress: Address;
+  targetContract: Address;
+  value: bigint;
+  callData: Hex;
+  intentHash: Hex;
+}) =>
+  encodeFunctionData({
+    abi: vaultExecutionModuleAbi,
+    functionName: "executeVaultCall",
+    args: [
+      args.ownerEoa,
+      args.vaultAddress,
+      args.targetContract,
+      args.value,
+      args.callData,
+      args.intentHash,
+    ],
+  });
+
+export const resolveUsdYVaultTransfer = (args: {
+  ownerEoa: Address;
+  vaultAddress: Address;
+  amountUsd: number;
+  intentHash: Hex;
+}) => {
+  if (!configuredUsdYTokenAddress) {
+    throw new Error("NEURALRATE_USDY_TOKEN_ADDRESS is not configured.");
+  }
+  if (!configuredUsdYRecipientAddress) {
+    throw new Error("NEURALRATE_USDY_STRATEGY_RECIPIENT_ADDRESS is not configured.");
+  }
+
+  const amount = parseUnits(String(args.amountUsd), tokenRegistry.USDY.decimals);
+  const tokenCallData = buildErc20TransferCalldata({
+    recipient: configuredUsdYRecipientAddress,
+    amount,
+  });
+
+  return {
+    targetContract: configuredUsdYTokenAddress,
+    tokenCallData,
+    recipientAddress: configuredUsdYRecipientAddress,
+    amountAtomic: amount,
+  };
+};
+
+export const resolveNativeMntVaultTransfer = (args: {
+  ownerEoa: Address;
+  recipientAddress?: Address | null;
+  amountToken?: number | null;
+  amountUsd: number;
+}) => {
+  const recipientAddress = args.recipientAddress ?? configuredMntRecipientAddress ?? args.ownerEoa;
+  const amountToken = args.amountToken ?? args.amountUsd;
+  if (!Number.isFinite(amountToken) || amountToken <= 0) {
+    throw new Error("A positive amountToken (or fallback amountUsd) is required for MNT transfers.");
+  }
+
+  const amountAtomic = parseUnits(String(amountToken), tokenRegistry.MNT.decimals);
+  return {
+    targetContract: recipientAddress,
+    value: amountAtomic,
+    callData: "0x" as Hex,
+    recipientAddress,
+    amountAtomic,
+  };
 };

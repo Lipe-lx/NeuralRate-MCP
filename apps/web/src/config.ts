@@ -1,7 +1,6 @@
 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 const defaultLocalOrigin = 'http://localhost:8787';
 const defaultPublicWorkerOrigin = 'https://neuralrate-worker.neuralrate.workers.dev';
-const defaultExecutorOrigin = 'http://127.0.0.1:8788';
 const defaultPublicRpcUrl = 'https://rpc.sepolia.mantle.xyz';
 const defaultExplorerBaseUrl = 'https://sepolia.mantlescan.xyz';
 const defaultBenchmarkContract = '0xc51560a5512d2A5756435d87319aeaE1bA480165';
@@ -20,7 +19,6 @@ const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
 const publicApiBaseUrl = import.meta.env.VITE_PUBLIC_API_BASE_URL?.trim();
 const publicMcpHttpUrl = import.meta.env.VITE_PUBLIC_MCP_HTTP_URL?.trim();
 const publicMcpSseUrl = import.meta.env.VITE_PUBLIC_MCP_SSE_URL?.trim();
-const publicExecutorBaseUrl = import.meta.env.VITE_PUBLIC_EXECUTOR_BASE_URL?.trim();
 const publicRpcUrl = import.meta.env.VITE_PUBLIC_MANTLE_RPC_URL?.trim();
 const publicExplorerBaseUrl = import.meta.env.VITE_PUBLIC_MANTLE_EXPLORER_BASE_URL?.trim();
 const publicBenchmarkContract = import.meta.env.VITE_PUBLIC_NEURALRATE_BENCHMARK_CONTRACT?.trim();
@@ -35,6 +33,7 @@ const publicOnboardingProvider = import.meta.env.VITE_PUBLIC_NEURALRATE_ONBOARDI
 const publicManagedSignerProvider = import.meta.env.VITE_PUBLIC_NEURALRATE_MANAGED_SIGNER_PROVIDER?.trim();
 const publicDemoStrategyKey = import.meta.env.VITE_PUBLIC_NEURALRATE_DEMO_STRATEGY_KEY?.trim();
 const publicDemoTargetAsset = import.meta.env.VITE_PUBLIC_NEURALRATE_DEMO_TARGET_ASSET?.trim();
+const publicVaultModuleAddress = import.meta.env.VITE_PUBLIC_NEURALRATE_VAULT_MODULE_ADDRESS?.trim();
 
 const workerOrigin = isLocal
   ? defaultLocalOrigin
@@ -63,7 +62,6 @@ export const MANTLE_EXPLORER_BASE_URL = trimTrailingSlash(publicExplorerBaseUrl 
 export const NEURALRATE_BENCHMARK_CONTRACT = publicBenchmarkContract || defaultBenchmarkContract;
 export const ERC8004_AGENT_ID = publicErc8004AgentId || defaultErc8004AgentId;
 export const ERC8004_IDENTITY_REGISTRY = publicErc8004IdentityRegistry || defaultErc8004IdentityRegistry;
-export const EXECUTOR_BASE_URL = trimTrailingSlash(publicExecutorBaseUrl || defaultExecutorOrigin);
 export const BICONOMY_API_KEY = publicBiconomyApiKey || '';
 export const BICONOMY_MEE_URL = publicBiconomyMeeUrl || '';
 export const NEURALRATE_AGENT_SMART_WALLET = publicAgentSmartWallet || defaultAgentSmartWallet;
@@ -75,5 +73,7 @@ export const PRIVY_APP_ID = publicPrivyAppId || '';
 export const PRIVY_CLIENT_ID = publicPrivyClientId || '';
 export const PRIVY_ENABLED = Boolean(PRIVY_APP_ID);
 export const SAFE_SALT_NONCE = publicSafeSaltNonce || '49';
-export const DEMO_STRATEGY_KEY = publicDemoStrategyKey || 'usdy-stable-allocation';
-export const DEMO_TARGET_ASSET = publicDemoTargetAsset || 'USDY';
+export const DEMO_STRATEGY_KEY = publicDemoStrategyKey || 'mnt-native-transfer';
+export const DEMO_TARGET_ASSET = publicDemoTargetAsset || 'MNT';
+export const VAULT_MODULE_ADDRESS = publicVaultModuleAddress || '';
+export const VAULT_MODULE_ENABLED = Boolean(VAULT_MODULE_ADDRESS);

@@ -20,13 +20,21 @@ type NonceChallenge = {
 type SignMessage = (message: string) => Promise<string>;
 
 const fetchJson = async <T>(url: string, options?: RequestInit) => {
-  const response = await fetch(url, options);
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`${response.status} ${response.statusText}: ${text}`);
-  }
+  try {
+    const response = await fetch(url, options);
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`${response.status} ${response.statusText}: ${text}`);
+    }
 
-  return (await response.json()) as T;
+    return (await response.json()) as T;
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error(`Network request failed for ${url}. Check the deployed API/executor URL and CORS settings.`);
+    }
+
+    throw error;
+  }
 };
 
 export async function signMutation(ownerEoa: string, signMessage: SignMessage) {

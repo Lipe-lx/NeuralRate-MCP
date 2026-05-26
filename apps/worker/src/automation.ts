@@ -209,6 +209,45 @@ export type BenchmarkJobInput = {
   policyVersion?: string | null;
 };
 
+export type AutomationGrantInput = {
+  grantId: string;
+  ownerEoa: string;
+  userId: string;
+  vaultId: string;
+  vaultAddress: string;
+  agentSubject: string;
+  policyVersion: string;
+  allowedDomains: string[];
+  nonce: string;
+  signature: string;
+  grantMessage: string;
+  issuedVia?: string | null;
+  status?: string;
+  issuedAt: string;
+  expiresAt: string;
+  revokedAt?: string | null;
+  sessionId?: string | null;
+};
+
+export type McpMutationSessionInput = {
+  sessionId: string;
+  grantId: string;
+  ownerEoa: string;
+  userId: string;
+  vaultId: string;
+  vaultAddress: string;
+  agentSubject: string;
+  policyVersion: string;
+  allowedDomains: string[];
+  sessionTokenHash: string;
+  issuedVia?: string | null;
+  status?: string;
+  issuedAt: string;
+  expiresAt: string;
+  lastUsedAt?: string | null;
+  revokedAt?: string | null;
+};
+
 type DbRecord = Record<string, unknown>;
 type NormalizedRecord = DbRecord & {
   allowed_contracts: string[];
@@ -217,6 +256,7 @@ type NormalizedRecord = DbRecord & {
   denied_assets: string[];
   allowed_protocols: string[];
   denied_protocols: string[];
+  allowed_domains: string[];
   raw_policy: Record<string, unknown>;
   session_details: unknown;
   payload: Record<string, unknown>;
@@ -253,6 +293,7 @@ const normalizeRecord = (record: DbRecord | null): NormalizedRecord | null => {
     denied_assets: asJson<string[]>(record.denied_assets_json, []),
     allowed_protocols: asJson<string[]>(record.allowed_protocols_json, []),
     denied_protocols: asJson<string[]>(record.denied_protocols_json, []),
+    allowed_domains: asJson<string[]>(record.allowed_domains_json, []),
     raw_policy: asJson<Record<string, unknown>>(record.raw_policy_json, {}),
     session_details: asJson<unknown>(record.session_details_json, null),
     payload: asJson<Record<string, unknown>>(record.payload_json, {}),
@@ -960,6 +1001,234 @@ export class AutomationStore {
     return (results ?? []).map((record) => normalizeRecord(record));
   }
 
+  async upsertAutomationGrant(input: AutomationGrantInput) {
+    await this.db
+      .prepare(`
+        INSERT INTO automation_grants (
+          grant_id, owner_eoa, user_id, vault_id, vault_address, agent_subject, policy_version,
+          allowed_domains_json, nonce, signature, grant_message, issued_via, status,
+          issued_at, expires_at, revoked_at, session_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(grant_id) DO UPDATE SET
+          owner_eoa = excluded.owner_eoa,
+          user_id = excluded.user_id,
+          vault_id = excluded.vault_id,
+          vault_address = excluded.vault_address,
+          agent_subject = excluded.agent_subject,
+          policy_version = excluded.policy_version,
+          allowed_domains_json = excluded.allowed_domains_json,
+          nonce = excluded.nonce,
+          signature = excluded.signature,
+          grant_message = excluded.grant_message,
+          issued_via = excluded.issued_via,
+          status = excluded.status,
+          issued_at = excluded.issued_at,
+          expires_at = excluded.expires_at,
+          revoked_at = excluded.revoked_at,
+          session_id = excluded.session_id,
+          updated_at = datetime('now')
+      `)
+      .bind(
+        input.grantId,
+        input.ownerEoa.toLowerCase(),
+        input.userId,
+        input.vaultId,
+        normalizeAddress(input.vaultAddress),
+        input.agentSubject,
+        input.policyVersion,
+        JSON.stringify(input.allowedDomains),
+        input.nonce,
+        input.signature,
+        input.grantMessage,
+        input.issuedVia ?? "web",
+        input.status ?? "active",
+        input.issuedAt,
+        input.expiresAt,
+        input.revokedAt ?? null,
+        input.sessionId ?? null,
+      )
+      .run();
+
+    return this.getAutomationGrant(input.grantId);
+  }
+
+  async getAutomationGrant(grantId: string) {
+    const result = await this.db
+      .prepare("SELECT * FROM automation_grants WHERE grant_id = ? LIMIT 1")
+      .bind(grantId)
+      .first<DbRecord>();
+
+    return normalizeRecord(result);
+  }
+
+  async getActiveAutomationGrant(ownerEoa: string) {
+    const now = new Date().toISOString();
+    const result = await this.db
+      .prepare(`
+        SELECT * FROM automation_grants
+        WHERE owner_eoa = ?
+          AND status = 'active'
+          AND revoked_at IS NULL
+          AND expires_at >= ?
+        ORDER BY issued_at DESC, id DESC
+        LIMIT 1
+      `)
+      .bind(ownerEoa.toLowerCase(), now)
+      .first<DbRecord>();
+
+    return normalizeRecord(result);
+  }
+
+  async listAutomationGrants(ownerEoa: string) {
+    const { results } = await this.db
+      .prepare("SELECT * FROM automation_grants WHERE owner_eoa = ? ORDER BY issued_at DESC, id DESC")
+      .bind(ownerEoa.toLowerCase())
+      .all<DbRecord>();
+
+    return (results ?? []).map((record) => normalizeRecord(record));
+  }
+
+  async revokeAutomationGrant(grantId: string, revokedAt = new Date().toISOString()) {
+    await this.db
+      .prepare(`
+        UPDATE automation_grants
+        SET status = 'revoked', revoked_at = ?, updated_at = datetime('now')
+        WHERE grant_id = ?
+      `)
+      .bind(revokedAt, grantId)
+      .run();
+
+    await this.db
+      .prepare(`
+        UPDATE mcp_mutation_sessions
+        SET status = 'revoked', revoked_at = COALESCE(revoked_at, ?), updated_at = datetime('now')
+        WHERE grant_id = ? AND status = 'active'
+      `)
+      .bind(revokedAt, grantId)
+      .run();
+
+    return this.getAutomationGrant(grantId);
+  }
+
+  async upsertMcpMutationSession(input: McpMutationSessionInput) {
+    await this.db
+      .prepare(`
+        INSERT INTO mcp_mutation_sessions (
+          session_id, grant_id, owner_eoa, user_id, vault_id, vault_address, agent_subject, policy_version,
+          allowed_domains_json, session_token_hash, issued_via, status, issued_at, expires_at, last_used_at, revoked_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(session_id) DO UPDATE SET
+          grant_id = excluded.grant_id,
+          owner_eoa = excluded.owner_eoa,
+          user_id = excluded.user_id,
+          vault_id = excluded.vault_id,
+          vault_address = excluded.vault_address,
+          agent_subject = excluded.agent_subject,
+          policy_version = excluded.policy_version,
+          allowed_domains_json = excluded.allowed_domains_json,
+          session_token_hash = excluded.session_token_hash,
+          issued_via = excluded.issued_via,
+          status = excluded.status,
+          issued_at = excluded.issued_at,
+          expires_at = excluded.expires_at,
+          last_used_at = excluded.last_used_at,
+          revoked_at = excluded.revoked_at,
+          updated_at = datetime('now')
+      `)
+      .bind(
+        input.sessionId,
+        input.grantId,
+        input.ownerEoa.toLowerCase(),
+        input.userId,
+        input.vaultId,
+        normalizeAddress(input.vaultAddress),
+        input.agentSubject,
+        input.policyVersion,
+        JSON.stringify(input.allowedDomains),
+        input.sessionTokenHash,
+        input.issuedVia ?? "web",
+        input.status ?? "active",
+        input.issuedAt,
+        input.expiresAt,
+        input.lastUsedAt ?? null,
+        input.revokedAt ?? null,
+      )
+      .run();
+
+    return this.getMcpMutationSession(input.sessionId);
+  }
+
+  async getMcpMutationSession(sessionId: string) {
+    const result = await this.db
+      .prepare("SELECT * FROM mcp_mutation_sessions WHERE session_id = ? LIMIT 1")
+      .bind(sessionId)
+      .first<DbRecord>();
+
+    return normalizeRecord(result);
+  }
+
+  async getMcpMutationSessionByTokenHash(sessionTokenHash: string) {
+    const result = await this.db
+      .prepare("SELECT * FROM mcp_mutation_sessions WHERE session_token_hash = ? LIMIT 1")
+      .bind(sessionTokenHash)
+      .first<DbRecord>();
+
+    return normalizeRecord(result);
+  }
+
+  async listMcpMutationSessions(ownerEoa: string) {
+    const { results } = await this.db
+      .prepare("SELECT * FROM mcp_mutation_sessions WHERE owner_eoa = ? ORDER BY issued_at DESC, id DESC")
+      .bind(ownerEoa.toLowerCase())
+      .all<DbRecord>();
+
+    return (results ?? []).map((record) => normalizeRecord(record));
+  }
+
+  async getActiveMcpMutationSession(ownerEoa: string) {
+    const now = new Date().toISOString();
+    const result = await this.db
+      .prepare(`
+        SELECT * FROM mcp_mutation_sessions
+        WHERE owner_eoa = ?
+          AND status = 'active'
+          AND revoked_at IS NULL
+          AND expires_at >= ?
+        ORDER BY issued_at DESC, id DESC
+        LIMIT 1
+      `)
+      .bind(ownerEoa.toLowerCase(), now)
+      .first<DbRecord>();
+
+    return normalizeRecord(result);
+  }
+
+  async touchMcpMutationSession(sessionId: string, lastUsedAt = new Date().toISOString()) {
+    await this.db
+      .prepare(`
+        UPDATE mcp_mutation_sessions
+        SET last_used_at = ?, updated_at = datetime('now')
+        WHERE session_id = ?
+      `)
+      .bind(lastUsedAt, sessionId)
+      .run();
+
+    return this.getMcpMutationSession(sessionId);
+  }
+
+  async revokeMcpMutationSession(sessionId: string, revokedAt = new Date().toISOString()) {
+    await this.db
+      .prepare(`
+        UPDATE mcp_mutation_sessions
+        SET status = 'revoked', revoked_at = ?, updated_at = datetime('now')
+        WHERE session_id = ?
+      `)
+      .bind(revokedAt, sessionId)
+      .run();
+
+    return this.getMcpMutationSession(sessionId);
+  }
+
   async upsertAutomationJob(input: AutomationJobInput) {
     const normalizedOwner = input.ownerEoa?.toLowerCase() ?? null;
     const identity = normalizedOwner ? await this.resolveIdentity(normalizedOwner, input.userId, input.vaultId) : null;
@@ -1132,7 +1401,21 @@ export class AutomationStore {
   }
 
   async getAutomationState(ownerEoa: string) {
-    const [profile, config, vault, account, permissions, policies, sessions, automationJobs, benchmarkJobs] = await Promise.all([
+    const [
+      profile,
+      config,
+      vault,
+      account,
+      permissions,
+      policies,
+      sessions,
+      automationJobs,
+      benchmarkJobs,
+      grants,
+      mcpSessions,
+      activeGrant,
+      activeMcpSession,
+    ] = await Promise.all([
       this.getUserProfile(ownerEoa),
       this.getAgentConfig(ownerEoa),
       this.getVault(ownerEoa),
@@ -1142,6 +1425,10 @@ export class AutomationStore {
       this.listSessions(ownerEoa),
       this.listAutomationJobs(ownerEoa),
       this.listBenchmarkJobs(ownerEoa),
+      this.listAutomationGrants(ownerEoa),
+      this.listMcpMutationSessions(ownerEoa),
+      this.getActiveAutomationGrant(ownerEoa),
+      this.getActiveMcpMutationSession(ownerEoa),
     ]);
 
     const activeSession =
@@ -1168,7 +1455,11 @@ export class AutomationStore {
       activeSession,
       automationJobs,
       benchmarkJobs,
-      automationReady: Boolean(vault?.vault_id && config?.user_id && activeSession?.session_id),
+      grants,
+      activeGrant,
+      mcpSessions,
+      activeMcpSession,
+      automationReady: Boolean(vault?.vault_id && config?.user_id && activeGrant?.grant_id && activeMcpSession?.session_id),
     };
   }
 }

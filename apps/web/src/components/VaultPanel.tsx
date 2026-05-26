@@ -185,6 +185,8 @@ const VaultPanel: React.FC<Props> = ({
   const vault = state?.vault;
   const config = state?.config;
   const session = state?.activeSession;
+  const activeGrant = state?.activeGrant;
+  const activeMcpSession = state?.activeMcpSession;
   const activePermission = state?.activePermission;
   const ownershipAcknowledged = Boolean(vault?.ownership_acknowledged_at);
   const isActionGated = Boolean(vault) && !ownershipAcknowledged;
@@ -207,16 +209,27 @@ const VaultPanel: React.FC<Props> = ({
   const perActionUsd = parseNumeric(activePermission?.spend_limit_per_use ?? config?.max_action_usd);
   const automationBudgetUsd = parseNumeric(activePermission?.spend_limit_total ?? config?.max_automation_usd);
   const manualApprovalUsd = parseNumeric(config?.require_manual_above_usd);
-  const sessionWindowEnd = session?.valid_until ?? activePermission?.valid_until ?? null;
+  const sessionWindowEnd =
+    activeMcpSession?.expires_at ??
+    activeGrant?.expires_at ??
+    session?.valid_until ??
+    activePermission?.valid_until ??
+    null;
   const usageLimit = activePermission?.usage_limit ?? null;
   const budgetCoverage = automationBudgetUsd > 0 ? Math.min((managedValueUsd / automationBudgetUsd) * 100, 100) : 0;
-  const automationStatus = humanize(session?.session_status ?? vault?.automation_status ?? "inactive");
+  const automationStatus = humanize(
+    activeGrant?.status ??
+    activeMcpSession?.status ??
+    session?.session_status ??
+    vault?.automation_status ??
+    "inactive"
+  );
   const fundingStatus = humanize(vault?.funding_status ?? "not-created");
   const policyPreset = humanize(config?.restriction_preset ?? "not-set");
   const riskProfile = humanize(config?.risk_profile ?? "medium");
-  const consentRecordedAt = session?.consent_verified_at ?? null;
-  const consentDigest = session?.consent_digest ?? session?.permission_id ?? null;
-  const onchainGrantStatus = session?.grant_tx_hash ? "Executed" : "Not used";
+  const consentRecordedAt = activeGrant?.issued_at ?? session?.consent_verified_at ?? null;
+  const consentDigest = activeGrant?.grant_id ?? session?.consent_digest ?? session?.permission_id ?? null;
+  const onchainGrantStatus = activeGrant?.status === "active" ? "Granted" : session?.grant_tx_hash ? "Executed" : "Not issued";
   const automationJobs = state?.automationJobs ?? [];
   const latestJobs = automationJobs.slice(0, 3);
 
@@ -337,7 +350,7 @@ const VaultPanel: React.FC<Props> = ({
             ) : (
               <>
                 <ActionButton label="Funding Intent" onClick={() => onFundingIntent(1000)} disabled={busy || isActionGated} />
-                {!session || session.session_status === "revoked" ? (
+                {!activeGrant || activeGrant.status === "revoked" ? (
                   <ActionButton
                     label={busy ? "Enabling..." : "Enable Automation"}
                     tone="primary"
@@ -367,8 +380,14 @@ const VaultPanel: React.FC<Props> = ({
                 label={busy ? "Queueing Demo..." : `Queue ${DEMO_TARGET_ASSET} Demo`}
                 tone="primary"
                 onClick={onQueueDemoStrategy}
-                disabled={busy || !session || session.session_status === "revoked"}
+                disabled={busy || !activeGrant || activeGrant.status !== "active"}
               />
+            </div>
+          )}
+
+          {!activeGrant && vault && ownershipAcknowledged && (
+            <div style={{ fontSize: "0.76rem", color: "var(--color-warning)", lineHeight: 1.5 }}>
+              Automation remains manual-only until this wallet issues a vault-scoped MCP grant.
             </div>
           )}
 
