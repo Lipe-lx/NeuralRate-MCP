@@ -51,6 +51,9 @@ export type StrategyIntent = {
   amountToken?: number | null;
   slippageBps?: number | null;
   notes?: string | null;
+  snapshotHash?: string | null;
+  snapshotCid?: string | null;
+  deadline?: string | null;
 };
 
 const runtimeAddress = (value: string | undefined | null) =>
@@ -157,6 +160,9 @@ const vaultExecutionModuleAbi = [{
     { name: "value", type: "uint256" },
     { name: "callData", type: "bytes" },
     { name: "intentHash", type: "bytes32" },
+    { name: "snapshotHash", type: "bytes32" },
+    { name: "slippageBps", type: "uint256" },
+    { name: "deadline", type: "uint256" },
   ] as const,
   outputs: [{ name: "", type: "bool" }] as const,
 }] as const;
@@ -369,6 +375,9 @@ export const buildVaultExecutionModuleCalldata = (args: {
   value: bigint;
   callData: Hex;
   intentHash: Hex;
+  snapshotHash: Hex;
+  slippageBps: number;
+  deadline: bigint;
 }) =>
   encodeFunctionData({
     abi: vaultExecutionModuleAbi,
@@ -380,6 +389,9 @@ export const buildVaultExecutionModuleCalldata = (args: {
       args.value,
       args.callData,
       args.intentHash,
+      args.snapshotHash,
+      BigInt(args.slippageBps),
+      args.deadline,
     ],
   });
 

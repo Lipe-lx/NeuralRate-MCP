@@ -43,6 +43,9 @@ async function main() {
     process.env.NEURALRATE_VAULT_MODULE_EXECUTOR_ADDRESS?.trim() ||
     process.env.TURNKEY_WALLET_ACCOUNT_ADDRESS?.trim() ||
     process.env.NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS?.trim();
+  const configuredExecutionGuard =
+    process.env.NEURALRATE_EXECUTION_GUARD_CONTRACT?.trim() ||
+    "0x0000000000000000000000000000000000000000";
 
   if (!configuredExecutor || configuredExecutor === "0x0000000000000000000000000000000000000000") {
     throw new Error(
@@ -53,9 +56,10 @@ async function main() {
   console.log("Deploying NeuralRateVaultModule...");
   console.log("Using deployer address:", signer.address);
   console.log("Authorized executor:", configuredExecutor);
+  console.log("Execution guard:", configuredExecutionGuard);
 
   const Module = await ethers.getContractFactory("NeuralRateVaultModule");
-  const contract = await Module.deploy(configuredExecutor);
+  const contract = await Module.deploy(configuredExecutor, configuredExecutionGuard);
 
   await contract.waitForDeployment();
   const address = await contract.getAddress();

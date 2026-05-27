@@ -8,7 +8,7 @@ type DeploymentManifest = {
   contractName: string;
   address: string;
   txHash: string;
-  benchmarkWriter?: string;
+  receiptWriter?: string;
   deploymentMode?: string;
   agentId: string;
   agentURI: string;
@@ -23,7 +23,7 @@ async function main() {
     throw new Error(`This deploy script is locked to Mantle Sepolia (5003). Current chainId: ${chainId}`);
   }
 
-  console.log("Deploying NeuralRateDecisionBenchmark...");
+  console.log("Deploying NeuralRateDecisionReceiptRegistry...");
   console.log("Using deployer address:", signer.address);
 
   const configuredBenchmarkWriter = process.env.NEURALRATE_AGENT_SMART_WALLET?.trim();
@@ -40,10 +40,10 @@ async function main() {
   }
 
   const initialBenchmarkWriter = isMissingWriter ? signer.address : configuredBenchmarkWriter!;
-  console.log("Initial benchmark writer:", initialBenchmarkWriter);
+  console.log("Initial receipt writer:", initialBenchmarkWriter);
 
-  const NeuralRateDecisionBenchmark = await ethers.getContractFactory("NeuralRateDecisionBenchmark");
-  const contract = await NeuralRateDecisionBenchmark.deploy(initialBenchmarkWriter);
+  const ReceiptRegistry = await ethers.getContractFactory("NeuralRateDecisionReceiptRegistry");
+  const contract = await ReceiptRegistry.deploy(initialBenchmarkWriter);
 
   await contract.waitForDeployment();
   const address = await contract.getAddress();
@@ -53,10 +53,10 @@ async function main() {
   let manifest: DeploymentManifest = {
     network: "mantleSepolia",
     chainId,
-    contractName: "NeuralRateDecisionBenchmark",
+    contractName: "NeuralRateDecisionReceiptRegistry",
     address,
     txHash,
-    benchmarkWriter: initialBenchmarkWriter,
+    receiptWriter: initialBenchmarkWriter,
     deploymentMode: "agent-smart-wallet",
     agentId: "",
     agentURI: "",
@@ -77,7 +77,7 @@ async function main() {
   mkdirSync(path.dirname(manifestPath), { recursive: true });
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
-  console.log(`NeuralRateDecisionBenchmark deployed to: ${address}`);
+  console.log(`NeuralRateDecisionReceiptRegistry deployed to: ${address}`);
   console.log(`Deployment tx hash: ${txHash}`);
   console.log(`Update your .env NEURALRATE_BENCHMARK_CONTRACT with this address`);
   console.log(`Deployment manifest updated: ${manifestPath}`);

@@ -156,6 +156,11 @@ export const resolveExecutionPlan = async (
   const amountUsd = Number(intent.amountUsd);
   const amountToken = intent.amountToken ?? null;
   const slippageBps = intent.slippageBps ?? 50;
+  const snapshotHash = typeof intent.snapshotHash === "string" ? intent.snapshotHash : "";
+  const deadlineTs =
+    typeof intent.deadline === "string" && intent.deadline.trim()
+      ? Math.floor(Date.parse(intent.deadline) / 1000)
+      : 0;
   const policyChecks: PolicyCheckResult[] = [
     makePolicyCheck(
       "strategy-asset-support",
@@ -189,6 +194,20 @@ export const resolveExecutionPlan = async (
       "policy-max-automation-usd",
       amountUsd <= context.maxAutomationUsd,
       `Requested ${amountUsd} USD vs max automation ${context.maxAutomationUsd} USD.`,
+    ),
+    makePolicyCheck(
+      "snapshot-hash-present",
+      /^0x[a-fA-F0-9]{64}$/.test(snapshotHash),
+      /^0x[a-fA-F0-9]{64}$/.test(snapshotHash)
+        ? `Snapshot hash ${snapshotHash} is present.`
+        : "Execution intents must include a 32-byte snapshot hash.",
+    ),
+    makePolicyCheck(
+      "deadline-valid",
+      Number.isFinite(deadlineTs) && deadlineTs > Math.floor(Date.now() / 1000),
+      Number.isFinite(deadlineTs) && deadlineTs > Math.floor(Date.now() / 1000)
+        ? `Execution deadline ${deadlineTs} is still in the future.`
+        : "Execution intents must include a future ISO-8601 deadline.",
     ),
     makePolicyCheck(
       "chain-id",
@@ -229,6 +248,8 @@ export const resolveExecutionPlan = async (
     targetAsset: normalizedTargetAsset,
     amountUsd,
     slippageBps,
+    snapshotHash,
+    deadline: intent.deadline ?? null,
     ownerEoa: context.ownerEoa.toLowerCase(),
     vaultAddress: context.vaultAddress.toLowerCase(),
     policyVersion: context.policyVersion,
@@ -287,6 +308,9 @@ export const resolveExecutionPlan = async (
           value: 0n,
           callData: routedTransfer.tokenCallData,
           intentHash,
+          snapshotHash: snapshotHash as Hex,
+          slippageBps,
+          deadline: BigInt(deadlineTs),
         });
         resolvedArgs = [
           context.ownerEoa.toLowerCase(),
@@ -295,6 +319,9 @@ export const resolveExecutionPlan = async (
           0n,
           routedTransfer.tokenCallData,
           intentHash,
+          snapshotHash,
+          BigInt(slippageBps),
+          BigInt(deadlineTs),
         ];
         executionSummary = `Strategy ${strategy.label} is ready to move ${amountUsd} USDY from the Safe to the configured recipient through the enabled NeuralRate module.`;
         riskFlags = [
@@ -341,6 +368,9 @@ export const resolveExecutionPlan = async (
           value: routedTransfer.value,
           callData: routedTransfer.callData,
           intentHash,
+          snapshotHash: snapshotHash as Hex,
+          slippageBps,
+          deadline: BigInt(deadlineTs),
         });
         resolvedArgs = [
           context.ownerEoa.toLowerCase(),
@@ -349,6 +379,9 @@ export const resolveExecutionPlan = async (
           routedTransfer.value,
           routedTransfer.callData,
           intentHash,
+          snapshotHash,
+          BigInt(slippageBps),
+          BigInt(deadlineTs),
         ];
         executionSummary = `Strategy ${strategy.label} is ready to move ${amountToken ?? amountUsd} MNT from the Safe to ${routedTransfer.recipientAddress}.`;
         riskFlags = [
@@ -393,6 +426,9 @@ export const resolveExecutionPlan = async (
       amountUsd,
       slippageBps,
       notes: intent.notes ?? null,
+      snapshotHash: snapshotHash || null,
+      snapshotCid: intent.snapshotCid ?? null,
+      deadline: intent.deadline ?? null,
     },
   };
 };

@@ -1,6 +1,7 @@
 import { createPublicClient, encodeFunctionData, http, parseEventLogs, defineChain } from "viem";
 import { type ManagedSigner } from "./managedSigner.js";
 import { config } from "./config.js";
+import { ensureAnchoredSnapshot, getActivePolicy } from "./onchainPolicy.js";
 
 const mantleSepolia = defineChain({
   id: 5003,
@@ -14,23 +15,34 @@ const mantleSepolia = defineChain({
 const benchmarkAbi = [
   {
     type: "function",
-    name: "createDecision",
+    name: "createDecisionReceipt",
     stateMutability: "nonpayable",
     inputs: [
-      { name: "_requestedBy", type: "address" },
-      { name: "_dataSnapshotHash", type: "string" },
-      { name: "_predictedApyBps", type: "int256" },
-      { name: "_settlementHorizonHours", type: "uint256" },
+      { name: "ownerEoa", type: "address" },
+      { name: "vaultAddress", type: "address" },
+      { name: "delegate", type: "address" },
+      { name: "externalDecisionId", type: "string" },
+      { name: "policyVersion", type: "string" },
+      { name: "strategyKey", type: "string" },
+      { name: "snapshotHash", type: "bytes32" },
+      { name: "snapshotCID", type: "string" },
+      { name: "predictedApyBps", type: "int256" },
+      { name: "settlementHorizonHours", type: "uint256" },
     ],
     outputs: [{ name: "", type: "uint256" }],
   },
   {
     type: "event",
-    name: "DecisionCreated",
+    name: "DecisionReceiptCreated",
     inputs: [
-      { indexed: true, name: "decisionId", type: "uint256" },
-      { indexed: true, name: "requestedBy", type: "address" },
-      { indexed: false, name: "dataSnapshotHash", type: "string" },
+      { indexed: true, name: "receiptId", type: "uint256" },
+      { indexed: false, name: "externalDecisionId", type: "string" },
+      { indexed: true, name: "vaultAddress", type: "address" },
+      { indexed: true, name: "delegate", type: "address" },
+      { indexed: false, name: "policyVersion", type: "string" },
+      { indexed: false, name: "strategyKey", type: "string" },
+      { indexed: false, name: "snapshotHash", type: "bytes32" },
+      { indexed: false, name: "snapshotCID", type: "string" },
       { indexed: false, name: "predictedApyBps", type: "int256" },
       { indexed: false, name: "settlementHorizonHours", type: "uint256" },
     ],
@@ -43,17 +55,29 @@ const publicClient = createPublicClient({
 });
 
 export function buildCreateDecisionCalldata(args: {
-  requestedBy: string;
-  dataSnapshotHash: string;
+  ownerEoa: string;
+  vaultAddress: string;
+  delegate: string;
+  externalDecisionId: string;
+  policyVersion: string;
+  strategyKey: string;
+  snapshotHash: `0x${string}`;
+  snapshotCID: string;
   predictedApyBps: number;
   settlementHorizonHours: number;
 }) {
   return encodeFunctionData({
     abi: benchmarkAbi,
-    functionName: "createDecision",
+    functionName: "createDecisionReceipt",
     args: [
-      args.requestedBy as `0x${string}`,
-      args.dataSnapshotHash,
+      args.ownerEoa as `0x${string}`,
+      args.vaultAddress as `0x${string}`,
+      args.delegate as `0x${string}`,
+      args.externalDecisionId,
+      args.policyVersion,
+      args.strategyKey,
+      args.snapshotHash,
+      args.snapshotCID,
       BigInt(args.predictedApyBps),
       BigInt(args.settlementHorizonHours),
     ],
@@ -63,26 +87,31 @@ export function buildCreateDecisionCalldata(args: {
 export function extractDecisionCreated(logs: readonly unknown[]) {
   const parsedLogs = parseEventLogs({
     abi: benchmarkAbi,
-    eventName: "DecisionCreated",
+    eventName: "DecisionReceiptCreated",
     logs: logs as any,
   });
 
   const match = parsedLogs.find((log) => log.address.toLowerCase() === config.benchmarkContract.toLowerCase());
   if (!match) {
-    throw new Error("DecisionCreated event not found in benchmark receipt.");
+    throw new Error("DecisionReceiptCreated event not found in benchmark receipt.");
   }
 
   return {
-    onchainDecisionId: match.args.decisionId?.toString() ?? "",
-    requestedBy: String(match.args.requestedBy ?? "").toLowerCase(),
+    onchainDecisionId: match.args.receiptId?.toString() ?? "",
+    vaultAddress: String(match.args.vaultAddress ?? "").toLowerCase(),
   };
 }
 
 export async function executeBenchmarkJob(
   signer: ManagedSigner,
   payload: {
-    requestedBy: string;
-    dataSnapshotHash: string;
+    ownerEoa: string;
+    vaultAddress: string;
+    decisionId: string;
+    policyVersion: string;
+    strategyKey: string;
+    snapshotHash?: string | null;
+    snapshotCid?: string | null;
     predictedApyBps: number;
     settlementHorizonHours: number;
   }
@@ -92,7 +121,34 @@ export async function executeBenchmarkJob(
     throw new Error("Signer cannot execute transactions");
   }
 
-  const calldata = buildCreateDecisionCalldata(payload);
+  const activePolicy = await getActivePolicy(payload.vaultAddress);
+  if (!activePolicy) {
+    throw new Error("No active on-chain policy for the target vault.");
+  }
+
+  const anchoredSnapshot = await ensureAnchoredSnapshot({
+    signer,
+    vaultAddress: payload.vaultAddress,
+    snapshotHash: payload.snapshotHash,
+    snapshotCid: payload.snapshotCid,
+    descriptor: `benchmark:${payload.decisionId}`,
+  });
+  if (!anchoredSnapshot.snapshotHash) {
+    throw new Error("Benchmark jobs require an anchored snapshot hash.");
+  }
+
+  const calldata = buildCreateDecisionCalldata({
+    ownerEoa: payload.ownerEoa,
+    vaultAddress: payload.vaultAddress,
+    delegate: activePolicy.delegate,
+    externalDecisionId: payload.decisionId,
+    policyVersion: payload.policyVersion,
+    strategyKey: payload.strategyKey,
+    snapshotHash: anchoredSnapshot.snapshotHash as `0x${string}`,
+    snapshotCID: payload.snapshotCid ?? payload.snapshotHash ?? "",
+    predictedApyBps: payload.predictedApyBps,
+    settlementHorizonHours: payload.settlementHorizonHours,
+  });
   const txHash = await signer.signAndSendTransaction({
     to: config.benchmarkContract,
     data: calldata,

@@ -78,9 +78,19 @@ const checks = [
     detail: env.TURNKEY_WALLET_ACCOUNT_ADDRESS || "missing",
   },
   {
-    label: "Benchmark contract target",
+    label: "Decision receipt registry target",
     ok: !isUnset(env.NEURALRATE_BENCHMARK_CONTRACT),
     detail: env.NEURALRATE_BENCHMARK_CONTRACT || "missing",
+  },
+  {
+    label: "Policy registry target",
+    ok: !isUnset(env.NEURALRATE_POLICY_REGISTRY_CONTRACT || ""),
+    detail: env.NEURALRATE_POLICY_REGISTRY_CONTRACT || "missing",
+  },
+  {
+    label: "Execution guard target",
+    ok: !isUnset(env.NEURALRATE_EXECUTION_GUARD_CONTRACT || ""),
+    detail: env.NEURALRATE_EXECUTION_GUARD_CONTRACT || "missing",
   },
   {
     label: "Public app agent smart wallet",
@@ -96,12 +106,12 @@ for (const check of checks) {
 
 if (deployment) {
   const deploymentMode = deployment.deploymentMode || "legacy-or-unspecified";
-  const benchmarkWriter = deployment.benchmarkWriter || "not recorded";
-  const likelyLegacy = !deployment.deploymentMode || !deployment.benchmarkWriter;
+  const receiptWriter = deployment.receiptWriter || deployment.benchmarkWriter || "not recorded";
+  const likelyLegacy = deployment.contractName !== "NeuralRateDecisionReceiptRegistry" || !deployment.receiptWriter;
   printStatus(
     "Deployment manifest mode",
     !likelyLegacy,
-    `${deploymentMode} / benchmarkWriter=${benchmarkWriter}`
+    `${deploymentMode} / receiptWriter=${receiptWriter}`
   );
   if (likelyLegacy) hasBlockers = true;
 }
@@ -112,10 +122,10 @@ if (hasBlockers) {
   console.log("Next actions:");
   console.log("1. Set real NEURALRATE_AGENT_SMART_WALLET and TURNKEY values.");
   console.log("2. Configure TURNKEY_ORGANIZATION_ID and keys.");
-  console.log("3. Redeploy NeuralRateDecisionBenchmark with the smart wallet as benchmarkWriter.");
-  console.log("4. Update deployments/mantle-sepolia.json and public env vars to the new addresses.");
+  console.log("3. Deploy NeuralRatePolicyRegistry and NeuralRateExecutionGuard and publish their addresses.");
+  console.log("4. Redeploy NeuralRateDecisionReceiptRegistry with the smart wallet as receiptWriter.");
+  console.log("5. Update deployments/mantle-sepolia.json and public env vars to the new addresses.");
   process.exitCode = 1;
 } else {
-  console.log("Autonomy preflight passed. The repo is configured for smart-wallet deployment via Turnkey.");
+  console.log("Autonomy preflight passed. The repo is configured for on-chain policy, receipt registry, and smart-wallet deployment via Turnkey.");
 }
-

@@ -12,6 +12,7 @@ import { buildBenchmarkPolicy, buildExecutionPolicy } from "./policy.js";
 import { executeBenchmarkJob } from "./benchmarkExecutor.js";
 import { getApprovedStrategySurface, resolveExecutionPlan } from "./executionPlanner.js";
 import type { StrategyIntent } from "./executionRegistry.js";
+import { ensureAnchoredSnapshot, getActivePolicy } from "./onchainPolicy.js";
 
 const dataApi = new DataApiClient(config.dataApiBaseUrl.replace(/\/+$/, ""), config.internalApiToken);
 const mantleSepolia = defineChain({
@@ -493,8 +494,13 @@ createServer(async (request, response) => {
       if (capabilities.canExecute) {
         try {
           const execution = await executeBenchmarkJob(managedSigner, {
-            requestedBy: scoped.ownerEoa,
-            dataSnapshotHash: body.dataSnapshotHash ?? "",
+            ownerEoa: scoped.ownerEoa,
+            vaultAddress: scoped.vaultAddress,
+            decisionId: body.decisionId,
+            policyVersion: String(body.payload?.policyVersion ?? scoped.policyVersion),
+            strategyKey: String(body.payload?.strategyKey ?? "benchmark-only"),
+            snapshotHash: typeof body.payload?.snapshotHash === "string" ? body.payload.snapshotHash : body.dataSnapshotHash ?? null,
+            snapshotCid: typeof body.payload?.snapshotCid === "string" ? body.payload.snapshotCid : body.dataSnapshotHash ?? null,
             predictedApyBps: Number(body.payload?.predictedApyBps ?? 0),
             settlementHorizonHours: Number(body.payload?.settlementHorizonHours ?? 24),
           });
@@ -591,6 +597,9 @@ createServer(async (request, response) => {
                   ? null
                   : Number.parseInt(String(body.intent.slippageBps), 10),
             notes: typeof body.intent.notes === "string" ? body.intent.notes : null,
+            snapshotHash: typeof body.intent.snapshotHash === "string" ? body.intent.snapshotHash : null,
+            snapshotCid: typeof body.intent.snapshotCid === "string" ? body.intent.snapshotCid : null,
+            deadline: typeof body.intent.deadline === "string" ? body.intent.deadline : null,
           }
         : null;
       const isStrategyExecution = body.jobType === "strategy-execution" && strategyKey && normalizedIntent;
@@ -609,6 +618,20 @@ createServer(async (request, response) => {
       let finalJob: unknown = null;
 
       if (isStrategyExecution) {
+        const onchainPolicy = await getActivePolicy(body.vaultAddress?.toLowerCase() || scoped.vaultAddress);
+        if (!onchainPolicy) {
+          throw new Error("No active on-chain policy found for this vault.");
+        }
+
+        const anchoredSnapshot = await ensureAnchoredSnapshot({
+          signer: managedSigner,
+          vaultAddress: body.vaultAddress?.toLowerCase() || scoped.vaultAddress,
+          snapshotHash: normalizedIntent.snapshotHash,
+          snapshotCid: normalizedIntent.snapshotCid,
+          descriptor: `strategy:${strategyKey}`,
+        });
+
+        normalizedIntent.snapshotHash = anchoredSnapshot.snapshotHash;
         const resolvedPlan = await resolveExecutionPlan(
           publicClient,
           strategyKey,
@@ -617,9 +640,9 @@ createServer(async (request, response) => {
             ownerEoa: scoped.ownerEoa,
             vaultAddress: (body.vaultAddress?.toLowerCase() || scoped.vaultAddress),
             chainId: 5003,
-            policyVersion: scoped.policyVersion,
-            maxActionUsd: getNumeric(scoped.config, "max_action_usd", 1000),
-            maxAutomationUsd: getNumeric(scoped.config, "max_automation_usd", 10000),
+            policyVersion: onchainPolicy.policyVersion || scoped.policyVersion,
+            maxActionUsd: Number(onchainPolicy.maxPerUse),
+            maxAutomationUsd: Number(onchainPolicy.maxTotal),
             allowedAssets: Array.isArray(scoped.config.allowed_assets) ? scoped.config.allowed_assets as string[] : [],
             allowedProtocols: Array.isArray(scoped.config.allowed_protocols) ? scoped.config.allowed_protocols as string[] : [],
           },

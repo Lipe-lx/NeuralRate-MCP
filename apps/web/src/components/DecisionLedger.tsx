@@ -8,6 +8,7 @@ import {
   NEURALRATE_BENCHMARK_CONTRACT,
 } from "../config";
 import { signedJsonFetch } from "../lib/auth";
+import { buildLocalSnapshotHash } from "../lib/policyRegistry";
 import type { AutomationState, DecisionRecord } from "../lib/userState";
 import { useWalletContext } from "../context/WalletContext";
 
@@ -169,6 +170,17 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
       const allocation = (await allocationResponse.json()) as AllocationResponse;
       const decisionId = `decision_${crypto.randomUUID()}`;
       const predictedApyBps = Math.round(allocation.blendedPredictedApy * 100);
+      const snapshotPayload = {
+        decisionId,
+        ownerEoa,
+        amountUsd,
+        objective: allocation.objective,
+        riskProfile: allocation.riskProfile,
+        allocations: allocation.allocations,
+        constraints: allocation.appliedConstraints,
+        rationale: allocation.rationale,
+      };
+      const snapshotHash = buildLocalSnapshotHash(snapshotPayload);
 
       await signedJsonFetch({
         ownerEoa,
@@ -180,6 +192,7 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
           decisionId,
           agentAddress: NEURALRATE_AGENT_SMART_WALLET,
           requestedBy: ownerEoa,
+          dataSnapshotHash: snapshotHash,
           predictedApyBps,
           benchmarkRateBps: predictedApyBps - allocation.tbillSpreadBps,
           riskProfile: allocation.riskProfile,
@@ -247,6 +260,9 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
           payload: {
             vaultId: state.vault?.vault_id,
             policyVersion: state.config?.policy_version,
+            strategyKey: "optimal-allocation",
+            snapshotHash: dataSnapshotHash,
+            snapshotCid: `local-snapshot:${dataSnapshotHash}`,
             benchmarkContract: NEURALRATE_BENCHMARK_CONTRACT,
             agentRegistry: ERC8004_IDENTITY_REGISTRY,
             agentId: ERC8004_AGENT_ID,

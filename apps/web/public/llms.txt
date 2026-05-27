@@ -5,24 +5,27 @@ NeuralRate MCP integrates decentralized finance (DeFi) yields, Nansen on-chain d
 
 ## Core Documentation
 *   [System Architecture](/docs/architecture.md): High-level system structure, micro-services data flow, and caching strategies.
-*   [MCP Server Specifications](/docs/mcp-server.md): Full documentation of the 7 callable MCP tools and the mathematical formulas behind our 6-factor Risk Assessment Model.
-*   [Smart Contract specifications](/docs/smart-contract.md): Detailed information on the deployed Solidity registry `NeuralRateDecisionBenchmark.sol` on Mantle Sepolia.
+*   [MCP Server Specifications](/docs/mcp-server.md): Documentation of the public read-only MCP catalog plus the scoped mutation catalogs for config, benchmark, and execution.
+*   [Smart Contract specifications](/docs/smart-contract.md): Detailed information on the on-chain policy registry, execution guard, receipt registry, and Safe vault module path.
 *   [D1 SQLite Database Schema](/docs/database.md): Schema definition for tables tracking decisions, profiles, vaults, and jobs.
 *   [Frontend UI Architecture](/docs/frontend.md): Overview of components, styling tokens, the EIP-1193 zero-dependency wallet bridge, and the Safe/control-wallet ownership handoff.
 
 ## Callable Model Context Protocol (MCP) Tools
-The server exposes the following tools at `/mcp` over Server-Sent Events (SSE):
+The public server exposes the following tools at `/mcp` over Server-Sent Events (SSE):
 1.  `yield_scan`: Scans major Mantle venues (Agni, Merchant Moe, Lendle) for APY/TVL.
 2.  `tbill_spread`: Calculates basis points spread over US 3-Month Treasury Bill rate.
 3.  `nansen_context`: Fetches real-time institutional Smart Money flows and labels for assets.
 4.  `risk_assess`: Evaluates the deterministic 6-factor risk metrics returning a 0-100 score.
 5.  `optimal_allocation`: Distributes capital dynamically based on user risk policies and allowance presets.
-6.  `log_decision`: Commits local recommendation metadata to the SQLite D1 database.
-7.  `get_decisions`: Fetches historical recommendation ledgers with pagination.
+6.  `get_decisions`: Fetches historical recommendation ledgers with pagination.
+7.  `get_user_state`: Returns indexed vault, grant, job, and on-chain policy overlay state.
+8.  `list_jobs`: Returns benchmark and execution job history.
+
+Scoped mutation routes exist separately at `/mcp/scoped/config`, `/mcp/scoped/benchmark`, and `/mcp/scoped/execution`.
 
 ## On-Chain Deployments
 *   **Target Chain:** Mantle Sepolia Testnet (Chain ID `5003`)
-*   **NeuralRateDecisionBenchmark Contract:** [`0xc51560a5512d2A5756435d87319aeaE1bA480165`](https://sepolia.mantlescan.xyz/address/0xc51560a5512d2A5756435d87319aeaE1bA480165)
+*   **Legacy Benchmark Contract:** [`0xc51560a5512d2A5756435d87319aeaE1bA480165`](https://sepolia.mantlescan.xyz/address/0xc51560a5512d2A5756435d87319aeaE1bA480165)
 *   **Turnkey Autonomous Smart Signer:** `0xc57130F28f3d670cA75AD9a78784966B767E55e3`
 *   **ERC-8004 Registry Agent ID:** `49`
 *   **IPFS Metadata Card:** `ipfs://QmYDnGppSXsgAiBHFMqmgRraTekqyY5myTvgDZxVxKBNvG`

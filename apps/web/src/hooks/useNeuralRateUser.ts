@@ -12,6 +12,7 @@ import {
 } from "../config";
 import { disableVaultModule, ensureVaultModuleEnabled, resolveUserSafeVault } from "../lib/automation";
 import { signedJsonFetch } from "../lib/auth";
+import { buildLocalSnapshotHash, publishActivePolicy, revokeActivePolicy } from "../lib/policyRegistry";
 import type { AutomationState } from "../lib/userState";
 
 const fetchJson = async <T>(url: string, options?: RequestInit) => {
@@ -48,6 +49,8 @@ type AutomationGrantChallenge = {
   expiresAt: string;
   message: string;
 };
+
+const DEFAULT_AUTOMATION_DOMAINS = ["state", "benchmark", "execution"] as const;
 
 export const useNeuralRateUser = ({
   ownerEoa,
@@ -172,6 +175,22 @@ export const useNeuralRateUser = ({
         },
       });
 
+      if (state?.vault?.vault_address) {
+        await publishActivePolicy({
+          ownerEoa,
+          vaultAddress: state.vault.vault_address,
+          wallet: { getEthereumProvider },
+          policyVersion: String((patch.policyVersion as string | undefined) ?? state?.config?.policy_version ?? SESSION_POLICY_VERSION),
+          allowedAssets: Array.isArray(patch.allowedAssets) ? patch.allowedAssets.map(String) : (state?.config?.allowed_assets ?? []),
+          allowedProtocols: Array.isArray(patch.allowedProtocols) ? patch.allowedProtocols.map(String) : (state?.config?.allowed_protocols ?? []),
+          maxPerUse: Number((patch.maxActionUsd as number | undefined) ?? state?.config?.max_action_usd ?? 1000),
+          maxDaily: Number((patch.maxDailyUsd as number | undefined) ?? state?.config?.max_daily_usd ?? 2500),
+          maxTotal: Number((patch.maxAutomationUsd as number | undefined) ?? state?.config?.max_automation_usd ?? 10000),
+          maxSlippageBps: Number((patch.maxSlippageBps as number | undefined) ?? state?.config?.max_slippage_bps ?? 50),
+          requireSnapshot: true,
+        });
+      }
+
       await refresh(ownerEoa);
       setNotice("Agent settings updated.");
       return response.config;
@@ -263,6 +282,32 @@ export const useNeuralRateUser = ({
         throw new Error("Acknowledge vault ownership before issuing an automation grant.");
       }
 
+      if (current.vault.vault_address) {
+        const effectivePolicy = current.config ?? {
+          allowed_assets: [],
+          allowed_protocols: [],
+          max_action_usd: 1000,
+          max_daily_usd: 2500,
+          max_automation_usd: 10000,
+          max_slippage_bps: 50,
+          policy_version: SESSION_POLICY_VERSION,
+        };
+
+        await publishActivePolicy({
+          ownerEoa,
+          vaultAddress: current.vault.vault_address,
+          wallet: { getEthereumProvider },
+          policyVersion: effectivePolicy.policy_version,
+          allowedAssets: effectivePolicy.allowed_assets,
+          allowedProtocols: effectivePolicy.allowed_protocols,
+          maxPerUse: effectivePolicy.max_action_usd,
+          maxDaily: effectivePolicy.max_daily_usd,
+          maxTotal: effectivePolicy.max_automation_usd,
+          maxSlippageBps: effectivePolicy.max_slippage_bps,
+          requireSnapshot: true,
+        });
+      }
+
       const agentSubject = `erc8004:${ERC8004_AGENT_ID}`;
       const challengeResponse = await signedJsonFetch<{
         success: boolean;
@@ -275,6 +320,7 @@ export const useNeuralRateUser = ({
         body: {
           ownerEoa,
           agentSubject,
+          allowedDomains: [...DEFAULT_AUTOMATION_DOMAINS],
           policyVersion: current.config?.policy_version ?? SESSION_POLICY_VERSION,
         },
       });
@@ -359,6 +405,13 @@ export const useNeuralRateUser = ({
           grantId: state.activeGrant.grant_id,
         },
       });
+      if (state.vault?.vault_address) {
+        await revokeActivePolicy({
+          ownerEoa,
+          vaultAddress: state.vault.vault_address,
+          wallet: { getEthereumProvider },
+        });
+      }
       await refresh(ownerEoa);
       setNotice(`Automation revoked for this vault.${moduleMessage}`);
     } catch (err) {
@@ -379,6 +432,15 @@ export const useNeuralRateUser = ({
     setError(null);
     try {
       const isNativeMntDemo = DEMO_TARGET_ASSET.toUpperCase() === "MNT";
+      const snapshotPayload = {
+        strategyKey: DEMO_STRATEGY_KEY,
+        targetAsset: DEMO_TARGET_ASSET,
+        riskProfile: state.config?.risk_profile ?? "medium",
+        policyVersion: state.config?.policy_version ?? SESSION_POLICY_VERSION,
+        createdAt: new Date().toISOString(),
+      };
+      const snapshotHash = buildLocalSnapshotHash(snapshotPayload);
+      const deadline = new Date(Date.now() + 60 * 60 * 1000).toISOString();
       const response = await signedJsonFetch<{
         success: boolean;
         executionCapable: boolean;
@@ -398,6 +460,9 @@ export const useNeuralRateUser = ({
             amountUsd: isNativeMntDemo ? 1 : state.config?.max_action_usd ?? 1000,
             amountToken: isNativeMntDemo ? 1 : undefined,
             slippageBps: isNativeMntDemo ? 0 : 50,
+            snapshotHash,
+            snapshotCid: `local-snapshot:${snapshotHash}`,
+            deadline,
           },
         },
       });

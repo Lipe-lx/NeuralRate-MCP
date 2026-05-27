@@ -4,9 +4,9 @@
 
 NeuralRate MCP is a Mantle Sepolia (`5003`) project with three public-facing outcomes implemented in code:
 
-- a Cloudflare Worker that exposes analytics and mutation-capable MCP tools
+- a Cloudflare Worker that exposes a public read-only MCP surface plus scoped mutation catalogs
 - a web panel that lets a user inspect state and sign manual actions
-- an internal executor that writes benchmark transactions and dispatches vault-scoped execution jobs
+- an internal executor that writes on-chain decision receipts, anchors snapshots, and dispatches vault-scoped execution jobs
 
 The current live Sepolia execution demo is a real native `MNT` transfer routed through a pinned Safe module. The preserved `usdy-stable-allocation` path is intentionally blocked on Sepolia unless a canonical venue is configured.
 
@@ -18,10 +18,12 @@ The current live Sepolia execution demo is a real native `MNT` transfer routed t
   The browser should not call it directly. The worker forwards validated jobs to it with an internal token.
 - **Web is an operator/user panel.**
   It bootstraps a user vault, displays policies, asks for wallet signatures, and shows grants, sessions, jobs, and benchmark history.
-- **On-chain benchmarking is real.**
-  Benchmark writes go to `NeuralRateDecisionBenchmark.sol` on Mantle Sepolia.
+- **On-chain execution policy is now registry-driven.**
+  The web app publishes an active policy on-chain and the executor resolves authority from the policy registry before dispatch.
+- **On-chain receipts are first-class.**
+  New benchmark-style writes target `NeuralRateDecisionReceiptRegistry.sol`; the legacy Sepolia deployment manifest still points to the previous benchmark registry until redeploy.
 - **Vault execution is real.**
-  The `NeuralRateVaultModule` executes real calls from the user Safe once automation has been granted and enabled.
+  The `NeuralRateVaultModule` executes real calls from the user Safe and can defer enforcement to `NeuralRateExecutionGuard`.
 
 ## Repository Layout
 
@@ -32,7 +34,7 @@ The current live Sepolia execution demo is a real native `MNT` transfer routed t
 - `apps/web`
   Vite React frontend. Connects the wallet, shows vault state, manages settings, and displays execution and benchmark traces.
 - `contracts`
-  Hardhat workspace for the benchmark registry, the Safe vault module, and the preserved USDY adapter.
+  Hardhat workspace for the on-chain policy registry, execution guard, receipt registry, Safe vault module, and preserved USDY adapter.
 - `docs`
   Canonical and historical documentation. See [docs/README.md](docs/README.md).
 
@@ -41,44 +43,47 @@ The current live Sepolia execution demo is a real native `MNT` transfer routed t
 ```mermaid
 graph TD
     User[User Wallet + Web Panel] -->|REST + signed actions| Worker[Cloudflare Worker]
-    Agent[External MCP Agent] -->|SSE MCP| Worker
+    Agent[External MCP Agent] -->|Read-only MCP| Worker
     Worker -->|D1| D1[(Cloudflare D1)]
     Worker -->|KV| KV[(Cloudflare KV)]
     Worker -->|internal token| Executor[Internal Executor]
-    Executor -->|benchmark tx| Benchmark[NeuralRateDecisionBenchmark]
+    Worker -->|policy + session discovery| PolicyRegistry[NeuralRatePolicyRegistry]
+    Executor -->|receipt tx| ReceiptRegistry[NeuralRateDecisionReceiptRegistry]
     Executor -->|vault module tx| VaultModule[NeuralRateVaultModule]
+    VaultModule --> Guard[NeuralRateExecutionGuard]
     VaultModule --> Safe[User Safe Vault]
 ```
 
 ## Public MCP Surface
 
-The worker advertises the MCP endpoint in [agent-card.json](agent-card.json) at:
+The worker advertises the public read-only MCP endpoint in [agent-card.json](agent-card.json) at:
 
 - `https://neuralrate-worker.neuralrate.workers.dev/mcp`
 
-The current public tool list is:
+The public tool list is:
 
 - `yield_scan`
 - `tbill_spread`
 - `nansen_context`
 - `risk_assess`
 - `optimal_allocation`
-- `log_decision`
 - `get_decisions`
 - `get_user_state`
-- `bootstrap_user_vault`
-- `update_agent_policy`
-- `issue_automation_grant`
-- `revoke_automation_grant`
-- `queue_benchmark`
-- `execute_strategy`
 - `list_jobs`
+
+Scoped mutation catalogs are exposed separately at:
+
+- `/mcp/scoped/config`
+- `/mcp/scoped/benchmark`
+- `/mcp/scoped/execution`
+
+Each scoped route requires a valid `sessionToken` in the query string or `x-neuralrate-session-token` header before the mutation tool is even advertised.
 
 Details and auth rules are in [docs/mcp-server.md](docs/mcp-server.md).
 
-## Live Mantle Sepolia Deployments
+## Mantle Sepolia Deployments
 
-- Benchmark registry:
+- Legacy benchmark registry:
   [`0xc51560a5512d2A5756435d87319aeaE1bA480165`](https://sepolia.mantlescan.xyz/address/0xc51560a5512d2A5756435d87319aeaE1bA480165)
 - Vault module:
   [`0xDAbB583bDE28241F1e3C61B423CF456D07f4DA11`](https://sepolia.mantlescan.xyz/address/0xDAbB583bDE28241F1e3C61B423CF456D07f4DA11)

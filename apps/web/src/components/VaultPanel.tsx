@@ -232,6 +232,8 @@ const VaultPanel: React.FC<Props> = ({
   const onchainGrantStatus = activeGrant?.status === "active" ? "Granted" : session?.grant_tx_hash ? "Executed" : "Not issued";
   const automationJobs = state?.automationJobs ?? [];
   const latestJobs = automationJobs.slice(0, 3);
+  const onchainPolicy = state?.onchainPolicy ?? null;
+  const aa = state?.aa ?? null;
 
   return (
     <section className="glass-panel animate-enter vault-panel">
@@ -299,6 +301,18 @@ const VaultPanel: React.FC<Props> = ({
               <span>Automation Ready</span>
               <strong style={{ color: state?.automationReady ? "var(--color-lime)" : "var(--text-primary)" }}>
                 {state?.automationReady ? "Ready" : "Pending"}
+              </strong>
+            </div>
+            <div style={rowStyle}>
+              <span>Onchain Policy</span>
+              <strong style={{ color: onchainPolicy ? "var(--color-lime)" : "var(--text-primary)" }}>
+                {onchainPolicy ? truncate(onchainPolicy.policyId) : "Not published"}
+              </strong>
+            </div>
+            <div style={rowStyle}>
+              <span>AA Runtime</span>
+              <strong style={{ color: aa?.safe4337ModuleAddress ? "var(--color-lime)" : "var(--text-primary)" }}>
+                {aa?.safe4337ModuleAddress ? "Safe4337 + 7579" : "Safe module path"}
               </strong>
             </div>
           </div>

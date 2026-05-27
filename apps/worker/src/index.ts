@@ -38,6 +38,7 @@ import {
   logDecisionSchema,
   updateAgentPolicySchema,
 } from "./mcp/tools";
+import { withOnchainPolicyState } from "./onchainState";
 
 export interface Env {
   CACHE_KV: KVNamespace;
@@ -46,12 +47,25 @@ export interface Env {
   FRED_API_KEY: string;
   NANSEN_API_KEY: string;
   NEURALRATE_BENCHMARK_CONTRACT: string;
+  NEURALRATE_POLICY_REGISTRY_CONTRACT?: string;
+  NEURALRATE_EXECUTION_GUARD_CONTRACT?: string;
+  NEURALRATE_SAFE_4337_MODULE_ADDRESS?: string;
+  NEURALRATE_SAFE_7579_ADAPTER_ADDRESS?: string;
+  MANTLE_SEPOLIA_RPC_URL?: string;
   INTERNAL_API_TOKEN?: string;
   EXECUTOR_BASE_URL?: string;
 }
 
 const MCP_CANONICAL_ROUTE = "/mcp";
 const MCP_SSE_ALIAS_ROUTE = "/sse";
+const MCP_SCOPED_ROUTE = "/mcp/scoped";
+const MCP_SCOPED_SSE_ALIAS_ROUTE = "/sse/scoped";
+const MCP_SCOPED_CONFIG_ROUTE = "/mcp/scoped/config";
+const MCP_SCOPED_CONFIG_SSE_ALIAS_ROUTE = "/sse/scoped/config";
+const MCP_SCOPED_BENCHMARK_ROUTE = "/mcp/scoped/benchmark";
+const MCP_SCOPED_BENCHMARK_SSE_ALIAS_ROUTE = "/sse/scoped/benchmark";
+const MCP_SCOPED_EXECUTION_ROUTE = "/mcp/scoped/execution";
+const MCP_SCOPED_EXECUTION_SSE_ALIAS_ROUTE = "/sse/scoped/execution";
 
 const readJsonBody = async <T>(request: Request) => (await request.json()) as T;
 
@@ -139,6 +153,174 @@ const resolveAutomationAccess = async (
   return resolveAutomationAccessFromOwner(automation, ownerEoa, requiredDomain);
 };
 
+type ScopedMutationDomain = "config" | "benchmark" | "execution";
+
+const createServices = (env: Env) => {
+  const defillama = new DefiLlamaService(env.CACHE_KV);
+  const fred = new FredService(env.CACHE_KV, env.FRED_API_KEY);
+  const nansen = new NansenService(env.CACHE_KV, env.NANSEN_API_KEY);
+  const handlers = new McpToolHandlers(defillama, fred, nansen, env.DECISIONS_DB);
+  const automation = new AutomationStore(env.DECISIONS_DB);
+  return { defillama, fred, nansen, handlers, automation };
+};
+
+const registerReadonlyCatalog = (
+  server: McpServer,
+  handlers: McpToolHandlers,
+  automation: AutomationStore,
+  env: Env
+) => {
+  server.tool(
+    "yield_scan",
+    "Scans Mantle DeFi pools for current APY and TVL via DefiLlama",
+    yieldScanSchema,
+    handlers.handleYieldScan.bind(handlers)
+  );
+
+  server.tool(
+    "tbill_spread",
+    "Calculates the spread (in bps) between a given DeFi pool APY and the real-time US 3-Month T-Bill rate",
+    tbillSpreadSchema,
+    handlers.handleTbillSpread.bind(handlers)
+  );
+
+  server.tool(
+    "nansen_context",
+    "Fetches Smart Money inflows/outflows for a specific token via Nansen API",
+    nansenContextSchema,
+    handlers.handleNansenContext.bind(handlers)
+  );
+
+  server.tool(
+    "risk_assess",
+    "Performs a deterministic risk assessment returning a score (0-100) and classification",
+    riskAssessSchema,
+    handlers.handleRiskAssess.bind(handlers)
+  );
+
+  server.tool(
+    "optimal_allocation",
+    "Calculates an optimal allocation of funds across Mantle pools based on risk profile",
+    optimalAllocationSchema,
+    handlers.handleOptimalAllocation.bind(handlers)
+  );
+
+  server.tool(
+    "get_decisions",
+    "Fetches the latest decisions from the database",
+    getDecisionsSchema,
+    handlers.handleGetDecisions.bind(handlers)
+  );
+
+  server.tool(
+    "get_user_state",
+    "Fetches the scoped user, vault, grant, session and job state",
+    getUserStateSchema,
+    async ({ ownerEoa, sessionToken }) => {
+      const scopedOwner = sessionToken
+        ? (await resolveAutomationAccessFromSessionToken(automation, sessionToken, "state")).ownerEoa
+        : ownerEoa;
+
+      if (!scopedOwner) {
+        throw new Error("ownerEoa or sessionToken is required.");
+      }
+
+      const state = await withOnchainPolicyState(await automation.getAutomationState(scopedOwner), env);
+      return {
+        content: [{ type: "text", text: JSON.stringify(state, null, 2) }],
+        structuredContent: state,
+      };
+    }
+  );
+
+  server.tool(
+    "list_jobs",
+    "Lists scoped benchmark and execution jobs for a user vault",
+    listJobsSchema,
+    async ({ sessionToken, ownerEoa }) => {
+      const scopedOwner = sessionToken
+        ? (await resolveAutomationAccessFromSessionToken(automation, sessionToken, "state")).ownerEoa
+        : ownerEoa;
+
+      if (!scopedOwner) {
+        throw new Error("ownerEoa or sessionToken is required.");
+      }
+
+      const [automationJobs, benchmarkJobs] = await Promise.all([
+        automation.listAutomationJobs(scopedOwner),
+        automation.listBenchmarkJobs(scopedOwner),
+      ]);
+      const structured = { automationJobs, benchmarkJobs };
+      return {
+        content: [{ type: "text", text: JSON.stringify(structured, null, 2) }],
+        structuredContent: structured,
+      };
+    }
+  );
+};
+
+const getScopedCatalogRequest = (request: Request) => {
+  const tokenFromHeader = request.headers.get("x-neuralrate-session-token")?.trim();
+  const url = new URL(request.url);
+  const tokenFromQuery = url.searchParams.get("sessionToken")?.trim();
+  return {
+    sessionToken: tokenFromHeader || tokenFromQuery || null,
+    domain: url.searchParams.get("domain")?.trim() ?? null,
+  };
+};
+
+const requireScopedCatalogAccess = async (
+  request: Request,
+  env: Env,
+  requiredDomain: ScopedMutationDomain
+) => {
+  const { sessionToken } = getScopedCatalogRequest(request);
+  if (!sessionToken) {
+    throw new Error("sessionToken query parameter or x-neuralrate-session-token header is required for scoped MCP catalogs.");
+  }
+
+  const automation = new AutomationStore(env.DECISIONS_DB);
+  return resolveAutomationAccessFromSessionToken(automation, sessionToken, requiredDomain);
+};
+
+const resolveScopedCatalogRoute = (url: URL): { route: string; domain: ScopedMutationDomain } | null => {
+  if (
+    url.pathname.startsWith(MCP_SCOPED_CONFIG_ROUTE) ||
+    url.pathname.startsWith(MCP_SCOPED_CONFIG_SSE_ALIAS_ROUTE)
+  ) {
+    return { route: MCP_SCOPED_CONFIG_ROUTE, domain: "config" };
+  }
+
+  if (
+    url.pathname.startsWith(MCP_SCOPED_BENCHMARK_ROUTE) ||
+    url.pathname.startsWith(MCP_SCOPED_BENCHMARK_SSE_ALIAS_ROUTE)
+  ) {
+    return { route: MCP_SCOPED_BENCHMARK_ROUTE, domain: "benchmark" };
+  }
+
+  if (
+    url.pathname.startsWith(MCP_SCOPED_EXECUTION_ROUTE) ||
+    url.pathname.startsWith(MCP_SCOPED_EXECUTION_SSE_ALIAS_ROUTE)
+  ) {
+    return { route: MCP_SCOPED_EXECUTION_ROUTE, domain: "execution" };
+  }
+
+  if (url.pathname.startsWith(MCP_SCOPED_ROUTE) || url.pathname.startsWith(MCP_SCOPED_SSE_ALIAS_ROUTE)) {
+    const domain = url.searchParams.get("domain")?.trim() ?? null;
+    if (domain === "config") {
+      return { route: MCP_SCOPED_CONFIG_ROUTE, domain };
+    }
+    if (domain === "benchmark") {
+      return { route: MCP_SCOPED_BENCHMARK_ROUTE, domain };
+    }
+    if (domain === "execution") {
+      return { route: MCP_SCOPED_EXECUTION_ROUTE, domain };
+    }
+  }
+
+  return null;
+};
+
 export class NeuralRateMcpAgent extends McpAgent<Env, Record<string, never>> {
   server = new McpServer({
     name: "neuralrate-mcp",
@@ -222,7 +404,7 @@ export class NeuralRateMcpAgent extends McpAgent<Env, Record<string, never>> {
           throw new Error("ownerEoa or sessionToken is required.");
         }
 
-        const state = await automation.getAutomationState(scopedOwner);
+        const state = await withOnchainPolicyState(await automation.getAutomationState(scopedOwner), this.env);
         return {
           content: [{ type: "text", text: JSON.stringify(state, null, 2) }],
           structuredContent: state,
@@ -414,6 +596,154 @@ export class NeuralRateMcpAgent extends McpAgent<Env, Record<string, never>> {
         return {
           content: [{ type: "text", text: JSON.stringify(structured, null, 2) }],
           structuredContent: structured,
+        };
+      }
+    );
+  }
+}
+
+export class NeuralRateReadonlyMcpAgent extends McpAgent<Env, Record<string, never>> {
+  server = new McpServer({
+    name: "neuralrate-mcp-readonly",
+    version: "1.0.0"
+  });
+
+  async init() {
+    const { handlers, automation } = createServices(this.env);
+    registerReadonlyCatalog(this.server, handlers, automation, this.env);
+  }
+}
+
+export class NeuralRateConfigMcpAgent extends McpAgent<Env, Record<string, never>> {
+  server = new McpServer({
+    name: "neuralrate-mcp-config",
+    version: "1.0.0"
+  });
+
+  async init() {
+    const { handlers, automation } = createServices(this.env);
+    registerReadonlyCatalog(this.server, handlers, automation, this.env);
+    const verifyScopedOwnerAuth = async (ownerEoa: string, auth: MutationAuthEnvelope | undefined) => {
+      if (!auth) {
+        throw new Error("auth is required for this tool when no sessionToken is supplied.");
+      }
+      await verifyMutationAuthEnvelope(this.env.DECISIONS_DB, auth, ownerEoa);
+    };
+
+    this.server.tool(
+      "update_agent_policy",
+      "Updates the scoped NeuralRate agent policy for a user vault",
+      updateAgentPolicySchema,
+      async (args) => {
+        const access = args.sessionToken
+          ? await resolveAutomationAccessFromSessionToken(automation, args.sessionToken, "config")
+          : (() => {
+              if (!args.ownerEoa) {
+                throw new Error("ownerEoa is required when no sessionToken is supplied.");
+              }
+              return verifyScopedOwnerAuth(args.ownerEoa, args.auth as MutationAuthEnvelope | undefined)
+                .then(() => resolveAutomationAccessFromOwner(automation, args.ownerEoa!, "config"));
+            })();
+
+        const scoped = await access;
+        const config = await updateAgentPolicyFromScopedAccess(automation, scoped, args as unknown as Record<string, unknown>);
+        return {
+          content: [{ type: "text", text: JSON.stringify(config, null, 2) }],
+          structuredContent: config as Record<string, unknown>,
+        };
+      }
+    );
+  }
+}
+
+export class NeuralRateBenchmarkMcpAgent extends McpAgent<Env, Record<string, never>> {
+  server = new McpServer({
+    name: "neuralrate-mcp-benchmark",
+    version: "1.0.0"
+  });
+
+  async init() {
+    const { handlers, automation } = createServices(this.env);
+    registerReadonlyCatalog(this.server, handlers, automation, this.env);
+    const verifyScopedOwnerAuth = async (ownerEoa: string, auth: MutationAuthEnvelope | undefined) => {
+      if (!auth) {
+        throw new Error("auth is required for this tool when no sessionToken is supplied.");
+      }
+      await verifyMutationAuthEnvelope(this.env.DECISIONS_DB, auth, ownerEoa);
+    };
+
+    this.server.tool(
+      "queue_benchmark",
+      "Queues a scoped benchmark job through the internal executor",
+      queueBenchmarkSchema,
+      async (args) => {
+        const access = args.sessionToken
+          ? await resolveAutomationAccessFromSessionToken(automation, args.sessionToken, "benchmark")
+          : (() => {
+              if (!args.ownerEoa) {
+                throw new Error("ownerEoa is required when no sessionToken is supplied.");
+              }
+              return verifyScopedOwnerAuth(args.ownerEoa, args.auth as MutationAuthEnvelope | undefined)
+                .then(() => resolveAutomationAccessFromOwner(automation, args.ownerEoa!, "benchmark"));
+            })();
+
+        const scoped = await access;
+        const result = await queueBenchmarkThroughExecutor(this.env, scoped, {
+          decisionId: args.decisionId,
+          dataSnapshotHash: args.dataSnapshotHash,
+          payload: args.payload as Record<string, unknown> | undefined,
+        });
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          structuredContent: result as Record<string, unknown>,
+        };
+      }
+    );
+  }
+}
+
+export class NeuralRateExecutionMcpAgent extends McpAgent<Env, Record<string, never>> {
+  server = new McpServer({
+    name: "neuralrate-mcp-execution",
+    version: "1.0.0"
+  });
+
+  async init() {
+    const { handlers, automation } = createServices(this.env);
+    registerReadonlyCatalog(this.server, handlers, automation, this.env);
+    const verifyScopedOwnerAuth = async (ownerEoa: string, auth: MutationAuthEnvelope | undefined) => {
+      if (!auth) {
+        throw new Error("auth is required for this tool when no sessionToken is supplied.");
+      }
+      await verifyMutationAuthEnvelope(this.env.DECISIONS_DB, auth, ownerEoa);
+    };
+
+    this.server.tool(
+      "execute_strategy",
+      "Queues and dispatches a scoped strategy execution through the internal executor",
+      executeStrategySchema,
+      async (args) => {
+        const access = args.sessionToken
+          ? await resolveAutomationAccessFromSessionToken(automation, args.sessionToken, "execution")
+          : (() => {
+              if (!args.ownerEoa) {
+                throw new Error("ownerEoa is required when no sessionToken is supplied.");
+              }
+              return verifyScopedOwnerAuth(args.ownerEoa, args.auth as MutationAuthEnvelope | undefined)
+                .then(() => resolveAutomationAccessFromOwner(automation, args.ownerEoa!, "execution"));
+            })();
+
+        const scoped = await access;
+        const result = await queueStrategyThroughExecutor(this.env, scoped, {
+          strategyKey: args.strategyKey,
+          intent: args.intent as Record<string, unknown>,
+          payload: args.payload as Record<string, unknown> | undefined,
+        });
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          structuredContent: result as Record<string, unknown>,
         };
       }
     );
@@ -738,7 +1068,7 @@ export default {
             return new Response(JSON.stringify({ error: "ownerEoa is required" }), { status: 400, headers: corsHeaders });
           }
 
-          const state = await automation.getAutomationState(ownerEoa);
+          const state = await withOnchainPolicyState(await automation.getAutomationState(ownerEoa), env);
           return new Response(JSON.stringify(state), { headers: corsHeaders });
         }
 
@@ -1140,7 +1470,61 @@ export default {
       }
     }
 
-    // Accept /mcp as canonical and /sse as a transport alias for existing clients.
+    const scopedCatalog = resolveScopedCatalogRoute(url);
+    if (scopedCatalog) {
+      try {
+        await requireScopedCatalogAccess(request, env, scopedCatalog.domain);
+      } catch (err: any) {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 403,
+          headers: {
+            "Access-Control-Allow-Origin": "*",
+            "Content-Type": "application/json",
+          },
+        });
+      }
+
+      const targetUrl = new URL(request.url);
+      if (scopedCatalog.route === MCP_SCOPED_CONFIG_ROUTE && targetUrl.pathname.startsWith(MCP_SCOPED_CONFIG_SSE_ALIAS_ROUTE)) {
+        targetUrl.pathname = targetUrl.pathname.replace(MCP_SCOPED_CONFIG_SSE_ALIAS_ROUTE, MCP_SCOPED_CONFIG_ROUTE);
+      } else if (
+        scopedCatalog.route === MCP_SCOPED_BENCHMARK_ROUTE &&
+        targetUrl.pathname.startsWith(MCP_SCOPED_BENCHMARK_SSE_ALIAS_ROUTE)
+      ) {
+        targetUrl.pathname = targetUrl.pathname.replace(MCP_SCOPED_BENCHMARK_SSE_ALIAS_ROUTE, MCP_SCOPED_BENCHMARK_ROUTE);
+      } else if (
+        scopedCatalog.route === MCP_SCOPED_EXECUTION_ROUTE &&
+        targetUrl.pathname.startsWith(MCP_SCOPED_EXECUTION_SSE_ALIAS_ROUTE)
+      ) {
+        targetUrl.pathname = targetUrl.pathname.replace(MCP_SCOPED_EXECUTION_SSE_ALIAS_ROUTE, MCP_SCOPED_EXECUTION_ROUTE);
+      } else if (targetUrl.pathname.startsWith(MCP_SCOPED_SSE_ALIAS_ROUTE)) {
+        targetUrl.pathname = targetUrl.pathname.replace(MCP_SCOPED_SSE_ALIAS_ROUTE, scopedCatalog.route);
+      } else if (targetUrl.pathname === MCP_SCOPED_ROUTE) {
+        targetUrl.pathname = scopedCatalog.route;
+      }
+
+      const mcpRequest = targetUrl.toString() === request.url
+        ? request
+        : new Request(targetUrl.toString(), request);
+
+      const scopedAgent =
+        scopedCatalog.domain === "config"
+          ? NeuralRateConfigMcpAgent
+          : scopedCatalog.domain === "benchmark"
+            ? NeuralRateBenchmarkMcpAgent
+            : NeuralRateExecutionMcpAgent;
+
+      const mcpResponse = await (scopedAgent as any).serve(scopedCatalog.route).fetch(mcpRequest, env, ctx);
+      const newHeaders = new Headers(mcpResponse.headers);
+      newHeaders.set("Access-Control-Allow-Origin", "*");
+      return new Response(mcpResponse.body, {
+        status: mcpResponse.status,
+        statusText: mcpResponse.statusText,
+        headers: newHeaders
+      });
+    }
+
+    // Accept /mcp as canonical and /sse as a transport alias for the public read-only catalog.
     if (url.pathname.startsWith(MCP_CANONICAL_ROUTE) || url.pathname.startsWith(MCP_SSE_ALIAS_ROUTE)) {
       const targetUrl = new URL(request.url);
       if (targetUrl.pathname.startsWith(MCP_SSE_ALIAS_ROUTE)) {
@@ -1151,7 +1535,7 @@ export default {
         ? request
         : new Request(targetUrl.toString(), request);
 
-      const mcpResponse = await (NeuralRateMcpAgent as any).serve(MCP_CANONICAL_ROUTE).fetch(mcpRequest, env, ctx);
+      const mcpResponse = await (NeuralRateReadonlyMcpAgent as any).serve(MCP_CANONICAL_ROUTE).fetch(mcpRequest, env, ctx);
       // We must add CORS headers to the SSE response if the frontend tries to connect via EventSource
       const newHeaders = new Headers(mcpResponse.headers);
       newHeaders.set("Access-Control-Allow-Origin", "*");

@@ -13,6 +13,10 @@ declare namespace Cloudflare {
 		INTERNAL_API_TOKEN: string;
 		NANSEN_API_KEY: string;
 		NEURALRATE_BENCHMARK_CONTRACT: string;
+		NEURALRATE_EXECUTION_GUARD_CONTRACT: string;
+		NEURALRATE_POLICY_REGISTRY_CONTRACT: string;
+		NEURALRATE_SAFE_4337_MODULE_ADDRESS: string;
+		NEURALRATE_SAFE_7579_ADAPTER_ADDRESS: string;
 		MCP_OBJECT: DurableObjectNamespace<import("./src/index").NeuralRateMcpAgent>;
 	}
 }
@@ -21,5 +25,5 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "EXECUTOR_BASE_URL" | "FRED_API_KEY" | "INTERNAL_API_TOKEN" | "NANSEN_API_KEY" | "NEURALRATE_BENCHMARK_CONTRACT">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "EXECUTOR_BASE_URL" | "FRED_API_KEY" | "INTERNAL_API_TOKEN" | "NANSEN_API_KEY" | "NEURALRATE_BENCHMARK_CONTRACT" | "NEURALRATE_EXECUTION_GUARD_CONTRACT" | "NEURALRATE_POLICY_REGISTRY_CONTRACT" | "NEURALRATE_SAFE_4337_MODULE_ADDRESS" | "NEURALRATE_SAFE_7579_ADAPTER_ADDRESS">> {}
 }

@@ -8,6 +8,7 @@
     "packages/*"
   ],
   "scripts": {
-    "install:all": "npm install"
+    "install:all": "npm install",
+    "sync:deployments": "node scripts/sync-deployments-to-env.mjs"
   }
 }

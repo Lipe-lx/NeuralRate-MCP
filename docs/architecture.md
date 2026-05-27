@@ -2,30 +2,33 @@
 
 **Status:** Canonical doc
 
-This document describes the architecture implemented in the repository as of the current codebase state.
+This document describes the architecture implemented in the repository after the on-chain policy and receipt refactor.
 
 ## Topology
 
 NeuralRate has three runtime services plus on-chain contracts:
 
 1. `apps/worker`
-   Public surface for REST and MCP.
+   Public REST surface plus MCP catalogs.
 2. `apps/executor`
-   Internal dispatch service for benchmark and strategy jobs.
+   Internal dispatch service for receipt and strategy jobs.
 3. `apps/web`
    User and operator panel.
 4. Mantle Sepolia contracts
-   Benchmark registry, Safe vault module, and preserved USDY adapter.
+   Policy registry, execution guard, receipt registry, Safe vault module, and preserved USDY adapter.
 
 ```mermaid
 graph TD
-    Web[Web Panel] -->|REST| Worker[Cloudflare Worker]
-    Agent[MCP Agent] -->|SSE MCP /mcp| Worker
+    Web[Web Panel] -->|REST + wallet signatures| Worker[Cloudflare Worker]
+    Agent[External MCP Agent] -->|Read-only MCP /mcp| Worker
     Worker --> D1[(D1)]
     Worker --> KV[(KV)]
     Worker -->|x-neuralrate-internal-token| Executor[Executor]
-    Executor --> Benchmark[NeuralRateDecisionBenchmark.sol]
-    Executor --> Module[NeuralRateVaultModule.sol]
+    Worker -->|policy discovery| PolicyRegistry[NeuralRatePolicyRegistry.sol]
+    Executor -->|anchor snapshot / read policy| PolicyRegistry
+    Executor -->|receipt tx| ReceiptRegistry[NeuralRateDecisionReceiptRegistry.sol]
+    Executor -->|vault module tx| Module[NeuralRateVaultModule.sol]
+    Module --> Guard[NeuralRateExecutionGuard.sol]
     Module --> Safe[User Safe Vault]
 ```
 
@@ -33,7 +36,8 @@ graph TD
 
 - **Public**
   - worker REST endpoints under `/api/*`
-  - worker MCP endpoint at `/mcp`
+  - worker read-only MCP endpoint at `/mcp`
+  - worker scoped MCP catalogs at `/mcp/scoped/config`, `/mcp/scoped/benchmark`, and `/mcp/scoped/execution`
   - web frontend
 - **Internal**
   - executor HTTP API
@@ -45,14 +49,16 @@ The browser should not call the executor directly.
 
 ### Worker
 
-The worker is the control plane.
+The worker is now mostly a control plane and indexing layer.
 
 - serves market data endpoints and deterministic analytics
-- stores user state in D1
+- stores user state and historical metadata in D1
 - caches provider responses in KV
-- verifies wallet-signed auth nonces for state-changing owner actions
-- issues automation grants and short-lived MCP mutation sessions
-- validates domain-scoped session usage
+- verifies wallet-signed auth nonces for owner actions
+- issues grant/session records for MCP scoping
+- exposes read-only MCP publicly
+- exposes scoped mutation catalogs only when a valid `sessionToken` is presented at the route level
+- overlays on-chain policy state into `AutomationState`
 - forwards benchmark and execution jobs to the executor
 
 ### Executor
@@ -60,20 +66,22 @@ The worker is the control plane.
 The executor is the dispatch layer.
 
 - requires `x-neuralrate-internal-token`
-- prepares benchmark and execution policies
+- resolves the active on-chain policy before execution
+- anchors `snapshotHash` and `snapshotCid` in the policy registry when needed
 - validates pinned strategy configuration
-- checks the vault module deployment manifest and runtime bytecode
-- submits benchmark transactions with the managed signer
-- submits vault execution transactions through the Safe module
+- builds receipt-registry writes for decisions
+- submits vault execution transactions through the Safe module path
 - reports job status back to the worker
 
 ### Web
 
-The web app is not the control plane.
+The web app remains the owner-operated panel.
 
 - connects the user wallet on Mantle Sepolia
 - bootstraps user and vault state through the worker
 - gathers nonce signatures and grant signatures
+- publishes the active policy on-chain when settings change
+- revokes the active policy on-chain when automation is disabled
 - shows settings, vault state, grants, sessions, jobs, and benchmark history
 - queues benchmark and execution actions through the worker
 
@@ -86,86 +94,55 @@ The web app is not the control plane.
 3. Worker computes deterministic scoring and allocation output.
 4. Worker returns structured JSON.
 
-External provider usage in code:
-
-- DefiLlama yields
-- FRED Treasury data
-- Nansen smart money data when configured
-
 ### 2. Owner-Signed Mutation Flow
 
-For mutations without an MCP session token:
+For direct owner mutations:
 
 1. Client requests `/api/auth/nonce`.
 2. Owner wallet signs the nonce envelope.
 3. Worker verifies signature and nonce freshness.
-4. Worker executes the requested mutation.
+4. Worker executes the requested mutation or policy update.
+5. The web app can then mirror the resulting limits to the on-chain policy registry.
 
-This is used by the web app and can also be used by MCP mutation tools when no `sessionToken` is supplied.
+### 3. Scoped MCP Catalog Flow
 
-### 3. Grant and MCP Session Flow
+1. Owner signs a canonical automation grant.
+2. Worker stores the grant and a short-lived `sessionToken`.
+3. A scoped MCP route is requested with that `sessionToken`.
+4. The worker verifies the route domain against the session before serving the MCP catalog.
+5. Only the matching mutation tool is advertised on that scoped route.
 
-1. Owner signs the canonical automation grant message.
-2. Worker verifies the signature against the owner EOA.
-3. Worker stores an `automation_grant`.
-4. Worker creates a short-lived `mcp_mutation_session`.
-5. Worker returns a `sessionToken`.
-6. Mutation tools accept that `sessionToken` and resolve access from the stored session instead of trusting arbitrary `ownerEoa` input.
+This means catalog exposure is reduced before the model sees the tool list.
 
-This grant/session flow is separate from the vault automation consent stored in `automation_sessions`.
+### 4. Policy Publication Flow
 
-Allowed grant domains in code:
+1. The web app saves the user policy through the worker for indexed state.
+2. The web app publishes the same active policy directly on-chain through `NeuralRatePolicyRegistry`.
+3. The policy records delegate, caps, allowlists, validity windows, and snapshot requirements.
 
-- `state`
-- `config`
-- `benchmark`
-- `execution`
+### 5. Decision Receipt Flow
 
-### 4. Manual Enable-Automation Flow in the Web App
-
-When the user enables automation from the web panel, the current code performs additional steps beyond the MCP grant:
-
-1. The web app resolves or deploys the user Safe if needed.
-2. The web app enables `NeuralRateVaultModule` on that Safe.
-3. The web app builds a separate `NeuralRate Vault Automation Consent` message.
-4. The owner signs that consent message.
-5. The resulting consent payload is stored in `automation_sessions`.
-
-### 5. Benchmark Flow
-
-1. A decision is logged in D1.
-2. The worker queues a benchmark job.
-3. The executor submits `createDecision` on `NeuralRateDecisionBenchmark.sol`.
-4. The executor confirms the transaction and parses `DecisionCreated`.
-5. The worker persists `tx_hash`, `onchain_decision_id`, and job status.
+1. A decision is logged locally in D1.
+2. The worker queues a benchmark-style receipt job.
+3. The executor resolves the active on-chain policy.
+4. The executor anchors the referenced snapshot if needed.
+5. The executor submits `createDecisionReceipt` on `NeuralRateDecisionReceiptRegistry.sol`.
+6. The worker persists `tx_hash`, on-chain receipt metadata, and job status.
 
 ### 6. Strategy Execution Flow
 
-1. The worker validates access and policy scope.
-2. The worker forwards a strategy job to the executor.
-3. The executor resolves the strategy plan from the registry.
-4. The executor validates target contract, selector, config, and pinned deployment metadata.
-5. The executor calls `NeuralRateVaultModule`.
+1. The worker validates scoped access and queues a strategy job.
+2. The executor resolves the active on-chain policy.
+3. The executor anchors the referenced snapshot if needed.
+4. The executor builds an intent with snapshot hash, slippage, deadline, and policy version.
+5. `NeuralRateExecutionGuard` validates the execution when the module call is made.
 6. The module executes the real Safe call with `execTransactionFromModule`.
-
-## Strategy State on Mantle Sepolia
-
-- `mnt-native-transfer`
-  - live default demo
-  - real native `MNT` transfer
-  - executed through the Safe module
-- `usdy-stable-allocation`
-  - preserved in the executor registry
-  - not the default path
-  - blocked when no canonical Sepolia venue is configured
-
-The code intentionally fails closed instead of simulating a USDY venue on Sepolia.
 
 ## Persistence and Cache
 
 ### D1
 
-The worker stores:
+The worker still stores:
 
 - decisions
 - user profiles and configs
@@ -174,9 +151,7 @@ The worker stores:
 - automation jobs and benchmark jobs
 - auth nonces
 - automation grants
-- MCP mutation sessions
-
-See [database.md](database.md) for the current schema.
+- MCP session records
 
 ### KV
 
@@ -189,8 +164,7 @@ Current TTL behavior implemented in code:
 
 ## Trust Boundaries
 
-- The benchmark registry is global and separate from user vault funds.
-- The user vault is isolated per owner.
-- Automation authority is represented by a signed grant plus a short-lived mutation session.
-- The executor is not the source of user authorization; the worker is.
+- Execution authority is intended to come from on-chain policy plus guard validation, not from the worker alone.
+- The worker still scopes MCP discovery and stores index state, but it is no longer the only meaningful execution gate.
+- The executor is internal, but it must still satisfy the on-chain policy and snapshot path.
 - The Safe module address is pinned and verified before execution.

@@ -213,6 +213,9 @@ export const executeStrategySchema = {
     amountToken: z.number().optional(),
     slippageBps: z.number().optional(),
     notes: z.string().optional(),
+    snapshotHash: z.string().optional(),
+    snapshotCid: z.string().optional(),
+    deadline: z.string().optional(),
   }),
   payload: z.record(z.string(), z.unknown()).optional(),
 };

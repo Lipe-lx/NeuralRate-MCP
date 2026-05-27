@@ -14,15 +14,8 @@
         "nansen_context",
         "risk_assess",
         "optimal_allocation",
-        "log_decision",
         "get_decisions",
         "get_user_state",
-        "bootstrap_user_vault",
-        "update_agent_policy",
-        "issue_automation_grant",
-        "revoke_automation_grant",
-        "queue_benchmark",
-        "execute_strategy",
         "list_jobs"
       ]
     }

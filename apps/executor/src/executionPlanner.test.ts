@@ -36,6 +36,7 @@ const withConfiguredVaultModuleProtocol = async (fn: () => Promise<void>) => {
 test("resolveExecutionPlan blocks when runtime bytecode is missing on-chain", async () => {
   await withConfiguredUsdYToken(async () => {
     await withConfiguredVaultModuleProtocol(async () => {
+      const futureDeadline = new Date(Date.now() + 60 * 60 * 1000).toISOString();
       const plan = await resolveExecutionPlan(
         {
           async getCode() {
@@ -50,6 +51,8 @@ test("resolveExecutionPlan blocks when runtime bytecode is missing on-chain", as
           targetAsset: "USDY",
           amountUsd: 1000,
           slippageBps: 50,
+          snapshotHash: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          deadline: futureDeadline,
         },
         {
           ownerEoa: "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
@@ -74,6 +77,7 @@ test("resolveExecutionPlan blocks when runtime bytecode is missing on-chain", as
 
 test("resolveExecutionPlan prepares a real MNT Safe-module transfer on Mantle Sepolia", async () => {
   await withConfiguredVaultModuleProtocol(async () => {
+    const futureDeadline = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     const plan = await resolveExecutionPlan(
       {
         async getCode() {
@@ -89,6 +93,8 @@ test("resolveExecutionPlan prepares a real MNT Safe-module transfer on Mantle Se
         amountUsd: 1,
         amountToken: 1,
         slippageBps: 0,
+        snapshotHash: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        deadline: futureDeadline,
       },
       {
         ownerEoa: "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
@@ -143,6 +149,7 @@ test("resolveExecutionPlan throws for unsupported strategy keys", async () => {
 
 test("resolveExecutionPlan blocks when amount exceeds policy limits", async () => {
   await withConfiguredUsdYToken(async () => {
+    const futureDeadline = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     const plan = await resolveExecutionPlan(
       {
         async getCode() {
@@ -156,6 +163,8 @@ test("resolveExecutionPlan blocks when amount exceeds policy limits", async () =
       {
         targetAsset: "USDY",
         amountUsd: 5000,
+        snapshotHash: "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        deadline: futureDeadline,
       },
       {
         ownerEoa: "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
@@ -172,6 +181,43 @@ test("resolveExecutionPlan blocks when amount exceeds policy limits", async () =
     const actionCheck = plan.policyChecks.find((check) => check.check === "policy-max-action-usd");
     assert.equal(plan.validationStatus, "blocked");
     assert.equal(actionCheck?.ok, false);
+  });
+});
+
+test("resolveExecutionPlan blocks when the snapshot hash is missing", async () => {
+  await withConfiguredVaultModuleProtocol(async () => {
+    const plan = await resolveExecutionPlan(
+      {
+        async getCode() {
+          return "0x6001600055";
+        },
+        async readContract() {
+          return true;
+        },
+      },
+      "mnt-native-transfer",
+      {
+        targetAsset: "MNT",
+        amountUsd: 1,
+        amountToken: 1,
+        slippageBps: 0,
+        deadline: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      },
+      {
+        ownerEoa: "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
+        vaultAddress: "0x1111111111111111111111111111111111111111",
+        chainId: 5003,
+        policyVersion: "v1",
+        maxActionUsd: 10,
+        maxAutomationUsd: 100,
+        allowedAssets: ["MNT"],
+        allowedProtocols: [],
+      },
+    );
+
+    const snapshotCheck = plan.policyChecks.find((check) => check.check === "snapshot-hash-present");
+    assert.equal(plan.validationStatus, "blocked");
+    assert.equal(snapshotCheck?.ok, false);
   });
 });
 

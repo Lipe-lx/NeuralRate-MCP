@@ -198,6 +198,29 @@ export interface AutomationState {
   automationJobs: AutomationJob[];
   benchmarkJobs: BenchmarkJob[];
   automationReady: boolean;
+  onchainPolicy?: {
+    policyId: string;
+    ownerEoa: string;
+    vaultAddress: string;
+    delegate: string;
+    maxPerUse: string;
+    maxDaily: string;
+    maxTotal: string;
+    validAfter: number;
+    validUntil: number;
+    maxSlippageBps: number;
+    requireSnapshot: boolean;
+    hasTargetAllowlist: boolean;
+    hasSelectorAllowlist: boolean;
+    policyVersion: string;
+  } | null;
+  aa?: {
+    policyRegistryContract: string | null;
+    executionGuardContract: string | null;
+    safe4337ModuleAddress: string | null;
+    safe7579AdapterAddress: string | null;
+    authorityModel: string;
+  } | null;
 }
 
 export const restrictionPresetOptions = [
