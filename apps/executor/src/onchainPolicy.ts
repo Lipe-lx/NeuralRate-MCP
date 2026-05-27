@@ -105,6 +105,23 @@ const normalizeHash = (value: string | null | undefined): Hex | null => {
   return keccak256(stringToHex(value));
 };
 
+export const buildAnchorSnapshotCalldata = (args: {
+  vaultAddress: string;
+  snapshotHash: Hex;
+  snapshotCid?: string | null;
+  descriptor?: string | null;
+}) =>
+  encodeFunctionData({
+    abi: policyRegistryAbi,
+    functionName: "anchorSnapshot",
+    args: [
+      args.vaultAddress as Address,
+      args.snapshotHash,
+      args.snapshotCid ?? args.snapshotHash,
+      args.descriptor ?? "neuralrate-snapshot",
+    ],
+  });
+
 export async function getActivePolicy(vaultAddress: string): Promise<OnchainActivePolicy> {
   if (!config.policyRegistryContract) {
     return null;
@@ -145,6 +162,7 @@ export async function ensureAnchoredSnapshot(args: {
   snapshotHash?: string | null;
   snapshotCid?: string | null;
   descriptor?: string | null;
+  mode?: "submit" | "read-only";
 }) {
   if (!config.policyRegistryContract || !args.snapshotHash) {
     return { anchored: false, snapshotHash: null as string | null };
@@ -167,7 +185,7 @@ export async function ensureAnchoredSnapshot(args: {
   }
 
   const capabilities = args.signer.getCapabilities();
-  if (!capabilities.canExecute) {
+  if (args.mode === "read-only" || !capabilities.canExecute) {
     return { anchored: false, snapshotHash: normalizedHash };
   }
 

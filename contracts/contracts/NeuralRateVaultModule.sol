@@ -49,8 +49,11 @@ contract NeuralRateVaultModule {
         _;
     }
 
-    modifier onlyAuthorizedExecutor() {
-        require(msg.sender == authorizedExecutor, "Only executor can call this");
+    modifier onlyAuthorizedExecutorOrVault(address vaultAddress) {
+        require(
+            msg.sender == authorizedExecutor || msg.sender == vaultAddress,
+            "Only executor or vault can call this"
+        );
         _;
     }
 
@@ -89,7 +92,7 @@ contract NeuralRateVaultModule {
         bytes32 snapshotHash,
         uint256 slippageBps,
         uint256 deadline
-    ) external onlyAuthorizedExecutor returns (bool) {
+    ) external onlyAuthorizedExecutorOrVault(vaultAddress) returns (bool) {
         require(ownerEoa != address(0), "Invalid owner");
         require(vaultAddress != address(0), "Invalid vault");
         require(targetContract != address(0), "Invalid target");

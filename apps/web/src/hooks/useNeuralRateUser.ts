@@ -2,15 +2,23 @@ import { useCallback, useEffect, useState } from "react";
 import type { EIP1193Provider } from "viem";
 import {
   API_BASE_URL,
+  DELEGATE_VALIDATOR_ADDRESS,
   ERC8004_AGENT_ID,
   DEMO_STRATEGY_KEY,
   DEMO_TARGET_ASSET,
+  SAFE_7579_ADAPTER_ADDRESS,
+  SAFE_7579_LAUNCHPAD_ADDRESS,
   SESSION_POLICY_VERSION,
   VAULT_MODULE_ADDRESS,
   VAULT_MODULE_ENABLED,
   VAULT_PROVIDER_STRATEGY,
 } from "../config";
-import { disableVaultModule, ensureVaultModuleEnabled, resolveUserSafeVault } from "../lib/automation";
+import {
+  disableVaultModule,
+  ensureAutonomousVaultRuntime,
+  ensureVaultModuleEnabled,
+  resolveUserSafeVault,
+} from "../lib/automation";
 import { signedJsonFetch } from "../lib/auth";
 import { buildLocalSnapshotHash, publishActivePolicy, revokeActivePolicy } from "../lib/policyRegistry";
 import type { AutomationState } from "../lib/userState";
@@ -351,13 +359,32 @@ export const useNeuralRateUser = ({
 
       let moduleMessage = "Grant recorded off-chain.";
       if (VAULT_MODULE_ENABLED) {
-        const moduleResult = await ensureVaultModuleEnabled(ownerEoa, {
-          getEthereumProvider,
-          signMessage,
-        }, VAULT_MODULE_ADDRESS);
-        moduleMessage = moduleResult.alreadyEnabled
-          ? "Safe module was already enabled on-chain."
-          : "Safe module enabled on-chain for real vault execution.";
+        const aaReady = Boolean(
+          SAFE_7579_ADAPTER_ADDRESS &&
+          SAFE_7579_LAUNCHPAD_ADDRESS &&
+          DELEGATE_VALIDATOR_ADDRESS
+        );
+        if (aaReady) {
+          const runtimeResult = await ensureAutonomousVaultRuntime(
+            ownerEoa,
+            {
+              getEthereumProvider,
+              signMessage,
+            },
+            VAULT_MODULE_ADDRESS
+          );
+          moduleMessage = runtimeResult.safe7579InstallTxHash || runtimeResult.validatorInstallTxHash
+            ? "AA runtime installed on-chain with Safe7579, delegate validator and vault module."
+            : "AA runtime was already installed on-chain for this vault.";
+        } else {
+          const moduleResult = await ensureVaultModuleEnabled(ownerEoa, {
+            getEthereumProvider,
+            signMessage,
+          }, VAULT_MODULE_ADDRESS);
+          moduleMessage = moduleResult.alreadyEnabled
+            ? "Safe module was already enabled on-chain."
+            : "Safe module enabled on-chain for real vault execution.";
+        }
       }
 
       await refresh(ownerEoa);

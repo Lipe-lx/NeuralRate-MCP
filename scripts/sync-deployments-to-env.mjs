@@ -117,13 +117,30 @@ const policyRegistryManifest = readJson("deployments/mantle-sepolia-policy-regis
 const executionGuardManifest = readJson("deployments/mantle-sepolia-execution-guard.json");
 const vaultModuleManifest = readJson("deployments/mantle-sepolia-vault-module.json");
 const receiptRegistryManifest = readJson("deployments/mantle-sepolia.json");
+const safe4337Manifest = readJson("deployments/mantle-sepolia-safe4337-module.json");
+const safe7579Manifest = readJson("deployments/mantle-sepolia-safe7579-adapter.json");
+const safe7579LaunchpadManifest = readJson("deployments/mantle-sepolia-safe7579-launchpad.json");
+const delegateValidatorManifest = readJson("deployments/mantle-sepolia-delegate-validator.json");
 
 const policyRegistryAddress = policyRegistryManifest?.address || "";
 const executionGuardAddress = executionGuardManifest?.address || "";
 const vaultModuleAddress = vaultModuleManifest?.address || "";
 const benchmarkAddress = receiptRegistryManifest?.address || "";
-const safe4337ModuleAddress = readOptionalEnv("NEURALRATE_SAFE_4337_MODULE_ADDRESS");
-const safe7579AdapterAddress = readOptionalEnv("NEURALRATE_SAFE_7579_ADAPTER_ADDRESS");
+const safe4337ModuleAddress = safe4337Manifest?.address || readOptionalEnv("NEURALRATE_SAFE_4337_MODULE_ADDRESS");
+const safe7579AdapterAddress = safe7579Manifest?.address || readOptionalEnv("NEURALRATE_SAFE_7579_ADAPTER_ADDRESS");
+const safe7579LaunchpadAddress =
+  safe7579LaunchpadManifest?.address || readOptionalEnv("NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS");
+const delegateValidatorAddress =
+  delegateValidatorManifest?.address || readOptionalEnv("NEURALRATE_DELEGATE_VALIDATOR_ADDRESS");
+const aaEntrypointAddress =
+  readOptionalEnv("NEURALRATE_4337_ENTRYPOINT_ADDRESS") ||
+  safe4337Manifest?.constructorArgs?.[0] ||
+  safe7579LaunchpadManifest?.constructorArgs?.[0] ||
+  "0x0000000071727De22E5E9d8BAf0edAc6f37da032";
+const erc7484RegistryAddress =
+  readOptionalEnv("NEURALRATE_ERC7484_REGISTRY_ADDRESS") ||
+  safe7579LaunchpadManifest?.constructorArgs?.[1] ||
+  "0x000000000069E2a187AEFFb852bF3cCdC95151B2";
 
 const sharedRuntimeEntries = [
   { key: "NEURALRATE_BENCHMARK_CONTRACT", value: benchmarkAddress, after: "AGENT_CARD_URI" },
@@ -132,6 +149,10 @@ const sharedRuntimeEntries = [
   { key: "NEURALRATE_VAULT_MODULE_ADDRESS", value: vaultModuleAddress, after: "NEURALRATE_EXECUTION_GUARD_CONTRACT" },
   { key: "NEURALRATE_SAFE_4337_MODULE_ADDRESS", value: safe4337ModuleAddress, after: "NEURALRATE_VAULT_MODULE_ADDRESS" },
   { key: "NEURALRATE_SAFE_7579_ADAPTER_ADDRESS", value: safe7579AdapterAddress, after: "NEURALRATE_SAFE_4337_MODULE_ADDRESS" },
+  { key: "NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS", value: safe7579LaunchpadAddress, after: "NEURALRATE_SAFE_7579_ADAPTER_ADDRESS" },
+  { key: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", value: delegateValidatorAddress, after: "NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS" },
+  { key: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", value: aaEntrypointAddress, after: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS" },
+  { key: "NEURALRATE_ERC7484_REGISTRY_ADDRESS", value: erc7484RegistryAddress, after: "NEURALRATE_4337_ENTRYPOINT_ADDRESS" },
 ];
 
 const sharedPublicEntries = [
@@ -142,6 +163,9 @@ const sharedPublicEntries = [
   { key: "VITE_PUBLIC_NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS", value: readOptionalEnv("NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS"), after: "VITE_PUBLIC_NEURALRATE_AGENT_SMART_WALLET" },
   { key: "VITE_PUBLIC_NEURALRATE_SAFE_4337_MODULE_ADDRESS", value: safe4337ModuleAddress, after: "VITE_PUBLIC_NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS" },
   { key: "VITE_PUBLIC_NEURALRATE_SAFE_7579_ADAPTER_ADDRESS", value: safe7579AdapterAddress, after: "VITE_PUBLIC_NEURALRATE_SAFE_4337_MODULE_ADDRESS" },
+  { key: "VITE_PUBLIC_NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS", value: safe7579LaunchpadAddress, after: "VITE_PUBLIC_NEURALRATE_SAFE_7579_ADAPTER_ADDRESS" },
+  { key: "VITE_PUBLIC_NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", value: delegateValidatorAddress, after: "VITE_PUBLIC_NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS" },
+  { key: "VITE_PUBLIC_NEURALRATE_4337_ENTRYPOINT_ADDRESS", value: aaEntrypointAddress, after: "VITE_PUBLIC_NEURALRATE_DELEGATE_VALIDATOR_ADDRESS" },
   { key: "VITE_PUBLIC_NEURALRATE_VAULT_MODULE_ADDRESS", value: vaultModuleAddress, after: "VITE_PUBLIC_NEURALRATE_SAFE_7579_ADAPTER_ADDRESS" },
 ];
 
@@ -187,6 +211,10 @@ updateEnvFile("apps/worker/.dev.vars", [
   { key: "NEURALRATE_EXECUTION_GUARD_CONTRACT", value: executionGuardAddress, after: "NEURALRATE_POLICY_REGISTRY_CONTRACT", style: "quoted" },
   { key: "NEURALRATE_SAFE_4337_MODULE_ADDRESS", value: safe4337ModuleAddress, after: "NEURALRATE_EXECUTION_GUARD_CONTRACT", style: "quoted" },
   { key: "NEURALRATE_SAFE_7579_ADAPTER_ADDRESS", value: safe7579AdapterAddress, after: "NEURALRATE_SAFE_4337_MODULE_ADDRESS", style: "quoted" },
+  { key: "NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS", value: safe7579LaunchpadAddress, after: "NEURALRATE_SAFE_7579_ADAPTER_ADDRESS", style: "quoted" },
+  { key: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", value: delegateValidatorAddress, after: "NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS", style: "quoted" },
+  { key: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", value: aaEntrypointAddress, after: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", style: "quoted" },
+  { key: "NEURALRATE_ERC7484_REGISTRY_ADDRESS", value: erc7484RegistryAddress, after: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", style: "quoted" },
   { key: "EXECUTOR_BASE_URL", value: readOptionalEnv("EXECUTOR_BASE_URL") || "http://127.0.0.1:8788", after: "INTERNAL_API_TOKEN", style: "quoted" },
 ]);
 
@@ -196,6 +224,10 @@ updateEnvFile("apps/worker/.dev.vars.example", [
   { key: "NEURALRATE_EXECUTION_GUARD_CONTRACT", value: executionGuardAddress || ZERO_ADDRESS, after: "NEURALRATE_POLICY_REGISTRY_CONTRACT", style: "quoted" },
   { key: "NEURALRATE_SAFE_4337_MODULE_ADDRESS", value: safe4337ModuleAddress || ZERO_ADDRESS, after: "NEURALRATE_EXECUTION_GUARD_CONTRACT", style: "quoted" },
   { key: "NEURALRATE_SAFE_7579_ADAPTER_ADDRESS", value: safe7579AdapterAddress || ZERO_ADDRESS, after: "NEURALRATE_SAFE_4337_MODULE_ADDRESS", style: "quoted" },
+  { key: "NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS", value: safe7579LaunchpadAddress || ZERO_ADDRESS, after: "NEURALRATE_SAFE_7579_ADAPTER_ADDRESS", style: "quoted" },
+  { key: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", value: delegateValidatorAddress || ZERO_ADDRESS, after: "NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS", style: "quoted" },
+  { key: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", value: aaEntrypointAddress || ZERO_ADDRESS, after: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", style: "quoted" },
+  { key: "NEURALRATE_ERC7484_REGISTRY_ADDRESS", value: erc7484RegistryAddress || ZERO_ADDRESS, after: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", style: "quoted" },
   { key: "EXECUTOR_BASE_URL", value: readOptionalEnv("EXECUTOR_BASE_URL") || "http://127.0.0.1:8788", after: "INTERNAL_API_TOKEN", style: "quoted" },
 ]);
 
@@ -205,4 +237,8 @@ updateEnvFile("apps/worker/wrangler.toml", [
   { key: "NEURALRATE_EXECUTION_GUARD_CONTRACT", value: executionGuardAddress || "", after: "NEURALRATE_POLICY_REGISTRY_CONTRACT", style: "tomlQuoted" },
   { key: "NEURALRATE_SAFE_4337_MODULE_ADDRESS", value: safe4337ModuleAddress || "", after: "NEURALRATE_EXECUTION_GUARD_CONTRACT", style: "tomlQuoted" },
   { key: "NEURALRATE_SAFE_7579_ADAPTER_ADDRESS", value: safe7579AdapterAddress || "", after: "NEURALRATE_SAFE_4337_MODULE_ADDRESS", style: "tomlQuoted" },
+  { key: "NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS", value: safe7579LaunchpadAddress || "", after: "NEURALRATE_SAFE_7579_ADAPTER_ADDRESS", style: "tomlQuoted" },
+  { key: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", value: delegateValidatorAddress || "", after: "NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS", style: "tomlQuoted" },
+  { key: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", value: aaEntrypointAddress || "", after: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", style: "tomlQuoted" },
+  { key: "NEURALRATE_ERC7484_REGISTRY_ADDRESS", value: erc7484RegistryAddress || "", after: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", style: "tomlQuoted" },
 ]);

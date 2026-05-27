@@ -12,7 +12,8 @@ import { buildBenchmarkPolicy, buildExecutionPolicy } from "./policy.js";
 import { executeBenchmarkJob } from "./benchmarkExecutor.js";
 import { getApprovedStrategySurface, resolveExecutionPlan } from "./executionPlanner.js";
 import type { StrategyIntent } from "./executionRegistry.js";
-import { ensureAnchoredSnapshot, getActivePolicy } from "./onchainPolicy.js";
+import { canUseAARuntime, sendAAVaultUserOperation } from "./aaRuntime.js";
+import { buildAnchorSnapshotCalldata, ensureAnchoredSnapshot, getActivePolicy } from "./onchainPolicy.js";
 
 const dataApi = new DataApiClient(config.dataApiBaseUrl.replace(/\/+$/, ""), config.internalApiToken);
 const mantleSepolia = defineChain({
@@ -173,6 +174,14 @@ createServer(async (request, response) => {
         managedSignerProvider: config.managedSignerProvider,
         managedSigner: await managedSigner.getPublicAddress(),
         capabilities: managedSigner.getCapabilities(),
+        aaRuntime: {
+          enabled: canUseAARuntime(managedSigner),
+          bundlerUrlConfigured: Boolean(config.aaBundlerUrl),
+          entryPointAddress: config.aaEntryPointAddress,
+          safe7579AdapterAddress: config.safe7579AdapterAddress,
+          safe7579LaunchpadAddress: config.safe7579LaunchpadAddress,
+          delegateValidatorAddress: config.delegateValidatorAddress,
+        },
         approvedStrategies: getApprovedStrategySurface().strategyKeys,
       });
       return;
@@ -623,12 +632,15 @@ createServer(async (request, response) => {
           throw new Error("No active on-chain policy found for this vault.");
         }
 
+        const useAARuntime = canUseAARuntime(managedSigner) && (body.executionDomain ?? "execution") === "execution";
+
         const anchoredSnapshot = await ensureAnchoredSnapshot({
           signer: managedSigner,
           vaultAddress: body.vaultAddress?.toLowerCase() || scoped.vaultAddress,
           snapshotHash: normalizedIntent.snapshotHash,
           snapshotCid: normalizedIntent.snapshotCid,
           descriptor: `strategy:${strategyKey}`,
+          mode: useAARuntime ? "read-only" : "submit",
         });
 
         normalizedIntent.snapshotHash = anchoredSnapshot.snapshotHash;
@@ -653,6 +665,8 @@ createServer(async (request, response) => {
         effectiveCalldata = resolvedPlan.calldata;
         effectivePayload = {
           ...effectivePayload,
+          aaRuntime: useAARuntime ? "safe7579-delegate-validator" : "legacy-signer",
+          anchoredSnapshot: anchoredSnapshot.anchored,
           strategyKey: resolvedPlan.strategyKey,
           strategyLabel: resolvedPlan.strategyLabel,
           protocolId: resolvedPlan.protocolId,
@@ -699,11 +713,58 @@ createServer(async (request, response) => {
 
       if (status !== "blocked" && effectiveTargetContract && effectiveCalldata) {
         try {
-          const txHash = await managedSigner.signAndSendTransaction({
-            to: effectiveTargetContract,
-            data: effectiveCalldata,
-            chainId: 5003,
-          });
+          const useAARuntime = canUseAARuntime(managedSigner) && (body.executionDomain ?? "execution") === "execution";
+          let txHash: string;
+          let userOpHash: string | null = null;
+
+          if (useAARuntime) {
+            const aaCalls: Array<{ to: string; data?: string; value?: bigint }> = [];
+            const intent = (effectivePayload.intent ?? {}) as Record<string, unknown>;
+            const snapshotHash = typeof intent.snapshotHash === "string" ? intent.snapshotHash : null;
+            const snapshotCid = typeof intent.snapshotCid === "string" ? intent.snapshotCid : null;
+
+            if (
+              config.policyRegistryContract &&
+              snapshotHash &&
+              !(effectivePayload as Record<string, unknown>).anchoredSnapshot
+            ) {
+              aaCalls.push({
+                to: config.policyRegistryContract,
+                data: buildAnchorSnapshotCalldata({
+                  vaultAddress: body.vaultAddress?.toLowerCase() || scoped.vaultAddress,
+                  snapshotHash: snapshotHash as `0x${string}`,
+                  snapshotCid,
+                  descriptor: `strategy:${effectiveJobType}`,
+                }),
+                value: 0n,
+              });
+            }
+
+            aaCalls.push({
+              to: effectiveTargetContract,
+              data: effectiveCalldata,
+              value: 0n,
+            });
+
+            const aaExecution = await sendAAVaultUserOperation({
+              signer: managedSigner,
+              vaultAddress: body.vaultAddress?.toLowerCase() || scoped.vaultAddress,
+              calls: aaCalls,
+            });
+            txHash = aaExecution.txHash;
+            userOpHash = aaExecution.userOpHash;
+            effectivePayload = {
+              ...effectivePayload,
+              userOpHash,
+              anchoredSnapshot: true,
+            };
+          } else {
+            txHash = await managedSigner.signAndSendTransaction({
+              to: effectiveTargetContract,
+              data: effectiveCalldata,
+              chainId: 5003,
+            });
+          }
 
           finalJob = await dataApi.updateAutomationJob(jobId, {
             sessionId: body.sessionId,

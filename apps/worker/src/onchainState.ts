@@ -38,6 +38,9 @@ export async function withOnchainPolicyState<T extends Record<string, unknown>>(
   NEURALRATE_EXECUTION_GUARD_CONTRACT?: string;
   NEURALRATE_SAFE_4337_MODULE_ADDRESS?: string;
   NEURALRATE_SAFE_7579_ADAPTER_ADDRESS?: string;
+  NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS?: string;
+  NEURALRATE_DELEGATE_VALIDATOR_ADDRESS?: string;
+  NEURALRATE_4337_ENTRYPOINT_ADDRESS?: string;
 }) {
   const vaultAddress = asString((state.vault as Record<string, unknown> | null)?.vault_address);
   const policyRegistryAddress = env.NEURALRATE_POLICY_REGISTRY_CONTRACT?.trim();
@@ -93,6 +96,9 @@ export async function withOnchainPolicyState<T extends Record<string, unknown>>(
       executionGuardContract: env.NEURALRATE_EXECUTION_GUARD_CONTRACT ?? null,
       safe4337ModuleAddress: env.NEURALRATE_SAFE_4337_MODULE_ADDRESS ?? null,
       safe7579AdapterAddress: env.NEURALRATE_SAFE_7579_ADAPTER_ADDRESS ?? null,
+      safe7579LaunchpadAddress: env.NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS ?? null,
+      delegateValidatorAddress: env.NEURALRATE_DELEGATE_VALIDATOR_ADDRESS ?? null,
+      entryPointAddress: env.NEURALRATE_4337_ENTRYPOINT_ADDRESS ?? null,
       authorityModel: "safe-first-aa",
     },
   };

@@ -8,6 +8,7 @@
     "deploy:sepolia": "hardhat run scripts/deploy.ts --network mantleSepolia",
     "deploy:policy-registry:sepolia": "hardhat run scripts/deploy-policy-registry.ts --network mantleSepolia",
     "deploy:execution-guard:sepolia": "hardhat run scripts/deploy-execution-guard.ts --network mantleSepolia",
+    "deploy:aa-stack:sepolia": "hardhat run scripts/deploy-aa-stack.ts --network mantleSepolia",
     "configure:vault-module:sepolia": "hardhat run scripts/configure-vault-module.ts --network mantleSepolia",
     "deploy:usdy-adapter:sepolia": "hardhat run scripts/deploy-usdy-adapter.ts --network mantleSepolia",
     "deploy:vault-module:sepolia": "hardhat run scripts/deploy-vault-module.ts --network mantleSepolia",
@@ -35,5 +36,8 @@
     "ts-node": "^10.9.2",
     "typechain": "^8.3.2",
     "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "@safe-global/safe-4337": "^0.3.0-1"
   }
 }

@@ -165,7 +165,29 @@ describe("NeuralRateVaultModule", function () {
           0,
           (await ethers.provider.getBlock("latest"))!.timestamp + 3600
         )
-    ).to.be.revertedWith("Only executor can call this");
+    ).to.be.revertedWith("Only executor or vault can call this");
+  });
+
+  it("accepts AA-style self-calls from the Safe while preserving guard validation", async function () {
+    const { module, safe, token, otherAccount, recipient } = await deployFixture();
+    const amount = ethers.parseUnits("5", 18);
+    const intentHash = ethers.keccak256(ethers.toUtf8Bytes("aa-safe-self-call"));
+    const calldata = token.interface.encodeFunctionData("transfer", [recipient.address, amount]);
+    const moduleCall = module.interface.encodeFunctionData("executeVaultCall", [
+      otherAccount.address,
+      await safe.getAddress(),
+      await token.getAddress(),
+      0,
+      calldata,
+      intentHash,
+      ethers.ZeroHash,
+      10,
+      (await ethers.provider.getBlock("latest"))!.timestamp + 3600,
+    ]);
+
+    await expect(
+      safe.callAsSafe(await module.getAddress(), moduleCall)
+    ).to.emit(module, "VaultCallExecuted");
   });
 
   it("reverts when the Safe has not enabled the module", async function () {

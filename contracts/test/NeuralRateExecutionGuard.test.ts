@@ -92,4 +92,27 @@ describe("NeuralRateExecutionGuard", function () {
       otherModule.executeViaSafe(await safe.getAddress(), await token.getAddress(), 0, calldata)
     ).to.be.revertedWith("Untrusted module");
   });
+
+  it("permits AA executions where the Safe is the effective executor", async function () {
+    const { module, safe, token, ownerEoa, recipient, snapshotHash } = await deployFixture();
+    const amount = ethers.parseUnits("10", 18);
+    const intentHash = ethers.keccak256(ethers.toUtf8Bytes("aa-execution"));
+    const calldata = token.interface.encodeFunctionData("transfer", [recipient.address, amount]);
+    const deadline = (await ethers.provider.getBlock("latest"))!.timestamp + 3600;
+    const moduleCall = module.interface.encodeFunctionData("executeVaultCall", [
+      ownerEoa.address,
+      await safe.getAddress(),
+      await token.getAddress(),
+      0,
+      calldata,
+      intentHash,
+      snapshotHash,
+      25,
+      deadline,
+    ]);
+
+    await expect(
+      safe.callAsSafe(await module.getAddress(), moduleCall)
+    ).to.emit(module, "VaultCallExecuted");
+  });
 });

@@ -1,6 +1,22 @@
 import Safe from '@safe-global/protocol-kit';
-import { keccak256, stringToHex, type EIP1193Provider } from 'viem';
-import { SAFE_SALT_NONCE } from '../config';
+import type { MetaTransactionData } from '@safe-global/types-kit';
+import {
+  decodeFunctionResult,
+  encodeAbiParameters,
+  encodeFunctionData,
+  keccak256,
+  stringToHex,
+  type EIP1193Provider,
+} from 'viem';
+import {
+  DELEGATE_VALIDATOR_ADDRESS,
+  NEURALRATE_EXECUTION_GUARD_CONTRACT,
+  NEURALRATE_POLICY_REGISTRY_CONTRACT,
+  NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS,
+  SAFE_7579_ADAPTER_ADDRESS,
+  SAFE_7579_LAUNCHPAD_ADDRESS,
+  SAFE_SALT_NONCE,
+} from '../config';
 
 export type PreparedAutomationSession = {
   sessionId: string;
@@ -50,6 +66,69 @@ type VaultModuleResult = {
   moduleTxHash: string | null;
   alreadyEnabled: boolean;
 };
+
+type AutonomousRuntimeResult = VaultModuleResult & {
+  aaMode: 'safe7579-delegate-validator';
+  safe7579InstallTxHash: string | null;
+  validatorInstallTxHash: string | null;
+  validatorRotateTxHash: string | null;
+  fallbackTxHash: string | null;
+  moduleGuardTxHash: string | null;
+  safe7579Enabled: boolean;
+  delegateValidatorConfigured: boolean;
+};
+
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+const MODULE_TYPE_VALIDATOR = 1n;
+const safe7579LaunchpadAbi = [{
+  type: 'function',
+  name: 'addSafe7579',
+  stateMutability: 'nonpayable',
+  inputs: [
+    { name: 'safe7579', type: 'address' },
+    {
+      name: 'modules',
+      type: 'tuple[]',
+      components: [
+        { name: 'module', type: 'address' },
+        { name: 'initData', type: 'bytes' },
+        { name: 'moduleType', type: 'uint256' },
+      ],
+    },
+    { name: 'attesters', type: 'address[]' },
+    { name: 'threshold', type: 'uint8' },
+  ],
+  outputs: [],
+}] as const;
+
+const safe7579AccountAbi = [{
+  type: 'function',
+  name: 'installModule',
+  stateMutability: 'nonpayable',
+  inputs: [
+    { name: 'moduleType', type: 'uint256' },
+    { name: 'module', type: 'address' },
+    { name: 'initData', type: 'bytes' },
+  ],
+  outputs: [],
+}] as const;
+
+const delegateValidatorAbi = [
+  {
+    type: 'function',
+    name: 'getDelegate',
+    stateMutability: 'view',
+    inputs: [{ name: 'smartAccount', type: 'address' }],
+    outputs: [{ name: '', type: 'address' }],
+  },
+  {
+    type: 'function',
+    name: 'setDelegate',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'newDelegate', type: 'address' }],
+    outputs: [],
+  },
+] as const;
 
 const buildPredictedSafe = async ({ ownerAddress, provider, saltNonce }: SafeInitArgs) =>
   Safe.init({
@@ -104,6 +183,58 @@ const openSafeByAddress = async (ownerAddress: string, provider: EIP1193Provider
     signer: ownerAddress,
     safeAddress,
   });
+
+const executeSafeTransactions = async (
+  safe: Awaited<ReturnType<typeof openSafeByAddress>>,
+  provider: EIP1193Provider,
+  transactions: MetaTransactionData[]
+) => {
+  const safeTx = await safe.createTransaction({ transactions });
+  const result = await safe.executeTransaction(safeTx);
+  await waitForTransactionReceipt(provider, result.hash);
+  return result.hash;
+};
+
+const readContractViaProvider = async (
+  provider: EIP1193Provider,
+  call: { to: string; data: string }
+) =>
+  provider.request({
+    method: 'eth_call',
+    params: [call, 'latest'],
+  }) as Promise<string>;
+
+const buildDelegateValidatorInitData = (delegateAddress: string, vaultModuleAddress: string) =>
+  encodeAbiParameters(
+    [
+      { name: 'delegate', type: 'address' },
+      { name: 'policyRegistry', type: 'address' },
+      { name: 'vaultModule', type: 'address' },
+    ],
+    [
+      delegateAddress as `0x${string}`,
+      (NEURALRATE_POLICY_REGISTRY_CONTRACT || ZERO_ADDRESS) as `0x${string}`,
+      (vaultModuleAddress || ZERO_ADDRESS) as `0x${string}`,
+    ]
+  );
+
+const getInstalledDelegate = async (
+  provider: EIP1193Provider,
+  safeAddress: string,
+  validatorAddress: string
+) => {
+  const data = encodeFunctionData({
+    abi: delegateValidatorAbi,
+    functionName: 'getDelegate',
+    args: [safeAddress as `0x${string}`],
+  });
+  const result = await readContractViaProvider(provider, { to: validatorAddress, data });
+  return decodeFunctionResult({
+    abi: delegateValidatorAbi,
+    functionName: 'getDelegate',
+    data: result as `0x${string}`,
+  }).toLowerCase();
+};
 
 export async function resolveUserSafeVault(
   ownerAddress: string,
@@ -194,6 +325,137 @@ export async function ensureVaultModuleEnabled(
     deploymentTxHash: deployment.txHash,
     moduleTxHash: result.hash,
     alreadyEnabled: false,
+  };
+}
+
+export async function ensureAutonomousVaultRuntime(
+  ownerAddress: string,
+  wallet: WalletAccess,
+  moduleAddress: string,
+  saltNonce?: string
+): Promise<AutonomousRuntimeResult> {
+  if (!SAFE_7579_ADAPTER_ADDRESS || !SAFE_7579_LAUNCHPAD_ADDRESS || !DELEGATE_VALIDATOR_ADDRESS) {
+    throw new Error('Configure Safe7579 adapter, launchpad and delegate validator addresses before enabling AA runtime.');
+  }
+  if (!NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS || /^0x0{40}$/i.test(NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS)) {
+    throw new Error('Configure the NeuralRate agent session signer address before enabling AA runtime.');
+  }
+
+  const provider = await wallet.getEthereumProvider();
+  const deployment = await deployUserSafeVault(ownerAddress, wallet, saltNonce);
+
+  if (deployment.txHash) {
+    await waitForTransactionReceipt(provider, deployment.txHash);
+  }
+
+  let safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
+  let moduleTxHash: string | null = null;
+  const vaultModuleAlreadyEnabled = await safe.isModuleEnabled(moduleAddress);
+  if (!vaultModuleAlreadyEnabled) {
+    const enableModuleTx = await safe.createEnableModuleTx(moduleAddress);
+    const result = await safe.executeTransaction(enableModuleTx);
+    await waitForTransactionReceipt(provider, result.hash);
+    moduleTxHash = result.hash;
+  }
+
+  let moduleGuardTxHash: string | null = null;
+  if (NEURALRATE_EXECUTION_GUARD_CONTRACT) {
+    const currentModuleGuard = (await safe.getModuleGuard()).toLowerCase();
+    if (currentModuleGuard !== NEURALRATE_EXECUTION_GUARD_CONTRACT.toLowerCase()) {
+      const enableModuleGuardTx = await safe.createEnableModuleGuardTx(NEURALRATE_EXECUTION_GUARD_CONTRACT);
+      const result = await safe.executeTransaction(enableModuleGuardTx);
+      await waitForTransactionReceipt(provider, result.hash);
+      moduleGuardTxHash = result.hash;
+    }
+  }
+
+  let safe7579InstallTxHash: string | null = null;
+  let validatorInstallTxHash: string | null = null;
+  let validatorRotateTxHash: string | null = null;
+  let fallbackTxHash: string | null = null;
+
+  const safe7579Enabled = await safe.isModuleEnabled(SAFE_7579_ADAPTER_ADDRESS);
+  const fallbackHandler = (await safe.getFallbackHandler()).toLowerCase();
+  const delegateValidatorInitData = buildDelegateValidatorInitData(
+    NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS,
+    moduleAddress
+  );
+
+  if (!safe7579Enabled) {
+    safe7579InstallTxHash = await executeSafeTransactions(safe, provider, [
+      {
+        to: SAFE_7579_LAUNCHPAD_ADDRESS,
+        value: '0',
+        data: encodeFunctionData({
+          abi: safe7579LaunchpadAbi,
+          functionName: 'addSafe7579',
+          args: [
+            SAFE_7579_ADAPTER_ADDRESS as `0x${string}`,
+            [{
+              module: DELEGATE_VALIDATOR_ADDRESS as `0x${string}`,
+              initData: delegateValidatorInitData,
+              moduleType: MODULE_TYPE_VALIDATOR,
+            }],
+            [] as `0x${string}`[],
+            0,
+          ],
+        }),
+      },
+    ]);
+    safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
+  }
+
+  const installedDelegate = await getInstalledDelegate(provider, deployment.safeAddress, DELEGATE_VALIDATOR_ADDRESS);
+  if (installedDelegate === ZERO_ADDRESS) {
+    validatorInstallTxHash = await executeSafeTransactions(safe, provider, [
+      {
+        to: deployment.safeAddress,
+        value: '0',
+        data: encodeFunctionData({
+          abi: safe7579AccountAbi,
+          functionName: 'installModule',
+          args: [
+            MODULE_TYPE_VALIDATOR,
+            DELEGATE_VALIDATOR_ADDRESS as `0x${string}`,
+            delegateValidatorInitData,
+          ],
+        }),
+      },
+    ]);
+  } else if (installedDelegate !== NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS.toLowerCase()) {
+    validatorRotateTxHash = await executeSafeTransactions(safe, provider, [
+      {
+        to: DELEGATE_VALIDATOR_ADDRESS,
+        value: '0',
+        data: encodeFunctionData({
+          abi: delegateValidatorAbi,
+          functionName: 'setDelegate',
+          args: [NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS as `0x${string}`],
+        }),
+      },
+    ]);
+  }
+
+  if (fallbackHandler !== SAFE_7579_ADAPTER_ADDRESS.toLowerCase()) {
+    const enableFallbackTx = await safe.createEnableFallbackHandlerTx(SAFE_7579_ADAPTER_ADDRESS);
+    const result = await safe.executeTransaction(enableFallbackTx);
+    await waitForTransactionReceipt(provider, result.hash);
+    fallbackTxHash = result.hash;
+  }
+
+  return {
+    aaMode: 'safe7579-delegate-validator',
+    safeAddress: deployment.safeAddress,
+    deploymentTxHash: deployment.txHash,
+    moduleTxHash,
+    alreadyEnabled: vaultModuleAlreadyEnabled,
+    safe7579InstallTxHash,
+    validatorInstallTxHash,
+    validatorRotateTxHash,
+    fallbackTxHash,
+    moduleGuardTxHash,
+    safe7579Enabled: true,
+    delegateValidatorConfigured: true,
   };
 }
 

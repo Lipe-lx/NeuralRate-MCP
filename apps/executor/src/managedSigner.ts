@@ -13,6 +13,7 @@ const mantleSepolia = defineChain({
 
 export type ManagedSignerCapabilities = {
   canExecute: boolean;
+  canSignUserOperations: boolean;
   mode: "turnkey" | "remote" | "address-only";
 };
 
@@ -25,6 +26,7 @@ export interface ManagedSigner {
     value?: bigint;
     chainId: number;
   }): Promise<string>;
+  signHash?(hash: Hex): Promise<Hex>;
 }
 
 export class AddressOnlyManagedSigner implements ManagedSigner {
@@ -37,12 +39,17 @@ export class AddressOnlyManagedSigner implements ManagedSigner {
   getCapabilities(): ManagedSignerCapabilities {
     return {
       canExecute: false,
+      canSignUserOperations: false,
       mode: "address-only",
     };
   }
 
   async signAndSendTransaction(tx: any): Promise<string> {
     throw new Error("AddressOnlyManagedSigner cannot execute transactions");
+  }
+
+  async signHash(hash: Hex): Promise<Hex> {
+    throw new Error("AddressOnlyManagedSigner cannot sign user operations");
   }
 }
 
@@ -68,6 +75,7 @@ export class RemoteManagedSigner implements ManagedSigner {
   getCapabilities(): ManagedSignerCapabilities {
     return {
       canExecute: false,
+      canSignUserOperations: false,
       mode: "remote",
     };
   }
@@ -76,6 +84,10 @@ export class RemoteManagedSigner implements ManagedSigner {
     // Note: Remote signer execution logic goes here if needed. 
     // Currently throwing since Turnkey is the main path.
     throw new Error("RemoteManagedSigner execution not implemented");
+  }
+
+  async signHash(hash: Hex): Promise<Hex> {
+    throw new Error("RemoteManagedSigner user operation signing not implemented");
   }
 }
 
@@ -112,8 +124,17 @@ export class TurnkeyManagedSigner implements ManagedSigner {
   getCapabilities(): ManagedSignerCapabilities {
     return {
       canExecute: true,
+      canSignUserOperations: true,
       mode: "turnkey",
     };
+  }
+
+  private async getAccount() {
+    return createAccount({
+      client: this.turnkeyClient.apiClient(),
+      organizationId: this.args.organizationId,
+      signWith: this.args.walletAccountAddress,
+    });
   }
 
   async signAndSendTransaction(tx: {
@@ -122,11 +143,7 @@ export class TurnkeyManagedSigner implements ManagedSigner {
     value?: bigint;
     chainId: number;
   }): Promise<string> {
-    const account = await createAccount({
-      client: this.turnkeyClient.apiClient(),
-      organizationId: this.args.organizationId,
-      signWith: this.args.walletAccountAddress, 
-    });
+    const account = await this.getAccount();
 
     const walletClient = createWalletClient({
       account,
@@ -143,5 +160,13 @@ export class TurnkeyManagedSigner implements ManagedSigner {
     });
 
     return txHash;
+  }
+
+  async signHash(hash: Hex): Promise<Hex> {
+    const account = await this.getAccount();
+    if (!account.sign) {
+      throw new Error("Turnkey account cannot sign user operation hashes");
+    }
+    return account.sign({ hash });
   }
 }

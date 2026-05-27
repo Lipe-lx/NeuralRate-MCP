@@ -34,6 +34,10 @@ contract MockSafeModuleAvatar {
         emit ModuleGuardSet(guard);
     }
 
+    function callAsSafe(address target, bytes calldata data) external returns (bool success, bytes memory returnData) {
+        (success, returnData) = target.call(data);
+    }
+
     function execTransactionFromModule(
         address to,
         uint256 value,

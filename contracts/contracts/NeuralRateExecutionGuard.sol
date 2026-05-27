@@ -106,7 +106,10 @@ contract NeuralRateExecutionGuard {
         require(policy.active, "No active policy");
         require(policy.ownerEoa == ownerEoa, "Owner mismatch");
         require(policy.vaultAddress == vaultAddress, "Vault mismatch");
-        require(policy.delegate == executor, "Delegate mismatch");
+        require(
+            policy.delegate == executor || executor == vaultAddress,
+            "Delegate mismatch"
+        );
         require(block.timestamp >= policy.validAfter, "Policy not active yet");
         require(block.timestamp <= policy.validUntil, "Policy expired");
         require(slippageBps <= policy.maxSlippageBps, "Slippage exceeds policy");

@@ -182,8 +182,10 @@ contract NeuralRatePolicyRegistry {
 
         PolicyMetadata storage metadata = policies[activePolicyId];
         require(
-            msg.sender == metadata.ownerEoa || msg.sender == metadata.delegate,
-            "Only owner or delegate can anchor snapshot"
+            msg.sender == metadata.ownerEoa
+                || msg.sender == metadata.delegate
+                || msg.sender == vaultAddress,
+            "Only owner, delegate or vault can anchor snapshot"
         );
 
         snapshots[snapshotHash] = SnapshotAnchor({

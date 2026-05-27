@@ -219,6 +219,9 @@ export interface AutomationState {
     executionGuardContract: string | null;
     safe4337ModuleAddress: string | null;
     safe7579AdapterAddress: string | null;
+    safe7579LaunchpadAddress: string | null;
+    delegateValidatorAddress: string | null;
+    entryPointAddress: string | null;
     authorityModel: string;
   } | null;
 }
