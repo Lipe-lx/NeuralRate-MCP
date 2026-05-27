@@ -44,6 +44,10 @@ export interface Env {
   CACHE_KV: KVNamespace;
   DECISIONS_DB: D1Database;
   MCP_OBJECT: DurableObjectNamespace;
+  MCP_READONLY_OBJECT: DurableObjectNamespace;
+  MCP_CONFIG_OBJECT: DurableObjectNamespace;
+  MCP_BENCHMARK_OBJECT: DurableObjectNamespace;
+  MCP_EXECUTION_OBJECT: DurableObjectNamespace;
   FRED_API_KEY: string;
   NANSEN_API_KEY: string;
   NEURALRATE_BENCHMARK_CONTRACT: string;
@@ -332,277 +336,8 @@ export class NeuralRateMcpAgent extends McpAgent<Env, Record<string, never>> {
   });
 
   async init() {
-    // Initialize Services
-    const defillama = new DefiLlamaService(this.env.CACHE_KV);
-    const fred = new FredService(this.env.CACHE_KV, this.env.FRED_API_KEY);
-    const nansen = new NansenService(this.env.CACHE_KV, this.env.NANSEN_API_KEY);
-    const handlers = new McpToolHandlers(defillama, fred, nansen, this.env.DECISIONS_DB);
-    const automation = new AutomationStore(this.env.DECISIONS_DB);
-    const verifyMcpMutationAuth = async (ownerEoa: string, auth: MutationAuthEnvelope | undefined) => {
-      if (!auth) {
-        throw new Error("auth is required for this tool when no sessionToken is supplied.");
-      }
-      await verifyMutationAuthEnvelope(this.env.DECISIONS_DB, auth, ownerEoa);
-    };
-
-    // Register Tools
-    this.server.tool(
-      "yield_scan",
-      "Scans Mantle DeFi pools for current APY and TVL via DefiLlama",
-      yieldScanSchema,
-      handlers.handleYieldScan.bind(handlers)
-    );
-
-    this.server.tool(
-      "tbill_spread",
-      "Calculates the spread (in bps) between a given DeFi pool APY and the real-time US 3-Month T-Bill rate",
-      tbillSpreadSchema,
-      handlers.handleTbillSpread.bind(handlers)
-    );
-
-    this.server.tool(
-      "nansen_context",
-      "Fetches Smart Money inflows/outflows for a specific token via Nansen API",
-      nansenContextSchema,
-      handlers.handleNansenContext.bind(handlers)
-    );
-
-    this.server.tool(
-      "risk_assess",
-      "Performs a deterministic risk assessment returning a score (0-100) and classification",
-      riskAssessSchema,
-      handlers.handleRiskAssess.bind(handlers)
-    );
-
-    this.server.tool(
-      "optimal_allocation",
-      "Calculates an optimal allocation of funds across Mantle pools based on risk profile",
-      optimalAllocationSchema,
-      handlers.handleOptimalAllocation.bind(handlers)
-    );
-
-    this.server.tool(
-      "log_decision",
-      "Logs a decision to the database",
-      logDecisionSchema,
-      handlers.handleLogDecision.bind(handlers)
-    );
-
-    this.server.tool(
-      "get_decisions",
-      "Fetches the latest decisions from the database",
-      getDecisionsSchema,
-      handlers.handleGetDecisions.bind(handlers)
-    );
-
-    this.server.tool(
-      "get_user_state",
-      "Fetches the scoped user, vault, grant, session and job state",
-      getUserStateSchema,
-      async ({ ownerEoa, sessionToken }) => {
-        const scopedOwner = sessionToken
-          ? (await resolveAutomationAccessFromSessionToken(automation, sessionToken, "state")).ownerEoa
-          : ownerEoa;
-
-        if (!scopedOwner) {
-          throw new Error("ownerEoa or sessionToken is required.");
-        }
-
-        const state = await withOnchainPolicyState(await automation.getAutomationState(scopedOwner), this.env);
-        return {
-          content: [{ type: "text", text: JSON.stringify(state, null, 2) }],
-          structuredContent: state,
-        };
-      }
-    );
-
-    this.server.tool(
-      "bootstrap_user_vault",
-      "Bootstraps the dedicated user vault record inside NeuralRate",
-      bootstrapUserVaultSchema,
-      async (args) => {
-        await verifyMcpMutationAuth(args.ownerEoa, args.auth as MutationAuthEnvelope | undefined);
-        const state = await automation.bootstrapUser({
-          ownerEoa: args.ownerEoa,
-          externalWallet: args.externalWallet,
-          embeddedWallet: args.embeddedWallet,
-          authStrategy: args.authStrategy,
-          displayName: args.displayName,
-          privyUserId: args.privyUserId,
-          providerUserRef: args.providerUserRef,
-          walletProvider: args.walletProvider,
-          vaultAddress: args.vaultAddress,
-          vaultProvider: args.vaultProvider,
-          vaultKind: args.vaultKind,
-          vaultStatus: args.vaultStatus,
-          safeDeploymentStatus: args.safeDeploymentStatus,
-          safeSaltNonce: args.safeSaltNonce,
-          chainId: args.chainId,
-        });
-        return {
-          content: [{ type: "text", text: JSON.stringify(state, null, 2) }],
-          structuredContent: state,
-        };
-      }
-    );
-
-    this.server.tool(
-      "update_agent_policy",
-      "Updates the scoped NeuralRate agent policy for a user vault",
-      updateAgentPolicySchema,
-      async (args) => {
-        const access = args.sessionToken
-          ? await resolveAutomationAccessFromSessionToken(automation, args.sessionToken, "config")
-          : (() => {
-              if (!args.ownerEoa) {
-                throw new Error("ownerEoa is required when no sessionToken is supplied.");
-              }
-              return verifyMcpMutationAuth(args.ownerEoa, args.auth as MutationAuthEnvelope | undefined)
-                .then(() => resolveAutomationAccessFromOwner(automation, args.ownerEoa!, "config"));
-            })();
-
-        const scoped = await access;
-        const config = await updateAgentPolicyFromScopedAccess(automation, scoped, args as unknown as Record<string, unknown>);
-        return {
-          content: [{ type: "text", text: JSON.stringify(config, null, 2) }],
-          structuredContent: config as Record<string, unknown>,
-        };
-      }
-    );
-
-    this.server.tool(
-      "issue_automation_grant",
-      "Creates a canonical automation grant challenge or finalizes a signed grant into an MCP mutation session",
-      issueAutomationGrantSchema,
-      async (args) => {
-        const result = await issueAutomationGrant(automation, this.env, {
-          ownerEoa: args.ownerEoa,
-          agentSubject: args.agentSubject,
-          allowedDomains: args.allowedDomains,
-          policyVersion: args.policyVersion,
-          issuedAt: args.issuedAt,
-          expiresAt: args.expiresAt,
-          nonce: args.nonce,
-          signature: args.signature,
-          issuedVia: args.issuedVia ?? "mcp",
-        });
-
-        return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-          structuredContent: result as Record<string, unknown>,
-        };
-      }
-    );
-
-    this.server.tool(
-      "revoke_automation_grant",
-      "Revokes the currently active grant or a specific grant",
-      revokeAutomationGrantSchema,
-      async (args) => {
-        let grantId = args.grantId ?? null;
-        if (args.sessionToken) {
-          const access = await resolveAutomationAccessFromSessionToken(automation, args.sessionToken, "state");
-          grantId = access.grantId;
-        } else if (args.ownerEoa) {
-          await verifyMcpMutationAuth(args.ownerEoa, args.auth as MutationAuthEnvelope | undefined);
-          const activeGrant = await automation.getActiveAutomationGrant(args.ownerEoa);
-          grantId = activeGrant?.grant_id ? String(activeGrant.grant_id) : null;
-        }
-
-        if (!grantId) {
-          throw new Error("grantId, sessionToken, or ownerEoa with auth is required to revoke a grant.");
-        }
-
-        const result = await revokeAutomationGrant(automation, grantId);
-        return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-          structuredContent: result as Record<string, unknown>,
-        };
-      }
-    );
-
-    this.server.tool(
-      "queue_benchmark",
-      "Queues a scoped benchmark job through the internal executor",
-      queueBenchmarkSchema,
-      async (args) => {
-        const access = args.sessionToken
-          ? await resolveAutomationAccessFromSessionToken(automation, args.sessionToken, "benchmark")
-          : (() => {
-              if (!args.ownerEoa) {
-                throw new Error("ownerEoa is required when no sessionToken is supplied.");
-              }
-              return verifyMcpMutationAuth(args.ownerEoa, args.auth as MutationAuthEnvelope | undefined)
-                .then(() => resolveAutomationAccessFromOwner(automation, args.ownerEoa!, "benchmark"));
-            })();
-
-        const scoped = await access;
-        const result = await queueBenchmarkThroughExecutor(this.env, scoped, {
-          decisionId: args.decisionId,
-          dataSnapshotHash: args.dataSnapshotHash,
-          payload: args.payload as Record<string, unknown> | undefined,
-        });
-
-        return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-          structuredContent: result as Record<string, unknown>,
-        };
-      }
-    );
-
-    this.server.tool(
-      "execute_strategy",
-      "Queues and dispatches a scoped strategy execution through the internal executor",
-      executeStrategySchema,
-      async (args) => {
-        const access = args.sessionToken
-          ? await resolveAutomationAccessFromSessionToken(automation, args.sessionToken, "execution")
-          : (() => {
-              if (!args.ownerEoa) {
-                throw new Error("ownerEoa is required when no sessionToken is supplied.");
-              }
-              return verifyMcpMutationAuth(args.ownerEoa, args.auth as MutationAuthEnvelope | undefined)
-                .then(() => resolveAutomationAccessFromOwner(automation, args.ownerEoa!, "execution"));
-            })();
-
-        const scoped = await access;
-        const result = await queueStrategyThroughExecutor(this.env, scoped, {
-          strategyKey: args.strategyKey,
-          intent: args.intent as Record<string, unknown>,
-          payload: args.payload as Record<string, unknown> | undefined,
-        });
-
-        return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-          structuredContent: result as Record<string, unknown>,
-        };
-      }
-    );
-
-    this.server.tool(
-      "list_jobs",
-      "Lists scoped benchmark and execution jobs for a user vault",
-      listJobsSchema,
-      async ({ sessionToken, ownerEoa }) => {
-        const scopedOwner = sessionToken
-          ? (await resolveAutomationAccessFromSessionToken(automation, sessionToken, "state")).ownerEoa
-          : ownerEoa;
-
-        if (!scopedOwner) {
-          throw new Error("ownerEoa or sessionToken is required.");
-        }
-
-        const [automationJobs, benchmarkJobs] = await Promise.all([
-          automation.listAutomationJobs(scopedOwner),
-          automation.listBenchmarkJobs(scopedOwner),
-        ]);
-        const structured = { automationJobs, benchmarkJobs };
-        return {
-          content: [{ type: "text", text: JSON.stringify(structured, null, 2) }],
-          structuredContent: structured,
-        };
-      }
-    );
+    const { handlers, automation } = createServices(this.env);
+    registerReadonlyCatalog(this.server, handlers, automation, this.env);
   }
 }
 
@@ -1518,7 +1253,14 @@ export default {
             ? NeuralRateBenchmarkMcpAgent
             : NeuralRateExecutionMcpAgent;
 
-      const mcpResponse = await (scopedAgent as any).serve(scopedCatalog.route).fetch(mcpRequest, env, ctx);
+      const scopedBinding =
+        scopedCatalog.domain === "config"
+          ? "MCP_CONFIG_OBJECT"
+          : scopedCatalog.domain === "benchmark"
+            ? "MCP_BENCHMARK_OBJECT"
+            : "MCP_EXECUTION_OBJECT";
+
+      const mcpResponse = await (scopedAgent as any).serve(scopedCatalog.route, { binding: scopedBinding }).fetch(mcpRequest, env, ctx);
       const newHeaders = new Headers(mcpResponse.headers);
       newHeaders.set("Access-Control-Allow-Origin", "*");
       return new Response(mcpResponse.body, {
@@ -1539,7 +1281,9 @@ export default {
         ? request
         : new Request(targetUrl.toString(), request);
 
-      const mcpResponse = await (NeuralRateReadonlyMcpAgent as any).serve(MCP_CANONICAL_ROUTE).fetch(mcpRequest, env, ctx);
+      const mcpResponse = await (NeuralRateReadonlyMcpAgent as any)
+        .serve(MCP_CANONICAL_ROUTE, { binding: "MCP_READONLY_OBJECT" })
+        .fetch(mcpRequest, env, ctx);
       // We must add CORS headers to the SSE response if the frontend tries to connect via EventSource
       const newHeaders = new Headers(mcpResponse.headers);
       newHeaders.set("Access-Control-Allow-Origin", "*");

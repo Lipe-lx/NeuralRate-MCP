@@ -13,6 +13,8 @@
     "cf:secrets:sync": "node scripts/push-cloudflare-secrets.mjs",
     "cf:worker:publish": "node scripts/publish-worker-from-env.mjs",
     "env:sync:runtime": "node scripts/sync-runtime-envs.mjs",
-    "preflight:release": "node scripts/preflight-release.mjs"
+    "preflight:release": "node scripts/preflight-release.mjs",
+    "test:e2e:live": "node tests/e2e/live-web-smoke.mjs",
+    "test:e2e:mcp": "node tests/e2e/mcp-public-smoke.mjs"
   }
 }

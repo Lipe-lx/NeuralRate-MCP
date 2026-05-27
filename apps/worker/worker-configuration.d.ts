@@ -3,7 +3,12 @@
 declare namespace Cloudflare {
 	interface GlobalProps {
 		mainModule: typeof import("./src/index");
-		durableNamespaces: "NeuralRateMcpAgent";
+		durableNamespaces:
+			| "NeuralRateMcpAgent"
+			| "NeuralRateReadonlyMcpAgent"
+			| "NeuralRateConfigMcpAgent"
+			| "NeuralRateBenchmarkMcpAgent"
+			| "NeuralRateExecutionMcpAgent";
 	}
 	interface Env {
 		CACHE_KV: KVNamespace;
@@ -22,6 +27,10 @@ declare namespace Cloudflare {
 		NEURALRATE_4337_ENTRYPOINT_ADDRESS: string;
 		NEURALRATE_ERC7484_REGISTRY_ADDRESS: string;
 		MCP_OBJECT: DurableObjectNamespace<import("./src/index").NeuralRateMcpAgent>;
+		MCP_READONLY_OBJECT: DurableObjectNamespace<import("./src/index").NeuralRateReadonlyMcpAgent>;
+		MCP_CONFIG_OBJECT: DurableObjectNamespace<import("./src/index").NeuralRateConfigMcpAgent>;
+		MCP_BENCHMARK_OBJECT: DurableObjectNamespace<import("./src/index").NeuralRateBenchmarkMcpAgent>;
+		MCP_EXECUTION_OBJECT: DurableObjectNamespace<import("./src/index").NeuralRateExecutionMcpAgent>;
 	}
 }
 interface Env extends Cloudflare.Env {}

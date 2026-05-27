@@ -35,6 +35,22 @@ migrations_dir = "migrations"
 name = "MCP_OBJECT"
 class_name = "NeuralRateMcpAgent"
 
+[[durable_objects.bindings]]
+name = "MCP_READONLY_OBJECT"
+class_name = "NeuralRateReadonlyMcpAgent"
+
+[[durable_objects.bindings]]
+name = "MCP_CONFIG_OBJECT"
+class_name = "NeuralRateConfigMcpAgent"
+
+[[durable_objects.bindings]]
+name = "MCP_BENCHMARK_OBJECT"
+class_name = "NeuralRateBenchmarkMcpAgent"
+
+[[durable_objects.bindings]]
+name = "MCP_EXECUTION_OBJECT"
+class_name = "NeuralRateExecutionMcpAgent"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["StableSyncMcpAgent"]
@@ -42,3 +58,12 @@ new_sqlite_classes = ["StableSyncMcpAgent"]
 [[migrations]]
 tag = "v2"
 renamed_classes = [{ from = "StableSyncMcpAgent", to = "NeuralRateMcpAgent" }]
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = [
+  "NeuralRateReadonlyMcpAgent",
+  "NeuralRateConfigMcpAgent",
+  "NeuralRateBenchmarkMcpAgent",
+  "NeuralRateExecutionMcpAgent",
+]

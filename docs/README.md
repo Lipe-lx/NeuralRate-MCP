@@ -21,6 +21,8 @@ This directory contains the current documentation split into two groups:
   Benchmark registry, vault module, and preserved USDY adapter.
 - [frontend.md](frontend.md)
   Role of the web app and the current Mantle Sepolia demo surface.
+- [deployment.md](deployment.md)
+  Canonical deployment trigger model and release expectations.
 - [hackathon-submission.md](hackathon-submission.md)
   Factual submission notes aligned to the current repository state.
 

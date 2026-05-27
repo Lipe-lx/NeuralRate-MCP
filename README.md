@@ -147,6 +147,32 @@ What these commands do:
 
 If both commands pass, the repository is ready to be committed. This does **not** mean local secrets from `/.env` will be uploaded by Git push alone.
 
+Operational rule:
+
+- if you changed runtime variables, public bindings, deployment metadata, or checked-in env examples, run `npm run sync:deployments` and `npm run preflight:release` before pushing
+
+## Deployment Trigger Model
+
+NeuralRate does **not** use GitHub Actions as the publish path for the public web or worker surfaces.
+
+- `apps/web`
+  Deploys through Cloudflare Pages Git integration configured in Cloudflare.
+- `apps/worker`
+  Deploys through Cloudflare Workers Git integration configured in Cloudflare.
+
+Operational rule:
+
+- if the connected branch is pushed, Cloudflare triggers the deployment
+- the trigger lives in Cloudflare platform configuration, not in versioned GitHub workflow files in this repository
+
+What still requires operator awareness:
+
+- local `/.env` values are not uploaded by a normal Git push
+- Worker secrets still depend on explicit Cloudflare secret management
+- the executor may have a separate deployment path outside this repository
+
+See [docs/deployment.md](docs/deployment.md) for the canonical deployment note.
+
 ## Configuration Security
 
 NeuralRate now distinguishes between public Worker bindings and secret Worker/runtime credentials:
