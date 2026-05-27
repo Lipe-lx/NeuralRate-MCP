@@ -139,16 +139,17 @@ const clickPoolSymbol = async (send, symbol) =>
   evalByValue(
     send,
     `(() => {
-      const xpath = "//h4[normalize-space()='" + ${JSON.stringify(symbol)} + "']";
-      const header = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+      const headers = [...document.querySelectorAll('h4')];
+      const header = headers.find((el) => (el.textContent || '').trim() === ${JSON.stringify(symbol)});
       if (!header) return false;
-      const row = header.closest('div[style*="grid-template-columns"]') || header.parentElement;
+
+      const row = header.closest('[style*="cursor: pointer"]') || header.parentElement?.parentElement || header.parentElement;
       if (!row) return false;
-      if (typeof row.click === 'function') {
-        row.click();
-      } else {
-        row.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-      }
+
+      row.scrollIntoView?.({ block: 'center', inline: 'center' });
+      row.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true, view: window }));
+      row.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+
       return true;
     })()`,
   );
@@ -162,6 +163,12 @@ const getSelectedPool = async (send) =>
       const el = document.querySelector('div[style*="background: rgba(223, 246, 81, 0.04)"] h4');
       return el ? el.textContent.trim() : null;
     })()`,
+  );
+
+const getVisiblePools = async (send) =>
+  evalByValue(
+    send,
+    `(() => [...document.querySelectorAll('h4')].map((el) => (el.textContent || '').trim()).filter(Boolean))()`,
   );
 
 const getRiskScore = async (send) =>
@@ -242,7 +249,10 @@ const main = async () => {
     const scoreBefore = await getRiskScore(send);
     const targetPoolSymbol = selectedBefore === 'USDC' ? 'GHO' : 'USDC';
     const switchedPool = await clickPoolSymbol(send, targetPoolSymbol);
-    if (!switchedPool) throw new Error('Could not select an alternate yield pool.');
+    if (!switchedPool) {
+      const visiblePools = await getVisiblePools(send);
+      throw new Error(`Could not select an alternate yield pool. Visible pools: ${visiblePools.join(', ') || 'none'}`);
+    }
 
     await waitFor(async () => {
       const next = await getSelectedPool(send);
