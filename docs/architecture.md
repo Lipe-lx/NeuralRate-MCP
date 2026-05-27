@@ -45,6 +45,31 @@ graph TD
 
 The browser should not call the executor directly.
 
+## Release and Configuration Boundary
+
+The repository now separates release-time address sync from secret injection:
+
+- checked-in release artifacts
+  - `deployments/*.json`
+  - `apps/worker/wrangler.toml`
+  - `*.env.example`
+- local-only operator files
+  - `/.env`
+  - `apps/executor/.env.local`
+  - `apps/worker/.dev.vars`
+- platform-managed secrets
+  - Cloudflare Worker secrets
+  - executor host secrets
+
+Recommended release check:
+
+```bash
+npm run sync:deployments
+npm run preflight:release
+```
+
+This keeps plaintext AA addresses versioned while leaving actual secrets outside git.
+
 ## Responsibility Split
 
 ### Worker
@@ -168,3 +193,4 @@ Current TTL behavior implemented in code:
 - The worker still scopes MCP discovery and stores index state, but it is no longer the only meaningful execution gate.
 - The executor is internal, but it must still satisfy the on-chain policy and snapshot path.
 - The Safe module address is pinned and verified before execution.
+- Public contract addresses are allowed in versioned Worker `vars`, but tokens, API keys, and internal auth material must stay in secret storage rather than `wrangler.toml`.

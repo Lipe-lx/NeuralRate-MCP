@@ -1,3 +1,7 @@
+import { loadExecutorEnv } from "./envLoader.js";
+
+loadExecutorEnv();
+
 const required = (name: string, fallback?: string) => {
   const value = process.env[name] ?? fallback;
   if (!value) {
@@ -8,6 +12,15 @@ const required = (name: string, fallback?: string) => {
 
 const optional = (name: string, fallback?: string) => process.env[name] ?? fallback ?? null;
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const MANTLE_SEPOLIA_CHAIN_ID = 5003;
+const parseList = (...values: Array<string | null>) =>
+  [...new Set(
+    values
+      .flatMap((value) => (value ?? "").split(/[,\n]/))
+      .map((value) => value.trim())
+      .filter(Boolean)
+  )];
+
 const optionalAddress = (name: string) => {
   const value = optional(name)?.trim() || null;
   if (!value || value.toLowerCase() === ZERO_ADDRESS.toLowerCase()) {
@@ -30,6 +43,7 @@ export const config = {
   mantleSepoliaRpcUrl: required("MANTLE_SEPOLIA_RPC_URL", "https://rpc.sepolia.mantle.xyz"),
   biconomyApiKey: optional("BICONOMY_API_KEY"),
   biconomyMeeUrl: optional("BICONOMY_MEE_URL"),
+  pimlicoApiKey: optional("PIMLICO_API_KEY"),
   vaultProviderStrategy: required("NEURALRATE_VAULT_PROVIDER_STRATEGY", "safe"),
   onboardingProvider: required("NEURALRATE_ONBOARDING_PROVIDER", "privy"),
   managedSignerProvider: required("NEURALRATE_MANAGED_SIGNER_PROVIDER", "turnkey"),
@@ -41,6 +55,16 @@ export const config = {
   safe7579LaunchpadAddress: optionalAddress("NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS"),
   delegateValidatorAddress: optionalAddress("NEURALRATE_DELEGATE_VALIDATOR_ADDRESS"),
   aaBundlerUrl: optional("NEURALRATE_4337_BUNDLER_URL"),
+  aaBundlerUrls: (() => {
+    const explicitPrimary = optional("NEURALRATE_4337_BUNDLER_URL");
+    const explicitFallbacks = optional("NEURALRATE_4337_BUNDLER_FALLBACK_URLS");
+    const pimlicoApiKey = optional("PIMLICO_API_KEY");
+    const derivedPrimary = pimlicoApiKey
+      ? `https://api.pimlico.io/v2/${MANTLE_SEPOLIA_CHAIN_ID}/rpc?apikey=${pimlicoApiKey.trim()}`
+      : null;
+
+    return parseList(explicitPrimary || derivedPrimary, explicitFallbacks);
+  })(),
   aaEntryPointAddress: required("NEURALRATE_4337_ENTRYPOINT_ADDRESS", "0x0000000071727De22E5E9d8BAf0edAc6f37da032"),
   erc7484RegistryAddress: required("NEURALRATE_ERC7484_REGISTRY_ADDRESS", "0x000000000069E2a187AEFFb852bF3cCdC95151B2"),
   agentSmartWallet: requiredAddress("NEURALRATE_AGENT_SMART_WALLET"),

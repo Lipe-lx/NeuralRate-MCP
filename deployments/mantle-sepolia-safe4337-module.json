@@ -1,0 +1,12 @@
+{
+  "network": "mantleSepolia",
+  "chainId": 5003,
+  "contractName": "Safe4337Module",
+  "address": "0x62B79C3dF9F15A94ce821ac558ED74F011bB7a41",
+  "txHash": "0xed25e9d604515f3284fb9e7d7cdb52bf3edf885586316726467ed5bb8b93d1ea",
+  "expectedBytecodeHash": "0x2aea997c4e3cf0e2f333025372e219abcfde81c21fc2f8fb066414a5685dd3e0",
+  "constructorArgs": [
+    "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
+  ],
+  "updatedAt": "2026-05-27T17:22:38.735Z"
+}

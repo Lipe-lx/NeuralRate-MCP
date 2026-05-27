@@ -126,6 +126,49 @@ cd apps/web && npm install && npm run dev
 
 For the web app, the worker is the API surface. The executor is only for worker-to-executor calls.
 
+## Release Workflow
+
+Before opening a PR or pushing a release commit, refresh the checked-in deployment metadata and run the release preflight:
+
+```bash
+npm run sync:deployments
+npm run preflight:release
+```
+
+What these commands do:
+
+- `npm run sync:deployments`
+  - copies the canonical Mantle Sepolia deployment addresses from `deployments/*.json`
+  - updates checked-in examples and worker plaintext bindings such as `apps/worker/wrangler.toml`
+  - keeps the public AA contract addresses aligned across worker, web, and executor examples
+- `npm run preflight:release`
+  - checks the local root `/.env` for the minimum runtime required to operate Worker + executor + AA bundler flow
+  - validates the presence of the AA addresses, Turnkey configuration, internal token, and bundler source
+
+If both commands pass, the repository is ready to be committed. This does **not** mean local secrets from `/.env` will be uploaded by Git push alone.
+
+## Configuration Security
+
+NeuralRate now distinguishes between public Worker bindings and secret Worker/runtime credentials:
+
+- `apps/worker/wrangler.toml`
+  - stores **plaintext non-secret bindings** only
+  - examples: deployed contract addresses, `EXECUTOR_BASE_URL`
+- Cloudflare Worker secrets
+  - store **secret bindings** only
+  - examples: `FRED_API_KEY`, `NANSEN_API_KEY`, `INTERNAL_API_TOKEN`
+- root `/.env`
+  - local operator file
+  - used for local runtime sync and preflight checks
+  - must **not** be committed
+
+Important security rules:
+
+- Do not put API keys, internal tokens, or signer credentials in `wrangler.toml`.
+- Do not assume `/.env` is visible to GitHub Actions or Cloudflare just because it exists locally.
+- Treat `deployments/*.json` and `wrangler.toml` as the source of truth for non-secret contract addresses that should ship with the repository.
+- Treat secrets as external CI/platform configuration unless you explicitly publish them with Wrangler.
+
 ## Documentation Index
 
 - [docs/architecture.md](docs/architecture.md)

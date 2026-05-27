@@ -12,7 +12,7 @@ import { buildBenchmarkPolicy, buildExecutionPolicy } from "./policy.js";
 import { executeBenchmarkJob } from "./benchmarkExecutor.js";
 import { getApprovedStrategySurface, resolveExecutionPlan } from "./executionPlanner.js";
 import type { StrategyIntent } from "./executionRegistry.js";
-import { canUseAARuntime, sendAAVaultUserOperation } from "./aaRuntime.js";
+import { canUseAARuntime, getAARuntimeStatus, sendAAVaultUserOperation } from "./aaRuntime.js";
 import { buildAnchorSnapshotCalldata, ensureAnchoredSnapshot, getActivePolicy } from "./onchainPolicy.js";
 
 const dataApi = new DataApiClient(config.dataApiBaseUrl.replace(/\/+$/, ""), config.internalApiToken);
@@ -163,6 +163,7 @@ createServer(async (request, response) => {
     const url = new URL(request.url, `http://${request.headers.host || "127.0.0.1"}`);
 
     if (url.pathname === "/health" && request.method === "GET") {
+      const aaRuntimeStatus = await getAARuntimeStatus(managedSigner);
       sendJson(response, 200, {
         status: "ok",
         service: "neuralrate-executor",
@@ -175,12 +176,14 @@ createServer(async (request, response) => {
         managedSigner: await managedSigner.getPublicAddress(),
         capabilities: managedSigner.getCapabilities(),
         aaRuntime: {
-          enabled: canUseAARuntime(managedSigner),
-          bundlerUrlConfigured: Boolean(config.aaBundlerUrl),
-          entryPointAddress: config.aaEntryPointAddress,
+          enabled: canUseAARuntime(managedSigner) && Boolean(aaRuntimeStatus.selectedBundlerUrl),
+          bundlerUrlsConfigured: config.aaBundlerUrls.length,
+          selectedBundlerUrl: aaRuntimeStatus.selectedBundlerUrl,
+          entryPointAddress: aaRuntimeStatus.entryPointAddress,
           safe7579AdapterAddress: config.safe7579AdapterAddress,
           safe7579LaunchpadAddress: config.safe7579LaunchpadAddress,
           delegateValidatorAddress: config.delegateValidatorAddress,
+          endpoints: aaRuntimeStatus.endpoints,
         },
         approvedStrategies: getApprovedStrategySurface().strategyKeys,
       });

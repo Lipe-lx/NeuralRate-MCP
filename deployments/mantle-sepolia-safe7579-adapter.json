@@ -1,0 +1,10 @@
+{
+  "network": "mantleSepolia",
+  "chainId": 5003,
+  "contractName": "Safe7579",
+  "address": "0x7ec994fD2F774Fb8AAe472C349ED3E64E0A15FEa",
+  "txHash": "0x826b2b9a911ffe1f44e940534aed9e5cea4a44d250ee70ff8d09da3a7d9e1629",
+  "expectedBytecodeHash": "0xfeb3546eac03e228c3734a9edc703a6d865e4ff2efeb6dced79101bfc8df12e2",
+  "constructorArgs": [],
+  "updatedAt": "2026-05-27T17:22:08.995Z"
+}

@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "presync-env": "node ../../scripts/sync-runtime-envs.mjs",
+    "predev": "npm run presync-env",
+    "prebuild": "npm run presync-env",
+    "prestart": "npm run presync-env",
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",

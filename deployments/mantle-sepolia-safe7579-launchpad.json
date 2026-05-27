@@ -1,0 +1,13 @@
+{
+  "network": "mantleSepolia",
+  "chainId": 5003,
+  "contractName": "Safe7579Launchpad",
+  "address": "0x16794305Ccd57F815cf81d7fE20d6B6b4E82AAd2",
+  "txHash": "0xbd4dd25e9b3b7443d3b5ce1f32cc239fd2ad0e70effb44aba7dd867777945148",
+  "expectedBytecodeHash": "0x10238e6dbf689bfc0d94e2dd72c48f0e66e3d90c274bab4d66fe2e6b82516caf",
+  "constructorArgs": [
+    "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+    "0x000000000069E2a187AEFFb852bF3cCdC95151B2"
+  ],
+  "updatedAt": "2026-05-27T17:22:22.880Z"
+}
