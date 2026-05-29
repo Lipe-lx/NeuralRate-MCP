@@ -1,5 +1,12 @@
 import { getApprovedStrategySurface } from "./executionPlanner.js";
-import { config } from "./config.js";
+
+const parseRuntimeChainId = () => {
+  const raw =
+    typeof process !== "undefined" && process.env
+      ? Number.parseInt(process.env.NEURALRATE_CHAIN_ID || "", 10)
+      : Number.NaN;
+  return Number.isFinite(raw) ? raw : 5003;
+};
 
 export type PolicyRequest = {
   ownerEoa: string;
@@ -53,9 +60,9 @@ export function buildExecutionPolicy(input: PolicyRequest, policyVersion: string
     validAfter,
     validUntil,
     humanSummary:
-      `Delegated execution on chain ${config.chainId} with registry-pinned strategy contracts, selectors, spend caps, and bounded lifetime.`,
+      `Delegated execution on chain ${parseRuntimeChainId()} with registry-pinned strategy contracts, selectors, spend caps, and bounded lifetime.`,
     rawPolicy: {
-      allowedChains: [config.chainId],
+      allowedChains: [parseRuntimeChainId()],
       approvedStrategyKeys: approvedSurface.strategyKeys,
       allowedContracts,
       allowedSelectors,

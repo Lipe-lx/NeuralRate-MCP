@@ -2,14 +2,31 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const repoRoot = path.resolve(__dirname, "../../..");
+const resolveEnvFiles = () => {
+  try {
+    const moduleUrl =
+      typeof import.meta !== "undefined" &&
+      import.meta &&
+      typeof import.meta.url === "string"
+        ? import.meta.url
+        : null;
 
-const envFiles = [
-  path.join(repoRoot, ".env"),
-  path.join(repoRoot, "apps", "executor", ".env.local"),
-];
+    if (!moduleUrl || !moduleUrl.startsWith("file:")) {
+      return [];
+    }
+
+    const __filename = fileURLToPath(moduleUrl);
+    const __dirname = path.dirname(__filename);
+    const repoRoot = path.resolve(__dirname, "../../..");
+
+    return [
+      path.join(repoRoot, ".env"),
+      path.join(repoRoot, "apps", "executor", ".env.local"),
+    ];
+  } catch {
+    return [];
+  }
+};
 
 const parseEnvFile = (source: string) => {
   const parsed = new Map<string, string>();
@@ -42,6 +59,11 @@ let loaded = false;
 export const loadExecutorEnv = () => {
   if (loaded) return;
   loaded = true;
+
+  const envFiles = resolveEnvFiles();
+  if (envFiles.length === 0) {
+    return;
+  }
 
   for (const envPath of envFiles) {
     if (!fs.existsSync(envPath)) continue;
