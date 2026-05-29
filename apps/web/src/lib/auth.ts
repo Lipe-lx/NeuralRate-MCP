@@ -71,3 +71,21 @@ export async function signedJsonFetch<T>(args: {
     }),
   });
 }
+
+export async function signedGetJsonFetch<T>(args: {
+  ownerEoa: string;
+  signMessage: SignMessage;
+  url: string;
+}) {
+  const auth = await signMutation(args.ownerEoa, args.signMessage);
+  return fetchJson<T>(args.url, {
+    method: "GET",
+    headers: {
+      "x-neuralrate-auth-owner-eoa": auth.ownerEoa,
+      "x-neuralrate-auth-nonce": auth.nonce,
+      "x-neuralrate-auth-issued-at": auth.issuedAt,
+      "x-neuralrate-auth-expires-at": auth.expiresAt,
+      "x-neuralrate-auth-signature": auth.signature,
+    },
+  });
+}

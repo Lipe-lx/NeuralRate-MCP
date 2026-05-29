@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "presync-docs": "node ../../scripts/sync-public-docs.mjs",
+    "prebuild": "npm run presync-docs",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"

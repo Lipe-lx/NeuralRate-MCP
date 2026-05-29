@@ -7,7 +7,7 @@ import {
   NEURALRATE_AGENT_SMART_WALLET,
   NEURALRATE_BENCHMARK_CONTRACT,
 } from "../config";
-import { signedJsonFetch } from "../lib/auth";
+import { signedGetJsonFetch, signedJsonFetch } from "../lib/auth";
 import { buildLocalSnapshotHash } from "../lib/policyRegistry";
 import type { AutomationState, DecisionRecord } from "../lib/userState";
 import { useWalletContext } from "../context/WalletContext";
@@ -96,6 +96,9 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
   const [error, setError] = useState<string | null>(null);
 
   const ownerEoa = state?.ownerEoa ?? null;
+  const hasVault = Boolean(state?.vault?.vault_id);
+  const hasConfig = Boolean(state?.config);
+  const isRecommendOnlyPath = !hasVault;
 
   const fetchHistory = async () => {
     if (!ownerEoa) {
@@ -106,11 +109,11 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/benchmark/history?ownerEoa=${encodeURIComponent(ownerEoa)}&limit=25`);
-      if (!response.ok) {
-        throw new Error(`History request failed: ${response.status}`);
-      }
-      const json = (await response.json()) as { success: boolean; decisions: DecisionRecord[] };
+      const json = await signedGetJsonFetch<{ success: boolean; decisions: DecisionRecord[] }>({
+        ownerEoa,
+        signMessage: wallet.signMessage,
+        url: `${API_BASE_URL}/benchmark/history?ownerEoa=${encodeURIComponent(ownerEoa)}&limit=25`,
+      });
       setDecisions(json.decisions);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to load benchmark history.";
@@ -122,7 +125,7 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
 
   useEffect(() => {
     void fetchHistory();
-  }, [ownerEoa]);
+  }, [ownerEoa, wallet.signMessage]);
 
   useEffect(() => {
     if (state?.config?.max_automation_usd) {
@@ -131,8 +134,8 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
   }, [state?.config?.max_automation_usd]);
 
   const generateDecision = async () => {
-    if (!ownerEoa || !state?.config || !state.vault) {
-      setError("Create your user vault and save agent settings before generating a decision.");
+    if (!ownerEoa || !state?.config) {
+      setError("Connect your wallet and save agent settings before generating a decision.");
       return;
     }
 
@@ -200,14 +203,20 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
           allocationJson: JSON.stringify(allocation.allocations),
           benchmarkStatus: "local",
           userId: state.userId,
-          vaultId: state.vault.vault_id,
-          policyVersion: state.config.policy_version,
+          vaultId: state.vault?.vault_id ?? null,
+          policyVersion: state.config?.policy_version ?? "recommend-only-v1",
           objective: allocation.objective,
-          automationMode: allocation.automationMode,
+          automationMode: state.vault ? allocation.automationMode : "recommend-only",
           appliedConstraintsJson: JSON.stringify(allocation.appliedConstraints),
           rationaleJson: JSON.stringify({
             ...allocation.rationale,
             automationEligibility: allocation.automationEligibility,
+            snapshotLineage: {
+              method: "keccak256(canonical-json-v1)",
+              payload: snapshotPayload,
+              hash: snapshotHash,
+              snapshotCid: `inline-rationale:${decisionId}`,
+            },
           }),
         },
       });
@@ -303,14 +312,14 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
             <div>
               <h2 style={{ margin: 0, fontSize: "1.1rem" }}>Benchmark History</h2>
               <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginTop: "0.2rem" }}>
-                Personalized decisions constrained by the current user vault policy
+                Personalized decisions with a recommend-first flow and optional vault automation
               </div>
             </div>
             <button
               onClick={() => {
                 void generateDecision();
               }}
-              disabled={loading || busy || !state?.config}
+              disabled={loading || busy || !hasConfig}
               style={{
                 border: "none",
                 background: "var(--color-lime)",
@@ -331,7 +340,11 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
             <div className="decision-ledger-summary-card accent">
               <div className="vault-swiss-kicker">Recorded Decisions</div>
               <div className="decision-ledger-summary-value">{decisions.length}</div>
-              <div className="decision-ledger-summary-note">Every benchmark candidate generated for this vault.</div>
+              <div className="decision-ledger-summary-note">
+                {hasVault
+                  ? "Every benchmark candidate generated for this vault."
+                  : "Recommendations generated before vault setup."}
+              </div>
             </div>
             <div className="decision-ledger-summary-card">
               <div className="vault-swiss-kicker">Queued / Onchain</div>
@@ -356,7 +369,9 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
                 <input type="number" value={amountUsd} onChange={(event) => setAmountUsd(Number(event.target.value))} style={{ width: "100%", marginTop: "0.25rem" }} />
               </label>
               <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
-                NeuralRate reads global Mantle yield data, then ranks opportunities only inside the limits of this user's vault policy. No shared treasury is used across users.
+                {isRecommendOnlyPath
+                  ? "NeuralRate can generate recommendations immediately. Create a vault later to turn these decisions into autonomous benchmark jobs."
+                  : "NeuralRate reads global Mantle yield data, then ranks opportunities inside this user's vault policy. No shared treasury is used across users."}
               </div>
             </div>
           </div>
@@ -492,7 +507,9 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
 
             {!loading && decisions.length === 0 && (
               <div className="decision-ledger-empty">
-                No personalized decisions yet. Bootstrap the vault, save settings, and generate the first benchmark decision.
+                {hasVault
+                  ? "No personalized decisions yet. Save settings and generate the first benchmark decision."
+                  : "No recommendations yet. Generate your first decision now, then bootstrap a vault when you're ready for automation."}
               </div>
             )}
           </div>

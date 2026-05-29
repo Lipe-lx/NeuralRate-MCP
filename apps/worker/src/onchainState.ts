@@ -34,6 +34,8 @@ const asString = (value: unknown) => (typeof value === "string" ? value : "");
 
 export async function withOnchainPolicyState<T extends Record<string, unknown>>(state: T, env: {
   MANTLE_SEPOLIA_RPC_URL?: string;
+  NEURALRATE_CHAIN_ID?: string;
+  NEURALRATE_CHAIN_NAME?: string;
   NEURALRATE_POLICY_REGISTRY_CONTRACT?: string;
   NEURALRATE_EXECUTION_GUARD_CONTRACT?: string;
   NEURALRATE_SAFE_4337_MODULE_ADDRESS?: string;
@@ -45,14 +47,17 @@ export async function withOnchainPolicyState<T extends Record<string, unknown>>(
   const vaultAddress = asString((state.vault as Record<string, unknown> | null)?.vault_address);
   const policyRegistryAddress = env.NEURALRATE_POLICY_REGISTRY_CONTRACT?.trim();
   const rpcUrl = env.MANTLE_SEPOLIA_RPC_URL?.trim() || "https://rpc.sepolia.mantle.xyz";
+  const chainId = Number.parseInt(env.NEURALRATE_CHAIN_ID || "", 10);
+  const runtimeChainId = Number.isFinite(chainId) ? chainId : 5003;
+  const runtimeChainName = env.NEURALRATE_CHAIN_NAME?.trim() || "Mantle Sepolia";
 
   let onchainPolicy: Record<string, unknown> | null = null;
   if (policyRegistryAddress && vaultAddress) {
     try {
       const publicClient = createPublicClient({
         chain: defineChain({
-          id: 5003,
-          name: "Mantle Sepolia",
+          id: runtimeChainId,
+          name: runtimeChainName,
           nativeCurrency: { name: "MNT", symbol: "MNT", decimals: 18 },
           rpcUrls: { default: { http: [rpcUrl] } },
         }),

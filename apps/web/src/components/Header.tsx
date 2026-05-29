@@ -8,14 +8,15 @@ type HeaderProps = {
   vaultTabsVisible?: boolean;
   activeVaultTab?: VaultHeaderTab;
   onVaultTabChange?: (tab: VaultHeaderTab) => void;
+  compact?: boolean;
 };
 
-const Header: React.FC<HeaderProps> = ({ vaultTabsVisible = false, activeVaultTab, onVaultTabChange }) => {
+const Header: React.FC<HeaderProps> = ({ vaultTabsVisible = false, activeVaultTab, onVaultTabChange, compact = false }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { isConnected, isConnecting, isCorrectChain, shortAddress, connect, disconnect, switchToMantle, error } = useWalletContext();
 
   return (
-    <header className="animate-enter" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', padding: '0.75rem 0', marginBottom: '1rem', flexShrink: 0 }}>
+    <header className="animate-enter" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', padding: compact ? '0.35rem 0' : '0.75rem 0', marginBottom: compact ? '0.25rem' : '1rem', flexShrink: 0 }}>
       {vaultTabsVisible && activeVaultTab && onVaultTabChange ? (
         <div className="vault-subnav vault-subnav-header">
           <button className={`vault-subnav-item ${activeVaultTab === 'vault' ? 'active' : ''}`} onClick={() => onVaultTabChange('vault')}>
@@ -34,14 +35,16 @@ const Header: React.FC<HeaderProps> = ({ vaultTabsVisible = false, activeVaultTa
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="btn-premium btn-premium-agent"
-            title="Connect AI Agent to MCP"
-          >
-            <span className="agent-dot agent-dot-active"></span>
-            <span style={{ fontSize: '0.8rem', fontWeight: 600, letterSpacing: '0.5px' }}>AGENT ACCESS</span>
-          </button>
+          {!compact && (
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="btn-premium btn-premium-agent"
+              title="Connect AI Agent to MCP"
+            >
+              <span className="agent-dot agent-dot-active"></span>
+              <span style={{ fontSize: '0.8rem', fontWeight: 600, letterSpacing: '0.5px' }}>AGENT ACCESS</span>
+            </button>
+          )}
 
           {!isConnected ? (
             <button

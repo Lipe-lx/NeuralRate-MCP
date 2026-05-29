@@ -4,8 +4,8 @@ import { config } from "./config.js";
 import { ensureAnchoredSnapshot, getActivePolicy } from "./onchainPolicy.js";
 
 const mantleSepolia = defineChain({
-  id: 5003,
-  name: "Mantle Sepolia",
+  id: config.chainId,
+  name: config.chainName,
   nativeCurrency: { name: "MNT", symbol: "MNT", decimals: 18 },
   rpcUrls: {
     default: { http: [config.mantleSepoliaRpcUrl] },
@@ -152,7 +152,7 @@ export async function executeBenchmarkJob(
   const txHash = await signer.signAndSendTransaction({
     to: config.benchmarkContract,
     data: calldata,
-    chainId: 5003,
+    chainId: config.chainId,
   });
 
   const receipt = await publicClient.waitForTransactionReceipt({

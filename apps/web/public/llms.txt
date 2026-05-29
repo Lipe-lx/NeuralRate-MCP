@@ -9,6 +9,7 @@ NeuralRate MCP integrates decentralized finance (DeFi) yields, Nansen on-chain d
 *   [Smart Contract specifications](/docs/smart-contract.md): Detailed information on the on-chain policy registry, execution guard, receipt registry, and Safe vault module path.
 *   [D1 SQLite Database Schema](/docs/database.md): Schema definition for tables tracking decisions, profiles, vaults, and jobs.
 *   [Frontend UI Architecture](/docs/frontend.md): Overview of components, styling tokens, the EIP-1193 zero-dependency wallet bridge, and the Safe/control-wallet ownership handoff.
+*   [Risk Model Specification](/docs/risk-model.md): Deterministic 6-factor risk formula with thresholds and worked examples.
 
 ## Callable Model Context Protocol (MCP) Tools
 The public server exposes the following tools at `/mcp` over Server-Sent Events (SSE):
@@ -25,7 +26,7 @@ Scoped mutation routes exist separately at `/mcp/scoped/config`, `/mcp/scoped/be
 
 ## On-Chain Deployments
 *   **Target Chain:** Mantle Sepolia Testnet (Chain ID `5003`)
-*   **Legacy Benchmark Contract:** [`0xc51560a5512d2A5756435d87319aeaE1bA480165`](https://sepolia.mantlescan.xyz/address/0xc51560a5512d2A5756435d87319aeaE1bA480165)
+*   **Decision Receipt Registry:** [`0xC0C836A220D006398cdE4D5caf529196E63f81A8`](https://sepolia.mantlescan.xyz/address/0xC0C836A220D006398cdE4D5caf529196E63f81A8)
 *   **Turnkey Autonomous Smart Signer:** `0xc57130F28f3d670cA75AD9a78784966B767E55e3`
 *   **ERC-8004 Registry Agent ID:** `49`
 *   **IPFS Metadata Card:** `ipfs://QmYDnGppSXsgAiBHFMqmgRraTekqyY5myTvgDZxVxKBNvG`

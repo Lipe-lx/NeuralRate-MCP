@@ -2,15 +2,6 @@ import { createAccount } from "@turnkey/viem";
 import { createWalletClient, http, type Address, type Hex, defineChain } from "viem";
 import { Turnkey } from "@turnkey/sdk-server";
 
-const mantleSepolia = defineChain({
-  id: 5003,
-  name: "Mantle Sepolia",
-  nativeCurrency: { name: "MNT", symbol: "MNT", decimals: 18 },
-  rpcUrls: {
-    default: { http: ["https://rpc.sepolia.mantle.xyz"] },
-  },
-});
-
 export type ManagedSignerCapabilities = {
   canExecute: boolean;
   canSignUserOperations: boolean;
@@ -144,15 +135,23 @@ export class TurnkeyManagedSigner implements ManagedSigner {
     chainId: number;
   }): Promise<string> {
     const account = await this.getAccount();
+    const runtimeChain = defineChain({
+      id: tx.chainId,
+      name: `NeuralRate Chain ${tx.chainId}`,
+      nativeCurrency: { name: "MNT", symbol: "MNT", decimals: 18 },
+      rpcUrls: {
+        default: { http: [this.args.rpcUrl || "https://rpc.sepolia.mantle.xyz"] },
+      },
+    });
 
     const walletClient = createWalletClient({
       account,
-      chain: mantleSepolia,
+      chain: runtimeChain,
       transport: http(this.args.rpcUrl || "https://rpc.sepolia.mantle.xyz"),
     });
 
     const txHash = await walletClient.sendTransaction({
-      chain: mantleSepolia,
+      chain: runtimeChain,
       to: tx.to as Address,
       data: tx.data as Hex,
       value: tx.value,

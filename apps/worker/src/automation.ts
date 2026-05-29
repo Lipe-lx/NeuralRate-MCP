@@ -333,7 +333,7 @@ const defaultAgentConfig = (input: { ownerEoa: string; userId: string; vaultId: 
 });
 
 export class AutomationStore {
-  constructor(private db: D1Database) {}
+  constructor(private db: D1Database, private defaultChainId = 5003) {}
 
   private async resolveIdentity(ownerEoa: string, userId?: string | null, vaultId?: string | null) {
     const normalizedOwner = ownerEoa.toLowerCase();
@@ -386,7 +386,7 @@ export class AutomationStore {
       safeDeploymentStatus: input.safeDeploymentStatus ?? status,
       safeSaltNonce: input.safeSaltNonce ?? "49",
       providerVaultRef: normalizedVaultAddress ? `safe:${normalizedVaultAddress}` : null,
-      chainId: input.chainId ?? 5003,
+      chainId: input.chainId ?? this.defaultChainId,
       status,
       fundingStatus: normalizedVaultAddress ? "needs_funding" : "setup_required",
       automationStatus: "not_enabled",
@@ -402,7 +402,7 @@ export class AutomationStore {
       await this.upsertAccount({
         ownerEoa: normalizedOwner,
         userSmartAccount: normalizedVaultAddress,
-        chainId: input.chainId ?? 5003,
+        chainId: input.chainId ?? this.defaultChainId,
         accountProvider: input.vaultProvider ?? "safe",
         accountKind: "dedicated-safe-vault",
         deploymentStatus: status,
@@ -511,7 +511,7 @@ export class AutomationStore {
         input.vaultKind ?? "dedicated-safe-vault",
         input.vaultProvider ?? "safe",
         normalizeAddress(input.agentScopeWallet),
-        input.chainId ?? 5003,
+        input.chainId ?? this.defaultChainId,
         input.status ?? (normalizedVaultAddress ? "predicted" : "provisioning"),
         input.fundingStatus ?? (normalizedVaultAddress ? "needs_funding" : "setup_required"),
         input.automationStatus ?? "not_enabled",
@@ -778,7 +778,7 @@ export class AutomationStore {
       .bind(
         input.ownerEoa.toLowerCase(),
         normalizeAddress(input.userSmartAccount),
-        input.chainId ?? 5003,
+        input.chainId ?? this.defaultChainId,
         input.accountProvider ?? "safe",
         input.accountKind ?? "dedicated-safe-vault",
         input.deploymentStatus ?? "predicted"
@@ -838,7 +838,7 @@ export class AutomationStore {
         input.policyId,
         input.ownerEoa.toLowerCase(),
         normalizeAddress(input.userSmartAccount),
-        input.chainId ?? 5003,
+        input.chainId ?? this.defaultChainId,
         input.policyVersion,
         input.domain,
         input.status ?? "draft",
@@ -951,7 +951,7 @@ export class AutomationStore {
         input.ownerEoa.toLowerCase(),
         normalizeAddress(input.userSmartAccount),
         input.agentSessionSigner.toLowerCase(),
-        input.chainId ?? 5003,
+        input.chainId ?? this.defaultChainId,
         input.sessionStatus ?? "pending_user",
         input.grantTxHash ?? null,
         input.revokeTxHash ?? null,

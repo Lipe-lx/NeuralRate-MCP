@@ -1,13 +1,14 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { EIP1193Provider } from 'viem';
+import { MANTLE_CHAIN_ID, MANTLE_CHAIN_NAME, MANTLE_EXPLORER_BASE_URL, MANTLE_RPC_URL } from '../config';
 
 // Mantle Sepolia network config
 const MANTLE_SEPOLIA = {
-  chainId: '0x138B', // 5003
-  chainName: 'Mantle Sepolia Testnet',
+  chainId: `0x${MANTLE_CHAIN_ID.toString(16).toUpperCase()}`,
+  chainName: MANTLE_CHAIN_NAME,
   nativeCurrency: { name: 'MNT', symbol: 'MNT', decimals: 18 },
-  rpcUrls: ['https://rpc.sepolia.mantle.xyz'],
-  blockExplorerUrls: ['https://sepolia.mantlescan.xyz']
+  rpcUrls: [MANTLE_RPC_URL],
+  blockExplorerUrls: [MANTLE_EXPLORER_BASE_URL]
 };
 
 export interface InjectedWalletState {
@@ -41,7 +42,7 @@ export function useInjectedWallet(): InjectedWalletState {
   const [error, setError] = useState<string | null>(null);
 
   const isConnected = !!address;
-  const isCorrectChain = chainId === 5003;
+  const isCorrectChain = chainId === MANTLE_CHAIN_ID;
   const shortAddress = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '';
 
   // Listen for account/chain changes
@@ -89,13 +90,13 @@ export function useInjectedWallet(): InjectedWalletState {
       setChainId(currentChainId);
 
       // Auto-switch to Mantle Sepolia if not on it
-      if (currentChainId !== 5003) {
+      if (currentChainId !== MANTLE_CHAIN_ID) {
         try {
           await eth.request({
             method: 'wallet_switchEthereumChain',
             params: [{ chainId: MANTLE_SEPOLIA.chainId }]
           });
-          setChainId(5003);
+          setChainId(MANTLE_CHAIN_ID);
         } catch (switchErr: any) {
           // Chain not added yet — add it
           if (switchErr.code === 4902) {
@@ -103,7 +104,7 @@ export function useInjectedWallet(): InjectedWalletState {
               method: 'wallet_addEthereumChain',
               params: [MANTLE_SEPOLIA]
             });
-            setChainId(5003);
+            setChainId(MANTLE_CHAIN_ID);
           }
         }
       }

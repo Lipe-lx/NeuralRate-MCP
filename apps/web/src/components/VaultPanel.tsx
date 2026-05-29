@@ -234,6 +234,49 @@ const VaultPanel: React.FC<Props> = ({
   const latestJobs = automationJobs.slice(0, 3);
   const onchainPolicy = state?.onchainPolicy ?? null;
   const aa = state?.aa ?? null;
+  const hasFundingIntent = fundingIntentUsd > 0;
+  const hasAutomation = Boolean(activeGrant && activeGrant.status === "active");
+  const hasDemoQueued = automationJobs.length > 0;
+  const onboardingSteps = [
+    {
+      key: "connect",
+      label: "Connect wallet",
+      done: isConnected && isCorrectChain,
+      blockedBy: !isConnected ? "Connect your wallet to continue." : !isCorrectChain ? "Switch to Mantle Sepolia to proceed." : null,
+    },
+    {
+      key: "vault",
+      label: "Create vault",
+      done: Boolean(vault),
+      blockedBy: !vault ? "Bootstrap your dedicated user vault." : null,
+    },
+    {
+      key: "fund",
+      label: "Set funding intent",
+      done: hasFundingIntent,
+      blockedBy: vault && !hasFundingIntent ? "Register an initial funding intent (e.g. $1,000)." : null,
+    },
+    {
+      key: "ownership",
+      label: "Confirm ownership",
+      done: ownershipAcknowledged,
+      blockedBy: vault && !ownershipAcknowledged ? "Review wallet ownership before grants and execution." : null,
+    },
+    {
+      key: "automation",
+      label: "Enable automation",
+      done: hasAutomation,
+      blockedBy: ownershipAcknowledged && !hasAutomation ? "Issue a scoped automation grant from your control wallet." : null,
+    },
+    {
+      key: "strategy",
+      label: "Run first strategy",
+      done: hasDemoQueued,
+      blockedBy: hasAutomation && !hasDemoQueued ? `Queue ${DEMO_TARGET_ASSET} demo to validate end-to-end execution.` : null,
+    },
+  ];
+  const completedSteps = onboardingSteps.filter((step) => step.done).length;
+  const nextStep = onboardingSteps.find((step) => !step.done);
 
   return (
     <section className="glass-panel animate-enter vault-panel">
@@ -319,6 +362,69 @@ const VaultPanel: React.FC<Props> = ({
 
           <div style={{ fontSize: "0.74rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
             Your {controlWalletLabel.toLowerCase()} approves and revokes. The agent only operates inside this vault and within the policy bound to it.
+          </div>
+          <div style={{ fontSize: "0.74rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
+            Signature trail: mutation auth signs API writes, grant signature opens scoped MCP domains, policy publish writes on-chain limits, and Safe/module transactions activate or revoke execution runtime.
+          </div>
+          <div
+            style={{
+              border: "1px solid var(--border-subtle)",
+              borderRadius: "12px",
+              background: "rgba(255,255,255,0.02)",
+              padding: "0.9rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.6rem",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem" }}>
+              <div style={{ fontSize: "0.82rem", color: "var(--text-primary)", fontWeight: 700 }}>Guided Onboarding</div>
+              <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)" }}>
+                {completedSteps}/{onboardingSteps.length} complete
+              </div>
+            </div>
+            {nextStep?.blockedBy && (
+              <div style={{ fontSize: "0.74rem", color: "var(--color-warning)", lineHeight: 1.45 }}>
+                Next unblock: {nextStep.blockedBy}
+              </div>
+            )}
+            <div style={{ display: "grid", gap: "0.5rem" }}>
+              {onboardingSteps.map((step, index) => (
+                <div
+                  key={step.key}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "24px 1fr",
+                    gap: "0.55rem",
+                    alignItems: "start",
+                    opacity: step.done ? 1 : 0.9,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "20px",
+                      height: "20px",
+                      borderRadius: "999px",
+                      display: "grid",
+                      placeItems: "center",
+                      fontSize: "0.7rem",
+                      fontWeight: 700,
+                      background: step.done ? "rgba(223, 246, 81, 0.16)" : "rgba(255,255,255,0.06)",
+                      color: step.done ? "var(--color-lime)" : "var(--text-secondary)",
+                      border: step.done ? "1px solid rgba(223, 246, 81, 0.35)" : "1px solid var(--border-subtle)",
+                    }}
+                  >
+                    {step.done ? "✓" : index + 1}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
+                    <div style={{ fontSize: "0.76rem", color: "var(--text-primary)", fontWeight: 600 }}>{step.label}</div>
+                    {!step.done && step.blockedBy && (
+                      <div style={{ fontSize: "0.71rem", color: "var(--text-secondary)", lineHeight: 1.4 }}>{step.blockedBy}</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {vault && !ownershipAcknowledged && (

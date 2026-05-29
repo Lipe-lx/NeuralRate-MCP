@@ -94,8 +94,7 @@ export const getDecisionsSchema = {
 };
 
 export const getUserStateSchema = {
-  ownerEoa: z.string().optional().describe("Owner address when querying without a session token"),
-  sessionToken: z.string().optional().describe("Active MCP mutation session token"),
+  sessionToken: z.string().describe("Active MCP mutation session token"),
 };
 
 export const bootstrapUserVaultSchema = {
@@ -221,8 +220,7 @@ export const executeStrategySchema = {
 };
 
 export const listJobsSchema = {
-  sessionToken: z.string().optional(),
-  ownerEoa: z.string().optional(),
+  sessionToken: z.string(),
 };
 
 const PRESET_RULES = {

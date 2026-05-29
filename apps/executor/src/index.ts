@@ -17,8 +17,8 @@ import { buildAnchorSnapshotCalldata, ensureAnchoredSnapshot, getActivePolicy } 
 
 const dataApi = new DataApiClient(config.dataApiBaseUrl.replace(/\/+$/, ""), config.internalApiToken);
 const mantleSepolia = defineChain({
-  id: 5003,
-  name: "Mantle Sepolia",
+  id: config.chainId,
+  name: config.chainName,
   nativeCurrency: { name: "MNT", symbol: "MNT", decimals: 18 },
   rpcUrls: {
     default: { http: [config.mantleSepoliaRpcUrl] },
@@ -167,7 +167,7 @@ createServer(async (request, response) => {
       sendJson(response, 200, {
         status: "ok",
         service: "neuralrate-executor",
-        chainId: 5003,
+        chainId: config.chainId,
         benchmarkContract: config.benchmarkContract,
         agentSmartWallet: config.agentSmartWallet,
         vaultProviderStrategy: config.vaultProviderStrategy,
@@ -227,7 +227,7 @@ createServer(async (request, response) => {
         vaultProvider: body.vaultProvider ?? config.vaultProviderStrategy,
         vaultKind: body.vaultKind ?? "dedicated-agent-vault",
         vaultStatus: body.vaultStatus ?? (body.vaultAddress ? "predicted" : "provisioning"),
-        chainId: 5003,
+        chainId: config.chainId,
       });
 
       sendJson(response, 200, { success: true, state });
@@ -291,7 +291,7 @@ createServer(async (request, response) => {
       await dataApi.upsertAccount({
         ownerEoa: scoped.ownerEoa,
         userSmartAccount: body.vaultAddress?.toLowerCase() || scoped.vaultAddress,
-        chainId: 5003,
+        chainId: config.chainId,
         accountProvider: config.vaultProviderStrategy,
         accountKind: "dedicated-agent-vault",
         deploymentStatus: scoped.state.vault?.status ?? "predicted",
@@ -303,7 +303,7 @@ createServer(async (request, response) => {
         policyId,
         ownerEoa: scoped.ownerEoa,
         userSmartAccount: body.vaultAddress?.toLowerCase() || scoped.vaultAddress,
-        chainId: 5003,
+        chainId: config.chainId,
         userId: scoped.userId,
         vaultId: scoped.vaultId,
         ...executionPolicy,
@@ -313,7 +313,7 @@ createServer(async (request, response) => {
         policyId: benchmarkPolicyId,
         ownerEoa: scoped.ownerEoa,
         userSmartAccount: body.vaultAddress?.toLowerCase() || scoped.vaultAddress,
-        chainId: 5003,
+        chainId: config.chainId,
         userId: scoped.userId,
         vaultId: scoped.vaultId,
         ...benchmarkPolicy,
@@ -325,7 +325,7 @@ createServer(async (request, response) => {
         ownerEoa: scoped.ownerEoa,
         userSmartAccount: body.vaultAddress?.toLowerCase() || scoped.vaultAddress,
         agentSessionSigner: signerAddress,
-        chainId: 5003,
+        chainId: config.chainId,
         sessionStatus: "pending_user",
         validAfter: executionPolicy.validAfter,
         validUntil: executionPolicy.validUntil,
@@ -346,7 +346,7 @@ createServer(async (request, response) => {
         agentSessionSigner: signerAddress,
         agentSmartWallet: config.agentSmartWallet.toLowerCase(),
         benchmarkContract: config.benchmarkContract.toLowerCase(),
-        chainId: 5003,
+        chainId: config.chainId,
         executionPolicy,
         benchmarkPolicy,
         approvedStrategies: getApprovedStrategySurface().strategyKeys,
@@ -384,7 +384,7 @@ createServer(async (request, response) => {
         ownerEoa: scoped.ownerEoa,
         userSmartAccount: body.vaultAddress.toLowerCase(),
         agentSessionSigner: signerAddress,
-        chainId: 5003,
+        chainId: config.chainId,
         grantTxHash: body.grantTxHash,
         permissionId: body.permissionId,
         sessionDetails: body.sessionDetails,
@@ -432,7 +432,7 @@ createServer(async (request, response) => {
         ownerEoa: scoped.ownerEoa,
         userSmartAccount: body.vaultAddress.toLowerCase(),
         agentSessionSigner: signerAddress,
-        chainId: 5003,
+        chainId: config.chainId,
         sessionStatus: "revoked",
         grantTxHash: body.grantTxHash,
         revokeTxHash: body.revokeTxHash,
@@ -654,7 +654,7 @@ createServer(async (request, response) => {
           {
             ownerEoa: scoped.ownerEoa,
             vaultAddress: (body.vaultAddress?.toLowerCase() || scoped.vaultAddress),
-            chainId: 5003,
+            chainId: config.chainId,
             policyVersion: onchainPolicy.policyVersion || scoped.policyVersion,
             maxActionUsd: Number(onchainPolicy.maxPerUse),
             maxAutomationUsd: Number(onchainPolicy.maxTotal),
@@ -765,7 +765,7 @@ createServer(async (request, response) => {
             txHash = await managedSigner.signAndSendTransaction({
               to: effectiveTargetContract,
               data: effectiveCalldata,
-              chainId: 5003,
+              chainId: config.chainId,
             });
           }
 

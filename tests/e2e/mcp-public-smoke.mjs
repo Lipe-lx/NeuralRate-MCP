@@ -139,17 +139,35 @@ const main = async () => {
       };
     }
 
-    const userState = await client.callTool({
-      name: 'get_user_state',
-      arguments: { ownerEoa: '0x0000000000000000000000000000000000000000' },
-    });
-    summary.toolCalls.get_user_state = summarizeContent(userState);
+    try {
+      const userState = await client.callTool({
+        name: 'get_user_state',
+        arguments: { ownerEoa: '0x0000000000000000000000000000000000000000' },
+      });
+      summary.toolCalls.get_user_state = summarizeContent(userState);
+      throw new Error('Public get_user_state should reject anonymous ownerEoa-only access.');
+    } catch (error) {
+      summary.toolCalls.get_user_state = {
+        isError: true,
+        text: error instanceof Error ? error.message : String(error),
+        structuredContent: null,
+      };
+    }
 
-    const jobs = await client.callTool({
-      name: 'list_jobs',
-      arguments: { ownerEoa: '0x0000000000000000000000000000000000000000' },
-    });
-    summary.toolCalls.list_jobs = summarizeContent(jobs);
+    try {
+      const jobs = await client.callTool({
+        name: 'list_jobs',
+        arguments: { ownerEoa: '0x0000000000000000000000000000000000000000' },
+      });
+      summary.toolCalls.list_jobs = summarizeContent(jobs);
+      throw new Error('Public list_jobs should reject anonymous ownerEoa-only access.');
+    } catch (error) {
+      summary.toolCalls.list_jobs = {
+        isError: true,
+        text: error instanceof Error ? error.message : String(error),
+        structuredContent: null,
+      };
+    }
 
     await fs.writeFile('/tmp/neuralrate-mcp-smoke-results.json', JSON.stringify(summary, null, 2));
     console.log(JSON.stringify(summary, null, 2));

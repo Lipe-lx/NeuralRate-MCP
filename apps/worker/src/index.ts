@@ -60,6 +60,8 @@ export interface Env {
   NEURALRATE_4337_ENTRYPOINT_ADDRESS?: string;
   NEURALRATE_ERC7484_REGISTRY_ADDRESS?: string;
   MANTLE_SEPOLIA_RPC_URL?: string;
+  NEURALRATE_CHAIN_ID?: string;
+  NEURALRATE_ENV_PROFILE?: string;
   INTERNAL_API_TOKEN?: string;
   EXECUTOR_BASE_URL?: string;
 }
@@ -101,6 +103,26 @@ const getAuthEnvelope = (body: unknown) => {
   return envelope as unknown as MutationAuthEnvelope;
 };
 
+const getHeaderAuthEnvelope = (request: Request) => {
+  const ownerEoa = request.headers.get("x-neuralrate-auth-owner-eoa")?.trim();
+  const nonce = request.headers.get("x-neuralrate-auth-nonce")?.trim();
+  const issuedAt = request.headers.get("x-neuralrate-auth-issued-at")?.trim();
+  const expiresAt = request.headers.get("x-neuralrate-auth-expires-at")?.trim();
+  const signature = request.headers.get("x-neuralrate-auth-signature")?.trim();
+
+  if (!ownerEoa || !nonce || !issuedAt || !expiresAt || !signature) {
+    return null;
+  }
+
+  return {
+    ownerEoa,
+    nonce,
+    issuedAt,
+    expiresAt,
+    signature,
+  } satisfies MutationAuthEnvelope;
+};
+
 const resolveMutationOwner = (body: Record<string, unknown>, field = "ownerEoa") => {
   const value = body[field];
   if (typeof value === "string" && value.trim()) {
@@ -133,6 +155,24 @@ const assertMutationAuthorized = async (
   return { mode: "signed" as const, ownerEoa: verified.ownerEoa };
 };
 
+const assertReadAuthorized = async (
+  request: Request,
+  env: Env,
+  expectedOwner: string
+) => {
+  if (isInternalMutationRequest(request, env.INTERNAL_API_TOKEN ?? null)) {
+    return { mode: "internal" as const, ownerEoa: expectedOwner.toLowerCase() };
+  }
+
+  const auth = getHeaderAuthEnvelope(request);
+  if (!auth) {
+    throw new Error("Missing signed read auth headers.");
+  }
+
+  const verified = await verifyMutationAuthEnvelope(env.DECISIONS_DB, auth, expectedOwner);
+  return { mode: "signed" as const, ownerEoa: verified.ownerEoa };
+};
+
 const resolveAutomationAccess = async (
   request: Request,
   env: Env,
@@ -159,6 +199,59 @@ const resolveAutomationAccess = async (
 
   await assertMutationAuthorized(request, env, body, ownerEoa);
   return resolveAutomationAccessFromOwner(automation, ownerEoa, requiredDomain);
+};
+
+const buildAuditSummary = (state: Record<string, unknown>) => {
+  const events: Array<{ type: string; status: string; at: string | null; detail: string }> = [];
+  const onchainPolicy = (state.onchainPolicy ?? null) as Record<string, unknown> | null;
+  const activeGrant = (state.activeGrant ?? null) as Record<string, unknown> | null;
+  const activeSession = (state.activeSession ?? null) as Record<string, unknown> | null;
+  const benchmarkJobs = Array.isArray(state.benchmarkJobs) ? (state.benchmarkJobs as Array<Record<string, unknown>>) : [];
+  const automationJobs = Array.isArray(state.automationJobs) ? (state.automationJobs as Array<Record<string, unknown>>) : [];
+
+  events.push({
+    type: "policy_published",
+    status: onchainPolicy ? "present" : "missing",
+    at: typeof onchainPolicy?.publishedAt === "string" ? onchainPolicy.publishedAt : null,
+    detail: onchainPolicy ? String(onchainPolicy.policyId ?? "policy") : "No on-chain policy found for this owner.",
+  });
+  events.push({
+    type: "grant_issued",
+    status: activeGrant?.status === "active" ? "active" : activeGrant ? "inactive" : "missing",
+    at: typeof activeGrant?.issued_at === "string" ? activeGrant.issued_at : null,
+    detail: activeGrant ? String(activeGrant.grant_id ?? "grant") : "No active automation grant.",
+  });
+  events.push({
+    type: "session_created",
+    status: activeSession?.session_status ? String(activeSession.session_status) : "missing",
+    at: typeof activeSession?.issued_at === "string" ? activeSession.issued_at : null,
+    detail: activeSession ? String(activeSession.session_id ?? "session") : "No MCP mutation session found.",
+  });
+
+  const blockedJobs = automationJobs.filter((job) => typeof job.failure_reason === "string" && job.failure_reason.length > 0);
+  const executedJobs = automationJobs.filter((job) => typeof job.tx_hash === "string" && job.tx_hash.length > 0);
+  const anchoredReceipts = benchmarkJobs.filter((job) => typeof job.tx_hash === "string" && job.tx_hash.length > 0);
+
+  events.push({
+    type: "strategy_blocked",
+    status: blockedJobs.length > 0 ? "present" : "none",
+    at: typeof blockedJobs[0]?.updated_at === "string" ? String(blockedJobs[0].updated_at) : null,
+    detail: `${blockedJobs.length} blocked automation jobs`,
+  });
+  events.push({
+    type: "strategy_executed",
+    status: executedJobs.length > 0 ? "present" : "none",
+    at: typeof executedJobs[0]?.confirmed_at === "string" ? String(executedJobs[0].confirmed_at) : null,
+    detail: `${executedJobs.length} executed automation jobs`,
+  });
+  events.push({
+    type: "receipt_created",
+    status: anchoredReceipts.length > 0 ? "present" : "none",
+    at: typeof anchoredReceipts[0]?.updated_at === "string" ? String(anchoredReceipts[0].updated_at) : null,
+    detail: `${anchoredReceipts.length} benchmark receipts with tx hash`,
+  });
+
+  return { events };
 };
 
 type ScopedMutationDomain = "config" | "benchmark" | "execution";
@@ -224,14 +317,8 @@ const registerReadonlyCatalog = (
     "get_user_state",
     "Fetches the scoped user, vault, grant, session and job state",
     getUserStateSchema,
-    async ({ ownerEoa, sessionToken }) => {
-      const scopedOwner = sessionToken
-        ? (await resolveAutomationAccessFromSessionToken(automation, sessionToken, "state")).ownerEoa
-        : ownerEoa;
-
-      if (!scopedOwner) {
-        throw new Error("ownerEoa or sessionToken is required.");
-      }
+    async ({ sessionToken }) => {
+      const scopedOwner = (await resolveAutomationAccessFromSessionToken(automation, sessionToken, "state")).ownerEoa;
 
       const state = await withOnchainPolicyState(await automation.getAutomationState(scopedOwner), env);
       return {
@@ -245,14 +332,8 @@ const registerReadonlyCatalog = (
     "list_jobs",
     "Lists scoped benchmark and execution jobs for a user vault",
     listJobsSchema,
-    async ({ sessionToken, ownerEoa }) => {
-      const scopedOwner = sessionToken
-        ? (await resolveAutomationAccessFromSessionToken(automation, sessionToken, "state")).ownerEoa
-        : ownerEoa;
-
-      if (!scopedOwner) {
-        throw new Error("ownerEoa or sessionToken is required.");
-      }
+    async ({ sessionToken }) => {
+      const scopedOwner = (await resolveAutomationAccessFromSessionToken(automation, sessionToken, "state")).ownerEoa;
 
       const [automationJobs, benchmarkJobs] = await Promise.all([
         automation.listAutomationJobs(scopedOwner),
@@ -499,7 +580,15 @@ export default {
         headers: {
           "Access-Control-Allow-Origin": "*",
           "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type, X-NeuralRate-Internal-Token",
+          "Access-Control-Allow-Headers": [
+            "Content-Type",
+            "X-NeuralRate-Internal-Token",
+            "X-NeuralRate-Auth-Owner-Eoa",
+            "X-NeuralRate-Auth-Nonce",
+            "X-NeuralRate-Auth-Issued-At",
+            "X-NeuralRate-Auth-Expires-At",
+            "X-NeuralRate-Auth-Signature",
+          ].join(", "),
         },
       });
     }
@@ -516,7 +605,11 @@ export default {
         const fred = new FredService(env.CACHE_KV, env.FRED_API_KEY);
         const nansen = new NansenService(env.CACHE_KV, env.NANSEN_API_KEY);
         const handlers = new McpToolHandlers(defillama, fred, nansen, env.DECISIONS_DB);
-        const automation = new AutomationStore(env.DECISIONS_DB);
+        const chainId = Number.parseInt(env.NEURALRATE_CHAIN_ID || "", 10);
+        const automation = new AutomationStore(
+          env.DECISIONS_DB,
+          Number.isFinite(chainId) ? chainId : 5003
+        );
 
         if (url.pathname === "/api/auth/nonce" && request.method === "POST") {
           const body = await readJsonBody<{ ownerEoa?: string }>(request);
@@ -546,6 +639,56 @@ export default {
         if (url.pathname === "/api/yields" && request.method === "GET") {
           const res = await handlers.handleYieldScan({ minTvlUsd: 100000, chainFilter: "Mantle" });
           return new Response(res.content[0].text, { headers: corsHeaders });
+        }
+
+        if (url.pathname === "/api/health" && request.method === "GET") {
+          const health = {
+            ok: true,
+            envProfile: env.NEURALRATE_ENV_PROFILE || "demo",
+            env: {
+              hasFredApiKey: Boolean(env.FRED_API_KEY),
+              hasNansenApiKey: Boolean(env.NANSEN_API_KEY),
+              hasExecutorBaseUrl: Boolean(env.EXECUTOR_BASE_URL),
+              hasRpcUrl: Boolean(env.MANTLE_SEPOLIA_RPC_URL),
+              hasInternalToken: Boolean(env.INTERNAL_API_TOKEN),
+            },
+            mcp: {
+              canonicalRoute: MCP_CANONICAL_ROUTE,
+              scopedRoutes: [
+                MCP_SCOPED_ROUTE,
+                MCP_SCOPED_CONFIG_ROUTE,
+                MCP_SCOPED_BENCHMARK_ROUTE,
+                MCP_SCOPED_EXECUTION_ROUTE,
+              ],
+            },
+            timestamp: new Date().toISOString(),
+          };
+
+          return new Response(JSON.stringify(health), { headers: corsHeaders });
+        }
+
+        if (url.pathname === "/api/telemetry/error" && request.method === "POST") {
+          const body = await readJsonBody<Record<string, unknown>>(request);
+          const source = typeof body.source === "string" ? body.source : "unknown";
+          const level = typeof body.level === "string" ? body.level : "error";
+          const message = typeof body.message === "string" ? body.message : "unknown error";
+          const route = typeof body.route === "string" ? body.route : null;
+          const metadata = body.metadata && typeof body.metadata === "object" ? body.metadata : null;
+          const eventId = `evt_${crypto.randomUUID()}`;
+
+          await env.DECISIONS_DB
+            .prepare("INSERT INTO telemetry_events (event_id, source, level, message, route, metadata_json) VALUES (?, ?, ?, ?, ?, ?)")
+            .bind(eventId, source, level, message, route, metadata ? JSON.stringify(metadata) : null)
+            .run();
+
+          return new Response(JSON.stringify({ success: true, eventId }), { headers: corsHeaders });
+        }
+
+        if (url.pathname === "/api/telemetry/summary" && request.method === "GET") {
+          const { results } = await env.DECISIONS_DB
+            .prepare("SELECT level, COUNT(*) as count FROM telemetry_events WHERE datetime(created_at) >= datetime('now', '-1 day') GROUP BY level")
+            .all<Record<string, unknown>>();
+          return new Response(JSON.stringify({ success: true, last24h: results }), { headers: corsHeaders });
         }
 
         const yieldsChartMatch = url.pathname.match(/^\/api\/yields\/chart\/([^/]+)$/);
@@ -659,6 +802,7 @@ export default {
           if (!ownerEoa) {
             return new Response(JSON.stringify({ error: "ownerEoa is required" }), { status: 400, headers: corsHeaders });
           }
+          await assertReadAuthorized(request, env, ownerEoa);
 
           const config = await automation.getAgentConfig(ownerEoa);
           return new Response(JSON.stringify({ success: true, config }), { headers: corsHeaders });
@@ -706,6 +850,7 @@ export default {
           if (!ownerEoa) {
             return new Response(JSON.stringify({ error: "ownerEoa is required" }), { status: 400, headers: corsHeaders });
           }
+          await assertReadAuthorized(request, env, ownerEoa);
 
           const vault = await automation.getVault(ownerEoa);
           return new Response(JSON.stringify({ success: true, vault }), { headers: corsHeaders });
@@ -764,6 +909,27 @@ export default {
           return new Response(res.content[0].text, { headers: corsHeaders });
         }
 
+        const lineageMatch = url.pathname.match(/^\/api\/decisions\/([^/]+)\/lineage$/);
+        if (lineageMatch && request.method === "GET") {
+          const ownerEoa = url.searchParams.get("ownerEoa");
+          if (!ownerEoa) {
+            return new Response(JSON.stringify({ error: "ownerEoa is required" }), { status: 400, headers: corsHeaders });
+          }
+          await assertReadAuthorized(request, env, ownerEoa);
+          const decisionId = decodeURIComponent(lineageMatch[1]);
+
+          const row = await env.DECISIONS_DB
+            .prepare("SELECT decision_id, data_snapshot_hash, allocation_json, applied_constraints_json, rationale_json, created_at FROM decisions WHERE decision_id = ? AND (requested_by = ? OR agent_address = ?) LIMIT 1")
+            .bind(decisionId, ownerEoa.toLowerCase(), ownerEoa.toLowerCase())
+            .first<Record<string, unknown>>();
+
+          if (!row) {
+            return new Response(JSON.stringify({ error: "Decision not found" }), { status: 404, headers: corsHeaders });
+          }
+
+          return new Response(JSON.stringify({ success: true, lineage: row }), { headers: corsHeaders });
+        }
+
         const benchmarkMatch = url.pathname.match(/^\/api\/decisions\/([^/]+)\/benchmark$/);
         if (benchmarkMatch && request.method === "PATCH") {
           const body = await readJsonBody<Record<string, unknown>>(request);
@@ -792,6 +958,7 @@ export default {
           if (!ownerEoa) {
             return new Response(JSON.stringify({ error: "ownerEoa is required" }), { status: 400, headers: corsHeaders });
           }
+          await assertReadAuthorized(request, env, ownerEoa);
 
           const requestedLimit = Number.parseInt(url.searchParams.get("limit") || "", 10);
           const decisions = await automation.listBenchmarkHistory(
@@ -806,9 +973,21 @@ export default {
           if (!ownerEoa) {
             return new Response(JSON.stringify({ error: "ownerEoa is required" }), { status: 400, headers: corsHeaders });
           }
+          await assertReadAuthorized(request, env, ownerEoa);
 
           const state = await withOnchainPolicyState(await automation.getAutomationState(ownerEoa), env);
           return new Response(JSON.stringify(state), { headers: corsHeaders });
+        }
+
+        if (url.pathname === "/api/audit/summary" && request.method === "GET") {
+          const ownerEoa = url.searchParams.get("ownerEoa");
+          if (!ownerEoa) {
+            return new Response(JSON.stringify({ error: "ownerEoa is required" }), { status: 400, headers: corsHeaders });
+          }
+          await assertReadAuthorized(request, env, ownerEoa);
+          const state = await withOnchainPolicyState(await automation.getAutomationState(ownerEoa), env);
+          const summary = buildAuditSummary(state as unknown as Record<string, unknown>);
+          return new Response(JSON.stringify({ success: true, ...summary }), { headers: corsHeaders });
         }
 
         if (url.pathname === "/api/automation/grants/challenge" && request.method === "POST") {

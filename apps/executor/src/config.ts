@@ -13,6 +13,9 @@ const required = (name: string, fallback?: string) => {
 const optional = (name: string, fallback?: string) => process.env[name] ?? fallback ?? null;
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const MANTLE_SEPOLIA_CHAIN_ID = 5003;
+const configuredChainId = Number.parseInt(process.env.NEURALRATE_CHAIN_ID || "", 10);
+const runtimeChainId = Number.isFinite(configuredChainId) ? configuredChainId : MANTLE_SEPOLIA_CHAIN_ID;
+const runtimeChainName = process.env.NEURALRATE_CHAIN_NAME || "Mantle Sepolia";
 const parseList = (...values: Array<string | null>) =>
   [...new Set(
     values
@@ -38,6 +41,9 @@ const requiredAddress = (name: string) => {
 };
 
 export const config = {
+  envProfile: optional("NEURALRATE_ENV_PROFILE", "demo"),
+  chainId: runtimeChainId,
+  chainName: runtimeChainName,
   port: Number(process.env.EXECUTOR_PORT || 8788),
   dataApiBaseUrl: required("NEURALRATE_DATA_API_BASE_URL", "http://127.0.0.1:8787/api"),
   mantleSepoliaRpcUrl: required("MANTLE_SEPOLIA_RPC_URL", "https://rpc.sepolia.mantle.xyz"),
@@ -60,7 +66,7 @@ export const config = {
     const explicitFallbacks = optional("NEURALRATE_4337_BUNDLER_FALLBACK_URLS");
     const pimlicoApiKey = optional("PIMLICO_API_KEY");
     const derivedPrimary = pimlicoApiKey
-      ? `https://api.pimlico.io/v2/${MANTLE_SEPOLIA_CHAIN_ID}/rpc?apikey=${pimlicoApiKey.trim()}`
+      ? `https://api.pimlico.io/v2/${runtimeChainId}/rpc?apikey=${pimlicoApiKey.trim()}`
       : null;
 
     return parseList(explicitPrimary || derivedPrimary, explicitFallbacks);

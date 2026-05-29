@@ -3,7 +3,11 @@ const defaultLocalOrigin = 'http://localhost:8787';
 const defaultPublicWorkerOrigin = 'https://neuralrate-worker.neuralrate.workers.dev';
 const defaultPublicRpcUrl = 'https://rpc.sepolia.mantle.xyz';
 const defaultExplorerBaseUrl = 'https://sepolia.mantlescan.xyz';
-const defaultBenchmarkContract = '0xc51560a5512d2A5756435d87319aeaE1bA480165';
+const defaultMantleChainId = 5003;
+const defaultMantleChainName = 'Mantle Sepolia';
+const defaultMantleNetworkKey = 'mantle-sepolia';
+const defaultEnvProfile = 'demo';
+const defaultBenchmarkContract = '0xC0C836A220D006398cdE4D5caf529196E63f81A8';
 const defaultErc8004AgentId = '49';
 const defaultErc8004IdentityRegistry = '0x8004A818BFB912233c491871b3d84c89A494BD9e';
 const defaultAgentSmartWallet = '0x0000000000000000000000000000000000000000';
@@ -45,6 +49,10 @@ const public4337EntryPointAddress = import.meta.env.VITE_PUBLIC_NEURALRATE_4337_
 const publicDemoStrategyKey = import.meta.env.VITE_PUBLIC_NEURALRATE_DEMO_STRATEGY_KEY?.trim();
 const publicDemoTargetAsset = import.meta.env.VITE_PUBLIC_NEURALRATE_DEMO_TARGET_ASSET?.trim();
 const publicVaultModuleAddress = import.meta.env.VITE_PUBLIC_NEURALRATE_VAULT_MODULE_ADDRESS?.trim();
+const publicMantleChainId = Number.parseInt(import.meta.env.VITE_PUBLIC_MANTLE_CHAIN_ID?.trim() || '', 10);
+const publicMantleChainName = import.meta.env.VITE_PUBLIC_MANTLE_CHAIN_NAME?.trim();
+const publicMantleNetworkKey = import.meta.env.VITE_PUBLIC_MANTLE_NETWORK_KEY?.trim();
+const publicEnvProfile = import.meta.env.VITE_PUBLIC_ENV_PROFILE?.trim();
 const normalizeAddress = (value?: string | null) =>
   value && value.toLowerCase() !== ZERO_ADDRESS.toLowerCase() ? value : '';
 
@@ -80,6 +88,10 @@ export const SCOPED_SSE_URL = isLocal
 export const MCP_PROTOCOL_URL = MCP_HTTP_URL.replace(/^http/, 'mcp+sse');
 export const MANTLE_RPC_URL = trimTrailingSlash(publicRpcUrl || defaultPublicRpcUrl);
 export const MANTLE_EXPLORER_BASE_URL = trimTrailingSlash(publicExplorerBaseUrl || defaultExplorerBaseUrl);
+export const MANTLE_CHAIN_ID = Number.isFinite(publicMantleChainId) ? publicMantleChainId : defaultMantleChainId;
+export const MANTLE_CHAIN_NAME = publicMantleChainName || defaultMantleChainName;
+export const MANTLE_NETWORK_KEY = publicMantleNetworkKey || defaultMantleNetworkKey;
+export const ENV_PROFILE = publicEnvProfile || defaultEnvProfile;
 export const NEURALRATE_BENCHMARK_CONTRACT = publicBenchmarkContract || defaultBenchmarkContract;
 export const NEURALRATE_POLICY_REGISTRY_CONTRACT = normalizeAddress(publicPolicyRegistryContract);
 export const NEURALRATE_EXECUTION_GUARD_CONTRACT = normalizeAddress(publicExecutionGuardContract);

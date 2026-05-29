@@ -3,8 +3,8 @@ import type { ManagedSigner } from "./managedSigner.js";
 import { config } from "./config.js";
 
 const mantleSepolia = defineChain({
-  id: 5003,
-  name: "Mantle Sepolia",
+  id: config.chainId,
+  name: config.chainName,
   nativeCurrency: { name: "MNT", symbol: "MNT", decimals: 18 },
   rpcUrls: {
     default: { http: [config.mantleSepoliaRpcUrl] },
@@ -203,7 +203,7 @@ export async function ensureAnchoredSnapshot(args: {
   await args.signer.signAndSendTransaction({
     to: config.policyRegistryContract,
     data: calldata,
-    chainId: 5003,
+    chainId: config.chainId,
   });
 
   return { anchored: true, snapshotHash: normalizedHash };

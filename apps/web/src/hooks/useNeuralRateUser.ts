@@ -6,6 +6,7 @@ import {
   ERC8004_AGENT_ID,
   DEMO_STRATEGY_KEY,
   DEMO_TARGET_ASSET,
+  MANTLE_CHAIN_ID,
   SAFE_7579_ADAPTER_ADDRESS,
   SAFE_7579_LAUNCHPAD_ADDRESS,
   SESSION_POLICY_VERSION,
@@ -19,7 +20,7 @@ import {
   ensureVaultModuleEnabled,
   resolveUserSafeVault,
 } from "../lib/automation";
-import { signedJsonFetch } from "../lib/auth";
+import { signedGetJsonFetch, signedJsonFetch } from "../lib/auth";
 import { buildLocalSnapshotHash, publishActivePolicy, revokeActivePolicy } from "../lib/policyRegistry";
 import type { AutomationState } from "../lib/userState";
 
@@ -58,7 +59,7 @@ type AutomationGrantChallenge = {
   message: string;
 };
 
-const DEFAULT_AUTOMATION_DOMAINS = ["state", "benchmark", "execution"] as const;
+const DEFAULT_AUTOMATION_DOMAINS = ["state", "config", "benchmark", "execution"] as const;
 
 export const useNeuralRateUser = ({
   ownerEoa,
@@ -85,7 +86,11 @@ export const useNeuralRateUser = ({
     setLoading(true);
     setError(null);
     try {
-      const json = await fetchJson<AutomationState>(`${API_BASE_URL}/automation/state?ownerEoa=${encodeURIComponent(targetOwner)}`);
+      const json = await signedGetJsonFetch<AutomationState>({
+        ownerEoa: targetOwner,
+        signMessage,
+        url: `${API_BASE_URL}/automation/state?ownerEoa=${encodeURIComponent(targetOwner)}`,
+      });
       setState(json);
       return json;
     } catch (err) {
@@ -95,7 +100,7 @@ export const useNeuralRateUser = ({
     } finally {
       setLoading(false);
     }
-  }, [ownerEoa]);
+  }, [ownerEoa, signMessage]);
 
   useEffect(() => {
     if (!ownerEoa) {
@@ -145,7 +150,7 @@ export const useNeuralRateUser = ({
           vaultKind: "dedicated-safe-vault",
           vaultStatus: vaultAddress ? "predicted" : "provisioning",
           safeDeploymentStatus: vaultAddress ? "predicted" : "pending",
-          chainId: 5003,
+          chainId: MANTLE_CHAIN_ID,
         },
       });
 

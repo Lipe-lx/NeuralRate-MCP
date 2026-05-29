@@ -21,7 +21,7 @@ The current live Sepolia execution demo is a real native `MNT` transfer routed t
 - **On-chain execution policy is now registry-driven.**
   The web app publishes an active policy on-chain and the executor resolves authority from the policy registry before dispatch.
 - **On-chain receipts are first-class.**
-  New benchmark-style writes target `NeuralRateDecisionReceiptRegistry.sol`; the legacy Sepolia deployment manifest still points to the previous benchmark registry until redeploy.
+  Benchmark-style writes target `NeuralRateDecisionReceiptRegistry.sol` on Sepolia and the deployment manifest tracks that registry.
 - **Vault execution is real.**
   The `NeuralRateVaultModule` executes real calls from the user Safe and can defer enforcement to `NeuralRateExecutionGuard`.
 
@@ -83,8 +83,8 @@ Details and auth rules are in [docs/mcp-server.md](docs/mcp-server.md).
 
 ## Mantle Sepolia Deployments
 
-- Legacy benchmark registry:
-  [`0xc51560a5512d2A5756435d87319aeaE1bA480165`](https://sepolia.mantlescan.xyz/address/0xc51560a5512d2A5756435d87319aeaE1bA480165)
+- Decision receipt registry:
+  [`0xC0C836A220D006398cdE4D5caf529196E63f81A8`](https://sepolia.mantlescan.xyz/address/0xC0C836A220D006398cdE4D5caf529196E63f81A8)
 - Vault module:
   [`0xDAbB583bDE28241F1e3C61B423CF456D07f4DA11`](https://sepolia.mantlescan.xyz/address/0xDAbB583bDE28241F1e3C61B423CF456D07f4DA11)
 - Vault module deploy tx:
@@ -132,6 +132,7 @@ Before opening a PR or pushing a release commit, refresh the checked-in deployme
 
 ```bash
 npm run sync:deployments
+npm run preflight:public
 npm run preflight:release
 ```
 
@@ -202,5 +203,7 @@ Important security rules:
 - [docs/database.md](docs/database.md)
 - [docs/smart-contract.md](docs/smart-contract.md)
 - [docs/frontend.md](docs/frontend.md)
+- [docs/risk-model.md](docs/risk-model.md)
+- [docs/trust-assumptions.md](docs/trust-assumptions.md)
 - [docs/hackathon-submission.md](docs/hackathon-submission.md)
 - [docs/README.md](docs/README.md)

@@ -1,4 +1,5 @@
 import { getApprovedStrategySurface } from "./executionPlanner.js";
+import { config } from "./config.js";
 
 export type PolicyRequest = {
   ownerEoa: string;
@@ -52,9 +53,9 @@ export function buildExecutionPolicy(input: PolicyRequest, policyVersion: string
     validAfter,
     validUntil,
     humanSummary:
-      "Delegated execution on Mantle Sepolia with registry-pinned strategy contracts, selectors, spend caps, and bounded lifetime.",
+      `Delegated execution on chain ${config.chainId} with registry-pinned strategy contracts, selectors, spend caps, and bounded lifetime.`,
     rawPolicy: {
-      allowedChains: [5003],
+      allowedChains: [config.chainId],
       approvedStrategyKeys: approvedSurface.strategyKeys,
       allowedContracts,
       allowedSelectors,

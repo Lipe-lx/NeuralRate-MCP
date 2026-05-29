@@ -1,8 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useExportWallet, usePrivy, useSetWalletRecovery, useWallets } from '@privy-io/react-auth';
 import type { EIP1193Provider } from 'viem';
-
-const MANTLE_SEPOLIA_CHAIN_ID = 5003;
+import { MANTLE_CHAIN_ID, MANTLE_CHAIN_NAME } from '../config';
 
 const parsePrivyChainId = (value: string | null | undefined) => {
   if (!value) {
@@ -81,7 +80,7 @@ export function usePrivyWallet(): PrivyWalletState {
     (embeddedWallet as (typeof embeddedWallet & { recoveryMethod?: string }) | null)?.recoveryMethod ?? null;
   const externalWalletAddress = externalWallet?.address?.toLowerCase() ?? null;
   const isConnected = Boolean(address) && authenticated;
-  const isCorrectChain = chainId === MANTLE_SEPOLIA_CHAIN_ID;
+  const isCorrectChain = chainId === MANTLE_CHAIN_ID;
   const shortAddress = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '';
   const authStrategy = embeddedWalletAddress ? 'privy-passkey-embedded' : 'privy-external-wallet';
   const canExportEmbeddedWallet = Boolean(embeddedWalletAddress);
@@ -113,9 +112,9 @@ export function usePrivyWallet(): PrivyWalletState {
     setError(null);
 
     try {
-      await primaryWallet.switchChain(MANTLE_SEPOLIA_CHAIN_ID);
+      await primaryWallet.switchChain(MANTLE_CHAIN_ID);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to switch to Mantle Sepolia.';
+      const message = err instanceof Error ? err.message : `Failed to switch to ${MANTLE_CHAIN_NAME}.`;
       setError(message);
       throw err;
     }

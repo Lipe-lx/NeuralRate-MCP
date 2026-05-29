@@ -12,6 +12,7 @@ type ExecutorEnv = {
   EXECUTOR_BASE_URL?: string;
   INTERNAL_API_TOKEN?: string;
   NEURALRATE_BENCHMARK_CONTRACT: string;
+  NEURALRATE_CHAIN_ID?: string;
 };
 
 export type ScopedAutomationAccess = {
@@ -108,6 +109,8 @@ export async function issueAutomationGrant(
     issuedVia?: string | null;
   }
 ) {
+  const parsedChainId = Number.parseInt(env.NEURALRATE_CHAIN_ID || "", 10);
+  const resolvedChainId = Number.isFinite(parsedChainId) ? parsedChainId : 5003;
   const challenge = await createAutomationGrantChallenge(store, {
     ownerEoa: args.ownerEoa,
     agentSubject: args.agentSubject,
@@ -179,7 +182,7 @@ export async function issueAutomationGrant(
     policyId: executionPolicyId,
     ownerEoa: challenge.ownerEoa,
     userSmartAccount: challenge.vaultAddress,
-    chainId: 5003,
+    chainId: resolvedChainId,
     status: "active",
     userId: challenge.userId,
     vaultId: challenge.vaultId,
@@ -190,7 +193,7 @@ export async function issueAutomationGrant(
     policyId: benchmarkPolicyId,
     ownerEoa: challenge.ownerEoa,
     userSmartAccount: challenge.vaultAddress,
-    chainId: 5003,
+    chainId: resolvedChainId,
     status: "active",
     userId: challenge.userId,
     vaultId: challenge.vaultId,
@@ -239,7 +242,7 @@ export async function issueAutomationGrant(
     ownerEoa: challenge.ownerEoa,
     userSmartAccount: challenge.vaultAddress,
     agentSessionSigner: challenge.agentSubject,
-    chainId: 5003,
+    chainId: resolvedChainId,
     sessionStatus: "active",
     permissionId: grantId,
     sessionDetails: {
@@ -306,7 +309,7 @@ export async function revokeAutomationGrant(
       ownerEoa: String(activeSession.owner_eoa),
       userSmartAccount: typeof activeSession.user_smart_account === "string" ? activeSession.user_smart_account : undefined,
       agentSessionSigner: String(activeSession.agent_session_signer),
-      chainId: typeof activeSession.chain_id === "number" ? activeSession.chain_id : 5003,
+      chainId: typeof activeSession.chain_id === "number" ? activeSession.chain_id : resolvedChainId,
       sessionStatus: "revoked",
       grantTxHash: typeof activeSession.grant_tx_hash === "string" ? activeSession.grant_tx_hash : undefined,
       revokeTxHash: null,

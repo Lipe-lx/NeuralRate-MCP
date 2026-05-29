@@ -1,11 +1,20 @@
 import React from 'react';
 import { PrivyProvider } from '@privy-io/react-auth';
-import { PRIVY_APP_ID, PRIVY_CLIENT_ID, PRIVY_ENABLED } from '../config';
+import {
+  MANTLE_CHAIN_ID,
+  MANTLE_CHAIN_NAME,
+  MANTLE_EXPLORER_BASE_URL,
+  MANTLE_NETWORK_KEY,
+  MANTLE_RPC_URL,
+  PRIVY_APP_ID,
+  PRIVY_CLIENT_ID,
+  PRIVY_ENABLED,
+} from '../config';
 
 const mantleSepoliaChain = {
-  id: 5003,
-  name: 'Mantle Sepolia',
-  network: 'mantle-sepolia',
+  id: MANTLE_CHAIN_ID,
+  name: MANTLE_CHAIN_NAME,
+  network: MANTLE_NETWORK_KEY,
   nativeCurrency: {
     name: 'Mantle',
     symbol: 'MNT',
@@ -13,13 +22,13 @@ const mantleSepoliaChain = {
   },
   rpcUrls: {
     default: {
-      http: ['https://rpc.sepolia.mantle.xyz'],
+      http: [MANTLE_RPC_URL],
     },
   },
   blockExplorers: {
     default: {
       name: 'Mantlescan',
-      url: 'https://sepolia.mantlescan.xyz',
+      url: MANTLE_EXPLORER_BASE_URL,
     },
   },
   testnet: true,

@@ -2,7 +2,9 @@ import { encodeFunctionData, isAddress, keccak256, parseUnits, stringToHex, toFu
 import { usdyStrategyDeployment } from "./generated/usdyStrategyDeployment.js";
 import { vaultModuleDeployment } from "./generated/vaultModuleDeployment.js";
 
-const MANTLE_SEPOLIA_CHAIN_ID = 5003;
+const parsedChainId =
+  typeof process !== "undefined" ? Number.parseInt(process.env.NEURALRATE_CHAIN_ID || "", 10) : Number.NaN;
+const MANTLE_SEPOLIA_CHAIN_ID = Number.isFinite(parsedChainId) ? parsedChainId : 5003;
 
 export type TokenManifest = {
   symbol: string;

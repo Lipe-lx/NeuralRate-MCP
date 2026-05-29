@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Pool } from '../App';
 import { ApySparkline } from './ApySparkline';
+import { MANTLE_CHAIN_NAME } from '../config';
 
 interface Props {
   pools: Pool[];
@@ -21,7 +22,7 @@ const YieldScanner: React.FC<Props> = ({ pools, loading, onSelectPool, selectedP
           Yield Scanner
         </h2>
         <div style={{ fontSize: '0.875rem', color: 'var(--color-lime)', background: 'var(--color-lime-glow)', padding: '0.2rem 0.6rem', borderRadius: '4px' }}>
-          Live on Mantle Sepolia
+          Live on {MANTLE_CHAIN_NAME}
         </div>
       </div>
 
@@ -30,6 +31,11 @@ const YieldScanner: React.FC<Props> = ({ pools, loading, onSelectPool, selectedP
           <div className="spinner" style={{ width: '24px', height: '24px', border: '3px solid var(--border-subtle)', borderTopColor: 'var(--color-lime)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
           <span style={{ color: 'var(--text-secondary)' }}>Scanning blockchain opportunities...</span>
           <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+        </div>
+      ) : pools.length === 0 ? (
+        <div style={{ height: '180px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', flex: 1, color: 'var(--text-secondary)' }}>
+          <div>No yield pools available yet.</div>
+          <div style={{ fontSize: '0.8rem' }}>Retry in a moment or verify API/provider health in the Verify page.</div>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', overflowY: 'auto', flex: 1, paddingRight: '0.5rem' }}>

@@ -14,6 +14,9 @@
     "cf:worker:publish": "node scripts/publish-worker-from-env.mjs",
     "env:sync:runtime": "node scripts/sync-runtime-envs.mjs",
     "preflight:release": "node scripts/preflight-release.mjs",
+    "preflight:public": "node scripts/preflight-public-proof.mjs",
+    "release:audit": "node scripts/generate-release-audit.mjs",
+    "test:all": "npm --workspace apps/worker test && npm --workspace apps/executor test && npm --workspace contracts test && npm --workspace apps/web build",
     "test:e2e:live": "node tests/e2e/live-web-smoke.mjs",
     "test:e2e:mcp": "node tests/e2e/mcp-public-smoke.mjs"
   }

@@ -18,8 +18,8 @@ import { config } from "./config.js";
 import type { ManagedSigner } from "./managedSigner.js";
 
 const mantleSepolia = defineChain({
-  id: 5003,
-  name: "Mantle Sepolia",
+  id: config.chainId,
+  name: config.chainName,
   nativeCurrency: { name: "MNT", symbol: "MNT", decimals: 18 },
   rpcUrls: {
     default: { http: [config.mantleSepoliaRpcUrl] },
@@ -166,7 +166,7 @@ const probeBundlerEndpoint = async (url: string): Promise<BundlerEndpointStatus>
       chainId: Number.isFinite(chainId) ? chainId : null,
       supportsConfiguredEntryPoint,
       supportedEntryPoints,
-      error: healthy ? null : "Bundler does not match Mantle Sepolia and the configured EntryPoint.",
+      error: healthy ? null : `Bundler does not match chain ${config.chainId} and the configured EntryPoint.`,
     };
   } catch (error) {
     return {
@@ -289,7 +289,7 @@ export async function sendAAVaultUserOperation(args: {
     throw new Error("AA runtime is not configured with a Safe7579 adapter, validator and bundler URL.");
   }
   if (!runtimeStatus.selectedBundlerUrl) {
-    throw new Error("No healthy ERC-4337 bundler endpoint is configured for Mantle Sepolia and the selected EntryPoint.");
+    throw new Error(`No healthy ERC-4337 bundler endpoint is configured for chain ${config.chainId} and the selected EntryPoint.`);
   }
 
   const account = await buildSafe7579Account(args.signer, args.vaultAddress);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { MCP_HTTP_URL, MCP_PROTOCOL_URL, SSE_URL } from '../config';
+import { MCP_HTTP_URL, MCP_PROTOCOL_URL } from '../config';
 
 interface Props {
   isOpen: boolean;
@@ -78,12 +78,12 @@ const McpConnectModal: React.FC<Props> = ({ isOpen, onClose }) => {
           </div>
           <div>
             <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Agent Connection</h2>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Model Context Protocol (MCP) Server</div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Optional MCP access for operator automation</div>
           </div>
         </div>
 
         <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '1.5rem' }}>
-          NeuralRate exposes a canonical MCP endpoint at <code>{MCP_HTTP_URL}</code> and keeps <code>{SSE_URL}</code> as a transport alias for legacy SSE clients.
+          NeuralRate works as a yield terminal without MCP. Use this only if you want an external agent to run grant-scoped actions against your vault policy.
         </p>
 
         <div style={{ marginBottom: '1.5rem' }}>
