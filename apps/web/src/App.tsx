@@ -8,6 +8,7 @@ import VaultPanel from './components/VaultPanel';
 import AgentSettingsPanel from './components/AgentSettingsPanel';
 import WalletOwnershipModal from './components/WalletOwnershipModal';
 import VerifyPanel from './components/VerifyPanel';
+import HomePanel from './components/HomePanel';
 import { useApi } from './hooks/useApi';
 import { WalletProvider } from './context/WalletContext';
 import { useWalletContext } from './context/WalletContext';
@@ -187,41 +188,7 @@ function AppContent() {
       <div className="container" style={{ minHeight: '100vh', padding: '1.25rem', display: 'flex', justifyContent: 'center' }}>
         <div style={{ width: '100%', maxWidth: '1080px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <Header compact />
-          <section className="glass-panel animate-enter" style={{ display: 'grid', gap: '1rem' }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--color-lime)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-              Primary Persona: Yield Operator
-            </div>
-            <h1 style={{ margin: 0, fontSize: '2rem', lineHeight: 1.15 }}>{pageTitle}</h1>
-            <p style={{ color: 'var(--text-secondary)', maxWidth: '760px', lineHeight: 1.6 }}>
-              NeuralRate starts as a decision terminal for Mantle yields. Operators can compare opportunities against the 3M T-Bill benchmark,
-              inspect risk factors, and only then activate non-custodial automation through a user-scoped vault.
-            </p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.65rem' }}>
-              <button className="btn-premium btn-premium-wallet" onClick={() => navigateTo('/app')}>
-                Open App
-              </button>
-              <button className="btn-premium" onClick={() => navigateTo('/verify')}>
-                Open Verify
-              </button>
-              <button className="btn-premium" onClick={() => navigateTo('/docs')}>
-                Read Docs
-              </button>
-            </div>
-          </section>
-          <section className="glass-panel animate-enter delay-100" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '1rem' }}>
-            <article style={{ border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '0.9rem' }}>
-              <h3 style={{ margin: 0, fontSize: '0.95rem' }}>1. Analyze</h3>
-              <p style={{ marginTop: '0.45rem', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>Scan yield venues and rank opportunities with deterministic risk scoring.</p>
-            </article>
-            <article style={{ border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '0.9rem' }}>
-              <h3 style={{ margin: 0, fontSize: '0.95rem' }}>2. Recommend</h3>
-              <p style={{ marginTop: '0.45rem', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>Generate decisions instantly in recommend-only mode before any vault funding.</p>
-            </article>
-            <article style={{ border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '0.9rem' }}>
-              <h3 style={{ margin: 0, fontSize: '0.95rem' }}>3. Automate</h3>
-              <p style={{ marginTop: '0.45rem', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>Enable grant-scoped execution only after ownership review and policy confirmation.</p>
-            </article>
-          </section>
+          <HomePanel onNavigate={navigateTo} />
         </div>
       </div>
     );
@@ -235,7 +202,10 @@ function AppContent() {
           <section className="glass-panel animate-enter">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginBottom: '0.9rem' }}>
               <h1 style={{ margin: 0, fontSize: '1.45rem' }}>{pageTitle}</h1>
-              <button className="btn-premium" onClick={() => navigateTo('/app')}>Open App</button>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button className="btn-premium" onClick={() => navigateTo('/')}>Back to Home</button>
+                <button className="btn-premium btn-premium-wallet" onClick={() => navigateTo('/app')}>Open Terminal</button>
+              </div>
             </div>
             <p style={{ color: 'var(--text-secondary)', marginBottom: '0.95rem' }}>
               Public markdown docs are published as crawler-friendly files under <code>/docs/*</code>.
@@ -275,7 +245,10 @@ function AppContent() {
           <section className="glass-panel animate-enter">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginBottom: '0.8rem' }}>
               <h1 style={{ margin: 0, fontSize: '1.45rem' }}>{pageTitle}</h1>
-              <button className="btn-premium" onClick={() => navigateTo('/app')}>Open App</button>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button className="btn-premium" onClick={() => navigateTo('/')}>Back to Home</button>
+                <button className="btn-premium btn-premium-wallet" onClick={() => navigateTo('/app')}>Open Terminal</button>
+              </div>
             </div>
             <VerifyPanel />
           </section>
@@ -312,15 +285,6 @@ function AppContent() {
             </button>
             <button className={`sidebar-nav-item ${activeTab === 'vault' ? 'active' : ''}`} onClick={() => setActiveTab('vault')}>
               <span>Vault Automation</span>
-            </button>
-            <button className={`sidebar-nav-item`} onClick={() => navigateTo('/verify')}>
-              <span>Verify</span>
-            </button>
-            <button className={`sidebar-nav-item`} onClick={() => navigateTo('/docs')}>
-              <span>Docs</span>
-            </button>
-            <button className={`sidebar-nav-item`} onClick={() => navigateTo('/')}>
-              <span>Home</span>
             </button>
           </nav>
 
