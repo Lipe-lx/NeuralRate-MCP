@@ -1,31 +1,21 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 const resolveEnvFiles = () => {
-  try {
-    const moduleUrl =
-      typeof import.meta !== "undefined" &&
-      import.meta &&
-      typeof import.meta.url === "string"
-        ? import.meta.url
-        : null;
+  const cwd = process.cwd();
+  const candidateRoots = [
+    cwd,
+    path.resolve(cwd, ".."),
+    path.resolve(cwd, "../.."),
+  ];
 
-    if (!moduleUrl || !moduleUrl.startsWith("file:")) {
-      return [];
-    }
+  const repoRoot =
+    candidateRoots.find((root) => fs.existsSync(path.join(root, "apps", "executor"))) ?? cwd;
 
-    const __filename = fileURLToPath(moduleUrl);
-    const __dirname = path.dirname(__filename);
-    const repoRoot = path.resolve(__dirname, "../../..");
-
-    return [
-      path.join(repoRoot, ".env"),
-      path.join(repoRoot, "apps", "executor", ".env.local"),
-    ];
-  } catch {
-    return [];
-  }
+  return [
+    path.join(repoRoot, ".env"),
+    path.join(repoRoot, "apps", "executor", ".env.local"),
+  ];
 };
 
 const parseEnvFile = (source: string) => {
