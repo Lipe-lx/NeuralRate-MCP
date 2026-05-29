@@ -1,4 +1,4 @@
-import { buildBenchmarkPolicy, buildExecutionPolicy } from "../../executor/src/policy.js";
+import { buildBenchmarkPolicy, buildExecutionPolicy } from "./policy";
 import { AutomationStore, type UserAgentConfigInput } from "./automation";
 import {
   buildAutomationGrantDraft,
