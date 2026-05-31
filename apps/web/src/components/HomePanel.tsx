@@ -138,11 +138,13 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate }) => {
     return 'F';
   };
 
-  // State for dynamic features highlight
-  const [activeFeature, setActiveFeature] = useState<number>(0);
 
   return (
     <div className="home-panel-wrapper animate-enter">
+      {/* Background decoration orbs */}
+      <div className="glow-orb-indigo"></div>
+      <div className="glow-orb-lime"></div>
+
       {/* 1. HERO SECTION */}
       <section className="home-hero">
         <div className="hero-status-tag">
@@ -150,17 +152,16 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate }) => {
           <span>Mantle Sepolia Network Active</span>
         </div>
         <h1 className="hero-headline text-gradient">
-          Autonomous Yield Intelligence.<br />
-          Deterministic Risk Mitigation.
+          Intelligence Layer for<br />Autonomous AI Agents.
         </h1>
         <p className="hero-subhead">
-          NeuralRate empowers yield operators with mathematical rigor. Scan opportunities, simulate deterministic risk parameters, and automate secure strategies through non-custodial Safe vaults.
+          NeuralRate empowers AI agents and yield operators with mathematical rigor. Scan web3 opportunities, simulate deterministic risk parameters, and automate secure strategies through non-custodial Safe vaults natively via MCP.
         </p>
 
-        <div className="hero-actions" style={{ display: 'flex', gap: '0.85rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+        <div className="hero-actions">
           <button className="btn-premium btn-premium-wallet hero-btn" onClick={() => onNavigate('/app')}>
             <span>Launch Operator Terminal</span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="btn-arrow">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="btn-arrow" style={{ marginLeft: '0.35rem' }}>
               <line x1="5" y1="12" x2="19" y2="12"></line>
               <polyline points="12 5 19 12 12 19"></polyline>
             </svg>
@@ -168,7 +169,6 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate }) => {
 
           <button 
             className="btn-premium btn-premium-agent hero-btn" 
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             onClick={() => setIsMcpModalOpen(true)}
             title="Connect AI Agent to MCP"
           >
@@ -179,7 +179,7 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate }) => {
       </section>
 
       {/* 2. DYNAMIC RISK SIMULATOR */}
-      <section className="home-section glass-card-premium">
+      <section className="home-section glass-card-premium" id="poc-simulator">
         <div className="section-header-compact">
           <div className="section-kicker">Interactive Proof-of-Concept</div>
           <h2 className="section-title">Deterministic 6-Factor Risk Simulator</h2>
@@ -251,7 +251,7 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate }) => {
                 <select
                   value={volatility}
                   onChange={(e) => setVolatility(e.target.value as 'low' | 'medium' | 'high')}
-                  style={{ width: '100%', padding: '0.55rem' }}
+                  style={{ width: '100%', padding: '0.45rem' }}
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
@@ -311,7 +311,7 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate }) => {
                   <select
                     value={ilRisk}
                     onChange={(e) => setIlRisk(e.target.value as 'yes' | 'no')}
-                    style={{ width: '100%', padding: '0.55rem' }}
+                    style={{ width: '100%', padding: '0.45rem' }}
                   >
                     <option value="no">No</option>
                     <option value="yes">Yes (LP)</option>
@@ -358,11 +358,42 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate }) => {
                 </span>
               </div>
 
-              <div className="rating-display-core">
-                <span className="rating-grade-text">{getRatingLetter(scoreBreakdown.total)}</span>
-                <div className="rating-score-trail">
-                  <span className="score-main">{scoreBreakdown.total.toFixed(0)}</span>
-                  <span className="score-max">/100</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '2rem', flexWrap: 'wrap' }}>
+                {/* Circular conic progress ring */}
+                <div style={{
+                  position: 'relative',
+                  width: '110px',
+                  height: '110px',
+                  borderRadius: '50%',
+                  background: `conic-gradient(${getRatingBadgeColor(scoreBreakdown.classification)} ${scoreBreakdown.total}%, var(--bg-deep) ${scoreBreakdown.total}%)`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+                  transition: 'background 0.3s ease'
+                }}>
+                  <div style={{
+                    width: '94px',
+                    height: '94px',
+                    borderRadius: '50%',
+                    background: 'var(--bg-surface-elevated)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <span className="rating-grade-text" style={{ fontSize: '2.5rem', fontWeight: 800 }}>
+                      {getRatingLetter(scoreBreakdown.total)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="rating-display-core">
+                  <div className="rating-score-trail">
+                    <span className="score-main">{scoreBreakdown.total.toFixed(0)}</span>
+                    <span className="score-max">/100</span>
+                  </div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Safety Multiplier</span>
                 </div>
               </div>
 
@@ -414,33 +445,74 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate }) => {
               )}
             </div>
 
-            {/* Breakdown Mini-List */}
+            {/* Breakdown Mini-List with micro progress bars */}
             <div className="score-mini-breakdown">
               <div className="breakdown-title">Scoring Factor Breakdown</div>
               <div className="breakdown-list">
-                <div className="breakdown-item">
-                  <span>TVL Depth & Liquidity</span>
-                  <strong>{scoreBreakdown.tvlScore} / 20</strong>
+                {/* factor 1 */}
+                <div className="breakdown-item" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', width: '100%' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                    <span>TVL Depth & Liquidity</span>
+                    <strong>{scoreBreakdown.tvlScore} / 20</strong>
+                  </div>
+                  <div style={{ width: '100%', height: '4px', background: 'var(--bg-deep)', borderRadius: '99px', overflow: 'hidden' }}>
+                    <div style={{ width: `${(scoreBreakdown.tvlScore / 20) * 100}%`, height: '100%', background: 'var(--color-lime)', borderRadius: '99px', opacity: 0.8 }} />
+                  </div>
                 </div>
-                <div className="breakdown-item">
-                  <span>Vol/TVL Utilization</span>
-                  <strong>{scoreBreakdown.volScore} / 15</strong>
+
+                {/* factor 2 */}
+                <div className="breakdown-item" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', width: '100%' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                    <span>Vol/TVL Utilization</span>
+                    <strong>{scoreBreakdown.volScore} / 15</strong>
+                  </div>
+                  <div style={{ width: '100%', height: '4px', background: 'var(--bg-deep)', borderRadius: '99px', overflow: 'hidden' }}>
+                    <div style={{ width: `${(scoreBreakdown.volScore / 15) * 100}%`, height: '100%', background: 'var(--color-lime)', borderRadius: '99px', opacity: 0.8 }} />
+                  </div>
                 </div>
-                <div className="breakdown-item">
-                  <span>APY Sustainability</span>
-                  <strong>{scoreBreakdown.apyScore} / 20</strong>
+
+                {/* factor 3 */}
+                <div className="breakdown-item" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', width: '100%' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                    <span>APY Sustainability</span>
+                    <strong>{scoreBreakdown.apyScore} / 20</strong>
+                  </div>
+                  <div style={{ width: '100%', height: '4px', background: 'var(--bg-deep)', borderRadius: '99px', overflow: 'hidden' }}>
+                    <div style={{ width: `${(scoreBreakdown.apyScore / 20) * 100}%`, height: '100%', background: 'var(--color-lime)', borderRadius: '99px', opacity: 0.8 }} />
+                  </div>
                 </div>
-                <div className="breakdown-item">
-                  <span>Yield Composition</span>
-                  <strong>{scoreBreakdown.compScore} / 15</strong>
+
+                {/* factor 4 */}
+                <div className="breakdown-item" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', width: '100%' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                    <span>Yield Composition</span>
+                    <strong>{scoreBreakdown.compScore} / 15</strong>
+                  </div>
+                  <div style={{ width: '100%', height: '4px', background: 'var(--bg-deep)', borderRadius: '99px', overflow: 'hidden' }}>
+                    <div style={{ width: `${(scoreBreakdown.compScore / 15) * 100}%`, height: '100%', background: 'var(--color-lime)', borderRadius: '99px', opacity: 0.8 }} />
+                  </div>
                 </div>
-                <div className="breakdown-item">
-                  <span>Asset Exposure & IL</span>
-                  <strong>{scoreBreakdown.assetScore} / 15</strong>
+
+                {/* factor 5 */}
+                <div className="breakdown-item" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', width: '100%' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                    <span>Asset Exposure & IL</span>
+                    <strong>{scoreBreakdown.assetScore} / 15</strong>
+                  </div>
+                  <div style={{ width: '100%', height: '4px', background: 'var(--bg-deep)', borderRadius: '99px', overflow: 'hidden' }}>
+                    <div style={{ width: `${(scoreBreakdown.assetScore / 15) * 100}%`, height: '100%', background: 'var(--color-lime)', borderRadius: '99px', opacity: 0.8 }} />
+                  </div>
                 </div>
-                <div className="breakdown-item">
-                  <span>Institutional Flow</span>
-                  <strong>{scoreBreakdown.flowScore} / 15</strong>
+
+                {/* factor 6 */}
+                <div className="breakdown-item" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', width: '100%' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                    <span>Institutional Flow</span>
+                    <strong>{scoreBreakdown.flowScore} / 15</strong>
+                  </div>
+                  <div style={{ width: '100%', height: '4px', background: 'var(--bg-deep)', borderRadius: '99px', overflow: 'hidden' }}>
+                    <div style={{ width: `${(scoreBreakdown.flowScore / 15) * 100}%`, height: '100%', background: 'var(--color-lime)', borderRadius: '99px', opacity: 0.8 }} />
+                  </div>
                 </div>
               </div>
             </div>
@@ -448,69 +520,127 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate }) => {
         </div>
       </section>
 
-      {/* 3. CORE FEATURES INTERACTIVE GRID */}
-      <section className="home-section">
-        <div className="section-header-compact" style={{ textAlign: 'center', marginBottom: '2rem' }}>
+      {/* 3. BENTO GRID SECTION */}
+      <section className="home-section" id="features">
+        <div className="section-header-compact" style={{ textAlign: 'center', margin: '0 auto 2.5rem' }}>
           <div className="section-kicker">Core Architecture</div>
-          <h2 className="section-title">Engineered For Institutional Safety</h2>
+          <h2 className="section-title">Engineered For Autonomous Safety</h2>
+          <p className="section-desc" style={{ maxWidth: '600px', margin: '0 auto' }}>
+            A complete ecosystem built to bridge advanced AI models with cryptographically secure on-chain operations.
+          </p>
         </div>
 
-        <div className="features-grid">
-          <div
-            className={`feature-card ${activeFeature === 0 ? 'active' : ''}`}
-            onMouseEnter={() => setActiveFeature(0)}
-          >
-            <div className="feature-icon-wrapper">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-lime)" strokeWidth="2">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-              </svg>
+        <div className="features-bento-grid">
+          {/* Card 1: MCP Yield Automation (span 8) */}
+          <div className="bento-card bento-col-8 active">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+              <div style={{ flex: 1, minWidth: '250px', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                <div className="feature-icon-wrapper">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-lime)" strokeWidth="2">
+                    <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                    <polyline points="2 17 12 22 22 17"></polyline>
+                    <polyline points="2 12 12 17 22 12"></polyline>
+                  </svg>
+                </div>
+                <h3>MCP-Native Yield Automation</h3>
+                <p>
+                  NeuralRate leverages standard WebMCP toolkits to empower AI agents to autonomously scan yield rates, execute Safe multi-sig signatures, and deploy programmatic vaults entirely via the Model Context Protocol.
+                </p>
+              </div>
+
+              {/* Code mock representation */}
+              <div style={{ flex: '0 0 240px' }} className="desktop-actions-only">
+                <div className="bento-code-snippet">
+                  <span className="bento-code-keyword">"tool"</span>: <span className="bento-code-string">"optimize_yield"</span>,<br />
+                  <span className="bento-code-keyword">"params"</span>: &#123;<br />
+                  &nbsp;&nbsp;<span className="bento-code-keyword">"vault"</span>: <span className="bento-code-string">"0x94...1a"</span>,<br />
+                  &nbsp;&nbsp;<span className="bento-code-keyword">"score"</span>: <span className="bento-code-number">88.5</span>,<br />
+                  &nbsp;&nbsp;<span className="bento-code-keyword">"limit"</span>: <span className="bento-code-string">"100%"</span><br />
+                  &#125;
+                </div>
+              </div>
             </div>
-            <h3>1. Deterministic Risk Scopes</h3>
-            <p>
-              NeuralRate relies on strict mathematical boundaries. Every factor (from TVL depth to DEX utilization) is calculated on-chain, eliminating arbitrary opinions.
-            </p>
-            <span className="card-dot-indicator"></span>
           </div>
 
-          <div
-            className={`feature-card ${activeFeature === 1 ? 'active' : ''}`}
-            onMouseEnter={() => setActiveFeature(1)}
-          >
+          {/* Card 2: Multi-Agent Connectivity (span 4) */}
+          <div className="bento-card bento-col-4">
             <div className="feature-icon-wrapper">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-lime)" strokeWidth="2">
-                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-                <polyline points="2 17 12 22 22 17"></polyline>
-                <polyline points="2 12 12 17 22 12"></polyline>
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
               </svg>
             </div>
-            <h3>2. Recommend-First Advisory</h3>
+            <h3>Multi-Agent Connect</h3>
             <p>
-              Compare pools and review yield advice completely free in recommendation-only mode. Onboard and fund automation vaults only when you trust the advice.
+              Plug your existing agent frameworks (LangChain, AutoGPT, Eliza) directly into NeuralRate. Grant restricted programmatic access with cryptographic guardrails.
             </p>
-            <span className="card-dot-indicator"></span>
           </div>
 
-          <div
-            className={`feature-card ${activeFeature === 2 ? 'active' : ''}`}
-            onMouseEnter={() => setActiveFeature(2)}
-          >
+          {/* Card 3: Deterministic Risk Modeling (span 4) */}
+          <div className="bento-card bento-col-4">
+            <div className="feature-icon-wrapper">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-lime)" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="9" y1="3" x2="9" y2="21"></line>
+                <line x1="15" y1="3" x2="15" y2="21"></line>
+                <line x1="3" y1="9" x2="21" y2="9"></line>
+                <line x1="3" y1="15" x2="21" y2="15"></line>
+              </svg>
+            </div>
+            <h3>Deterministic Modeling</h3>
+            <p>
+              Zero opinions. Zero black boxes. Our 6-factor mathematical model translates complex on-chain parameters into a unified, mathematically verifiable safety score.
+            </p>
+          </div>
+
+          {/* Card 4: Non-Custodial Safe Vaults (span 4) */}
+          <div className="bento-card bento-col-4">
             <div className="feature-icon-wrapper">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-lime)" strokeWidth="2">
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                 <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
               </svg>
             </div>
-            <h3>3. Safe Smart Automation</h3>
+            <h3>Safe Smart Accounts</h3>
             <p>
-              Execute strategy steps through non-custodial Safe smart accounts. Guardrails are enforced via cryptographically signed operator policies.
+              Your funds never leave your Safe. Automated strategies execute within signed cryptographic limits, hard-blocked by on-chain policies and multisig bounds.
             </p>
-            <span className="card-dot-indicator"></span>
+          </div>
+
+          {/* Card 5: Mantle Yield Optimization (span 4) */}
+          <div className="bento-card bento-col-4">
+            <div className="feature-icon-wrapper">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-lime)" strokeWidth="2">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+              </svg>
+            </div>
+            <h3>Mantle Yield Optimization</h3>
+            <p>
+              Engineered on Mantle Network for ultra-low costs, sub-second execution speeds, and gas-efficient continuous scanning for continuous automated execution.
+            </p>
+          </div>
+
+          {/* Card 6: Immutable Verification Ledger (span 12) */}
+          <div className="bento-card bento-col-12">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div className="feature-icon-wrapper">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-lime)" strokeWidth="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                </svg>
+              </div>
+              <h3>Immutable Proof & Verification Ledger</h3>
+              <p>
+                Every single advisory decision and automated allocation triggers a cryptographic receipt anchored directly to the Mantle blockchain. The public registry stores hashes of inputs and scoring factors, creating an audit trail that is publicly verifiable forever. No manual database entries, pure cryptographic truth.
+              </p>
+            </div>
           </div>
         </div>
       </section>
 
       {/* 4. VISUAL TIMELINE: DECISION LINEAGE */}
-      <section className="home-section glass-card-premium">
+      <section className="home-section glass-card-premium" id="how-it-works">
         <div className="section-header-compact">
           <div className="section-kicker">Data Verifiability</div>
           <h2 className="section-title">The Cryptographic Decision Lifecycle</h2>
@@ -523,7 +653,7 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate }) => {
           <div className="timeline-node">
             <div className="node-marker">1</div>
             <div className="node-content">
-              <h4>Yield Scan & Parameter Assembly</h4>
+              <h4>Yield Scan & Assembly</h4>
               <p>
                 DEX pools and lending rates are scraped. Key metrics (TVL, stable ratio, average daily volume) are locked in a deterministic envelope.
               </p>
@@ -533,9 +663,9 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate }) => {
           <div className="timeline-node">
             <div className="node-marker">2</div>
             <div className="node-content">
-              <h4>Deterministic Scoring Engine</h4>
+              <h4>Scoring Engine</h4>
               <p>
-                Metrics are parsed through our open-source 6-factor scoring spec. An immutable recommendation rationale is generated with exact mathematical inputs.
+                Metrics are parsed through our open-source 6-factor scoring spec. An immutable recommendation rationale is generated with exact inputs.
               </p>
             </div>
           </div>
@@ -543,9 +673,9 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate }) => {
           <div className="timeline-node">
             <div className="node-marker">3</div>
             <div className="node-content">
-              <h4>Cryptographic Attestation</h4>
+              <h4>Attestation Receipt</h4>
               <p>
-                The advisor generates a unique decision hash. This hash binds the input metrics, risk calculations, and resulting action plan together forever.
+                The advisor generates a unique decision hash. This hash binds the input metrics, risk calculations, and resulting action plan together.
               </p>
             </div>
           </div>
@@ -553,7 +683,7 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate }) => {
           <div className="timeline-node">
             <div className="node-marker">4</div>
             <div className="node-content">
-              <h4>On-Chain Anchoring (Mantle)</h4>
+              <h4>On-Chain Anchoring</h4>
               <p>
                 The transaction is pushed to the Mantle Sepolia network. The `DecisionReceiptRegistry` anchors the hash, creating a permanently verifiable audit trail.
               </p>
@@ -562,36 +692,55 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate }) => {
         </div>
       </section>
 
-      {/* 5. TECH INTEGRATIONS */}
+      {/* 5. TECH INTEGRATIONS & TRUST METRICS BAR */}
       <section className="home-section" style={{ textAlign: 'center' }}>
-        <div className="section-header-compact">
+        <div className="section-header-compact" style={{ margin: '0 auto 1.5rem' }}>
           <div className="section-kicker">Built on standard web3 infrastructure</div>
-          <h2 className="section-title" style={{ fontSize: '1.25rem', color: 'var(--text-secondary)' }}>Powering the NeuralRate Stack</h2>
+          <h2 className="section-title" style={{ fontSize: '1.45rem', color: 'var(--text-secondary)' }}>Powering the NeuralRate Stack</h2>
         </div>
 
         <div className="integrations-grid">
           <div className="integration-badge">
-            <span className="badge-logo font-mono">Mantle</span>
+            <span className="badge-logo">Mantle</span>
             <span>Mantle Network</span>
           </div>
           <div className="integration-badge">
-            <span className="badge-logo font-mono">Safe</span>
+            <span className="badge-logo">Safe</span>
             <span>Safe Contracts</span>
           </div>
           <div className="integration-badge">
-            <span className="badge-logo font-mono">Privy</span>
+            <span className="badge-logo">Privy</span>
             <span>Privy Auth</span>
           </div>
           <div className="integration-badge">
-            <span className="badge-logo font-mono">WebMCP</span>
+            <span className="badge-logo">WebMCP</span>
             <span>Agent Web Tools</span>
+          </div>
+        </div>
+
+        {/* 3-column key metrics */}
+        <div className="trust-metrics-bar">
+          <div className="trust-metric-item">
+            <span className="trust-metric-number">0%</span>
+            <span className="trust-metric-label">Custodial Risk</span>
+            <p className="trust-metric-desc">Funds stay in your Safe smart account, hard-blocked by programmatic policies.</p>
+          </div>
+          <div className="trust-metric-item">
+            <span className="trust-metric-number">100%</span>
+            <span className="trust-metric-label">Verifiable Proofs</span>
+            <p className="trust-metric-desc">Every single allocation decision is anchored directly on the Mantle blockchain.</p>
+          </div>
+          <div className="trust-metric-item">
+            <span className="trust-metric-number">Open</span>
+            <span className="trust-metric-label">Mathematical Specs</span>
+            <p className="trust-metric-desc">Inspect and verify our 6-factor mathematical risk calculations in public specifications.</p>
           </div>
         </div>
       </section>
 
       {/* 6. SEMANTIC FAQ ACCORDIONS */}
       <section className="home-section" style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <div className="section-header-compact" style={{ textAlign: 'center', marginBottom: '2rem' }}>
+        <div className="section-header-compact" style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
           <div className="section-kicker">Operator Answers</div>
           <h2 className="section-title">Frequently Asked Questions</h2>
         </div>
@@ -632,25 +781,34 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate }) => {
               </p>
             </div>
           </details>
+
+          <details className="faq-item">
+            <summary className="faq-summary">How do I connect NeuralRate to my AI Agent?</summary>
+            <div className="faq-content">
+              <p>
+                You can expose NeuralRate functions to your AI agent by starting the NeuralRate MCP Server. Using our WebMCP protocol, your agent can query real-time yield opportunities, inspect pool risks, and trigger safe automated deposits with strict cryptographical permissions.
+              </p>
+            </div>
+          </details>
         </div>
       </section>
 
       {/* 7. BOTTOM CTA SECTION */}
-      <section className="home-section glass-card-premium" style={{ textAlign: 'center', padding: '3rem 2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem', marginTop: '1rem' }}>
-        <div style={{ fontSize: '0.72rem', color: 'var(--color-lime)', textTransform: 'uppercase', letterSpacing: '0.16em', fontWeight: 600 }}>Verify & Audits</div>
-        <h2 style={{ fontSize: '1.65rem', margin: 0, fontWeight: 700 }}>Ready to inspect the audit trails?</h2>
-        <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', maxWidth: '600px', margin: '0 auto 0.75rem', lineHeight: 1.6 }}>
+      <section className="home-section glass-card-premium" style={{ textAlign: 'center', padding: '4rem 2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem', marginTop: '1rem' }}>
+        <div className="section-kicker">Verify & Audits</div>
+        <h2 style={{ fontSize: '2rem', margin: 0, fontWeight: 700, letterSpacing: '-0.02em' }}>Ready to inspect the audit trails?</h2>
+        <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', maxWidth: '600px', margin: '0 auto 0.75rem', lineHeight: 1.6 }}>
           All NeuralRate decisions are backed by cryptographic receipts synced with Mantle. Explore live evidence or read our technical manuals.
         </p>
-        <div className="hero-actions" style={{ display: 'flex', gap: '0.85rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-          <button className="btn-premium hero-btn" onClick={() => onNavigate('/verify')} style={{ padding: '0.75rem 1.5rem', fontSize: '0.82rem' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+        <div className="hero-actions">
+          <button className="btn-premium hero-btn" onClick={() => onNavigate('/verify')}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: '0.35rem' }}>
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
             </svg>
             <span>Verify Evidence Ledger</span>
           </button>
-          <button className="btn-premium hero-btn" onClick={() => onNavigate('/docs')} style={{ padding: '0.75rem 1.5rem', fontSize: '0.82rem' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <button className="btn-premium hero-btn" onClick={() => onNavigate('/docs')}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: '0.35rem' }}>
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
               <polyline points="14 2 14 8 20 8"></polyline>
               <line x1="16" y1="13" x2="8" y2="13"></line>
@@ -663,10 +821,10 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate }) => {
       </section>
 
       {/* FOOTER */}
-      <footer className="home-footer-brand" style={{ width: '100%', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '3rem', marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
-        <div style={{ width: '100%', display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '2rem', textAlign: 'left' }} className="footer-sitemap-grid">
+      <footer className="home-footer-brand">
+        <div className="footer-sitemap-grid">
           {/* Brand Column */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
               <div style={{
                 width: '28px',
@@ -675,55 +833,55 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate }) => {
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 borderRadius: '6px',
-                boxShadow: '0 0 8px var(--color-lime-glow)'
+                boxShadow: '0 0 8px rgba(223, 246, 81, 0.15)'
               }} />
-              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>NeuralRate</h3>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>NeuralRate</h3>
             </div>
-            <p style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
               Yield Operator Terminal and non-custodial automation guardrails powered by Safe smart accounts on Mantle.
             </p>
-            <div className="hero-status-tag" style={{ margin: 0, padding: '0.2rem 0.6rem', fontSize: '0.65rem', alignSelf: 'flex-start' }}>
+            <div className="hero-status-tag" style={{ margin: '0.5rem 0 0 0', padding: '0.25rem 0.75rem', fontSize: '0.65rem', alignSelf: 'flex-start' }}>
               <span className="pulse-dot"></span>
               <span>Sepolia Active</span>
             </div>
           </div>
 
           {/* Column 2: Platform Links */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <h4 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-lime)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Platform</h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', fontSize: '0.78rem' }}>
-              <a href="#" onClick={(e) => { e.preventDefault(); onNavigate('/app'); }} style={{ color: 'var(--text-secondary)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}>Operator Terminal</a>
-              <a href="#" onClick={(e) => { e.preventDefault(); onNavigate('/verify'); }} style={{ color: 'var(--text-secondary)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}>Verify Proof Ledger</a>
-              <a href="#" onClick={(e) => { e.preventDefault(); onNavigate('/docs'); }} style={{ color: 'var(--text-secondary)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}>Documentation Hub</a>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            <h4>Platform</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.85rem' }}>
+              <a href="#" onClick={(e) => { e.preventDefault(); onNavigate('/app'); }}>Operator Terminal</a>
+              <a href="#" onClick={(e) => { e.preventDefault(); onNavigate('/verify'); }}>Verify Proof Ledger</a>
+              <a href="#" onClick={(e) => { e.preventDefault(); onNavigate('/docs'); }}>Documentation Hub</a>
             </div>
           </div>
 
           {/* Column 3: Trust & Security Docs */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <h4 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-lime)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Trust & Safety</h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', fontSize: '0.78rem' }}>
-              <a href="/docs/trust-assumptions.md" target="_blank" rel="noreferrer" style={{ color: 'var(--text-secondary)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}>Trust Assumptions</a>
-              <a href="/docs/risk-model.md" target="_blank" rel="noreferrer" style={{ color: 'var(--text-secondary)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}>6-Factor Risk Model</a>
-              <a href="/docs/mcp-server.md" target="_blank" rel="noreferrer" style={{ color: 'var(--text-secondary)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}>WebMCP Protocol Spec</a>
-              <a href="/docs/architecture.md" target="_blank" rel="noreferrer" style={{ color: 'var(--text-secondary)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}>System Architecture</a>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            <h4>Trust & Safety</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.85rem' }}>
+              <a href="/docs/trust-assumptions.md" target="_blank" rel="noreferrer">Trust Assumptions</a>
+              <a href="/docs/risk-model.md" target="_blank" rel="noreferrer">6-Factor Risk Model</a>
+              <a href="/docs/mcp-server.md" target="_blank" rel="noreferrer">WebMCP Protocol Spec</a>
+              <a href="/docs/architecture.md" target="_blank" rel="noreferrer">System Architecture</a>
             </div>
           </div>
 
           {/* Column 4: Technical Specs */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <h4 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-lime)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Technical Specs</h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', fontSize: '0.78rem' }}>
-              <a href="/docs/smart-contract.md" target="_blank" rel="noreferrer" style={{ color: 'var(--text-secondary)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}>Smart Contract Registry</a>
-              <a href="/docs/database.md" target="_blank" rel="noreferrer" style={{ color: 'var(--text-secondary)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}>D1 Schema & Storage</a>
-              <a href="/docs/frontend.md" target="_blank" rel="noreferrer" style={{ color: 'var(--text-secondary)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}>SPA Client Specs</a>
-              <a href="/docs/deployment.md" target="_blank" rel="noreferrer" style={{ color: 'var(--text-secondary)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}>Deployment Manual</a>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            <h4>Technical Specs</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.85rem' }}>
+              <a href="/docs/smart-contract.md" target="_blank" rel="noreferrer">Smart Contract Registry</a>
+              <a href="/docs/database.md" target="_blank" rel="noreferrer">D1 Schema & Storage</a>
+              <a href="/docs/frontend.md" target="_blank" rel="noreferrer">SPA Client Specs</a>
+              <a href="/docs/deployment.md" target="_blank" rel="noreferrer">Deployment Manual</a>
             </div>
           </div>
         </div>
 
-        <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.04)', paddingTop: '1.5rem', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+        <div style={{ borderTop: '1px solid oklch(100% 0 0 / 0.04)', paddingTop: '2rem', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.25rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
           <span>© {new Date().getFullYear()} NeuralRate. All rights verified on-chain.</span>
-          <div style={{ display: 'flex', gap: '1rem' }}>
+          <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
             <a href="/docs/README.md" target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>Quick Start</a>
             <span>•</span>
             <a href="https://github.com" target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>Open Source</a>

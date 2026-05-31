@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import McpConnectModal from './McpConnectModal';
 import { useWalletContext } from '../context/WalletContext';
 
@@ -13,10 +13,75 @@ type HeaderProps = {
 
 const Header: React.FC<HeaderProps> = ({ vaultTabsVisible = false, activeVaultTab, onVaultTabChange, compact = false }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const { isConnected, isConnecting, isCorrectChain, shortAddress, connect, disconnect, switchToMantle, error } = useWalletContext();
 
+  // Track scroll position to change background opacity
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 15) {
+        setIsScrolled(true);
+      } else {
+        setIsScrolled(false);
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const handleAnchorClick = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
+    e.preventDefault();
+    setIsMobileMenuOpen(false);
+    
+    if (window.location.pathname !== '/') {
+      window.history.pushState({}, '', `/#${id}`);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      
+      // Delay slightly to allow homepage mounting before scroll
+      setTimeout(() => {
+        const el = document.getElementById(id);
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    } else {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const navigateTo = (path: string) => {
+    setIsMobileMenuOpen(false);
+    if (window.location.pathname === path) return;
+    window.history.pushState({}, '', path);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  };
+
   return (
-    <header className="animate-enter" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', padding: compact ? '0.35rem 0' : '0.75rem 0', marginBottom: compact ? '0.25rem' : '1rem', flexShrink: 0 }}>
+    <header 
+      className={`header-premium ${isScrolled ? 'scrolled' : ''} ${compact ? 'homepage-nav' : 'workspace-nav'}`}
+      style={{
+        position: compact ? 'sticky' : 'relative',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 1000,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: compact ? '0.75rem 2rem' : '0.75rem 0',
+        marginBottom: compact ? '0' : '1rem',
+        transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+        background: compact 
+          ? (isScrolled ? 'var(--bg-surface-glass)' : 'transparent') 
+          : 'transparent',
+        backdropFilter: compact && isScrolled ? 'blur(16px)' : 'none',
+        WebkitBackdropFilter: compact && isScrolled ? 'blur(16px)' : 'none',
+        borderBottom: compact 
+          ? (isScrolled ? '1px solid oklch(100% 0 0 / 0.05)' : '1px solid transparent') 
+          : 'none',
+      }}
+    >
+      {/* LEFT: LOGO */}
       {vaultTabsVisible && activeVaultTab && onVaultTabChange ? (
         <div className="vault-subnav vault-subnav-header">
           <button className={`vault-subnav-item ${activeVaultTab === 'vault' ? 'active' : ''}`} onClick={() => onVaultTabChange('vault')}>
@@ -31,11 +96,8 @@ const Header: React.FC<HeaderProps> = ({ vaultTabsVisible = false, activeVaultTa
         </div>
       ) : (
         <div 
-          style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer' }} 
-          onClick={() => {
-            window.history.pushState({}, '', '/');
-            window.dispatchEvent(new PopStateEvent('popstate'));
-          }}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer', zIndex: 1010 }} 
+          onClick={() => navigateTo('/')}
         >
           <div style={{
             width: '32px',
@@ -44,21 +106,82 @@ const Header: React.FC<HeaderProps> = ({ vaultTabsVisible = false, activeVaultTa
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             borderRadius: '8px',
-            boxShadow: '0 0 10px var(--color-lime-glow)'
+            boxShadow: '0 0 10px rgba(223, 246, 81, 0.15)'
           }} />
-          <span style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>NeuralRate</span>
+          <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>NeuralRate</span>
         </div>
       )}
 
-      {!compact && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+      {/* CENTER: NAV LINKS (HOMEPAGE ONLY) */}
+      {compact && (
+        <nav 
+          className={`nav-links-container ${isMobileMenuOpen ? 'mobile-open' : ''}`}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '2rem',
+          }}
+        >
+          <a href="#features" onClick={(e) => handleAnchorClick(e, 'features')} className="nav-link-item">Features</a>
+          <a href="#how-it-works" onClick={(e) => handleAnchorClick(e, 'how-it-works')} className="nav-link-item">How It Works</a>
+          <a href="/docs" onClick={(e) => { e.preventDefault(); navigateTo('/docs'); }} className="nav-link-item">Docs</a>
+          <a href="/verify" onClick={(e) => { e.preventDefault(); navigateTo('/verify'); }} className="nav-link-item">Verify Evidence</a>
+
+          {/* MOBILE ACTIONS */}
+          {isMobileMenuOpen && (
+            <div className="mobile-menu-actions" style={{ display: 'none', flexDirection: 'column', gap: '1rem', width: '100%', marginTop: '2rem' }}>
+              <button 
+                onClick={() => { setIsMobileMenuOpen(false); setIsModalOpen(true); }}
+                className="btn-premium btn-premium-agent"
+                style={{ width: '100%', justifyContent: 'center' }}
+              >
+                <span className="agent-dot"></span>
+                <span>AGENT ACCESS</span>
+              </button>
+              <button 
+                onClick={() => navigateTo('/app')}
+                className="btn-premium btn-premium-wallet"
+                style={{ width: '100%', justifyContent: 'center' }}
+              >
+                <span>LAUNCH TERMINAL</span>
+              </button>
+            </div>
+          )}
+        </nav>
+      )}
+
+      {/* RIGHT: ACTIONS (WALLET / TERMINAL) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', zIndex: 1010 }}>
+        {compact ? (
+          // Homepage actions
+          <div className="desktop-actions-only" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="btn-premium btn-premium-agent"
+              title="Connect AI Agent to MCP"
+              style={{ padding: '0.55rem 1.1rem', fontSize: '0.75rem' }}
+            >
+              <span className="agent-dot"></span>
+              <span style={{ letterSpacing: '0.5px' }}>AGENT ACCESS</span>
+            </button>
+            
+            <button 
+              onClick={() => navigateTo('/app')}
+              className="btn-premium btn-premium-wallet"
+              style={{ padding: '0.55rem 1.1rem', fontSize: '0.75rem' }}
+            >
+              <span>LAUNCH TERMINAL</span>
+            </button>
+          </div>
+        ) : (
+          // Workspace actions (original wallet connections)
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button 
               onClick={() => setIsModalOpen(true)}
               className="btn-premium btn-premium-agent"
               title="Connect AI Agent to MCP"
             >
-              <span className="agent-dot agent-dot-active"></span>
+              <span className="agent-dot"></span>
               <span style={{ fontSize: '0.8rem', fontWeight: 600, letterSpacing: '0.5px' }}>AGENT ACCESS</span>
             </button>
 
@@ -109,8 +232,35 @@ const Header: React.FC<HeaderProps> = ({ vaultTabsVisible = false, activeVaultTa
               </div>
             )}
           </div>
-        </div>
-      )}
+        )}
+
+        {/* MOBILE MENU HAMBURGER (HOMEPAGE ONLY) */}
+        {compact && (
+          <button 
+            className={`hamburger-menu ${isMobileMenuOpen ? 'open' : ''}`}
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            aria-label="Toggle menu"
+            style={{
+              display: 'none',
+              cursor: 'pointer',
+              padding: '0.5rem',
+              flexDirection: 'column',
+              gap: '6px',
+              justifyContent: 'center',
+              alignItems: 'center',
+              width: '40px',
+              height: '40px',
+              borderRadius: '8px',
+              border: '1px solid oklch(100% 0 0 / 0.05)',
+              background: 'oklch(100% 0 0 / 0.02)'
+            }}
+          >
+            <span style={{ width: '20px', height: '2px', background: 'var(--text-primary)', transition: 'all 0.3s' }}></span>
+            <span style={{ width: '20px', height: '2px', background: 'var(--text-primary)', transition: 'all 0.3s' }}></span>
+            <span style={{ width: '20px', height: '2px', background: 'var(--text-primary)', transition: 'all 0.3s' }}></span>
+          </button>
+        )}
+      </div>
 
       {error && (
         <div style={{ position: 'fixed', top: '1rem', right: '1rem', background: 'rgba(255, 77, 79, 0.15)', border: '1px solid rgba(255, 77, 79, 0.3)', color: 'var(--color-danger)', padding: '0.75rem 1rem', borderRadius: '8px', fontSize: '0.8rem', zIndex: 10000, maxWidth: '300px' }}>

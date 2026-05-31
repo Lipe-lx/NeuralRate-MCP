@@ -185,11 +185,9 @@ function AppContent() {
 
   if (route === 'home') {
     return (
-      <div className="container" style={{ minHeight: '100vh', padding: '1.25rem', display: 'flex', justifyContent: 'center' }}>
-        <div style={{ width: '100%', maxWidth: '1080px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <Header compact />
-          <HomePanel onNavigate={navigateTo} />
-        </div>
+      <div className="container" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <Header compact />
+        <HomePanel onNavigate={navigateTo} />
       </div>
     );
   }
