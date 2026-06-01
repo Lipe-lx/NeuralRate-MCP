@@ -15,7 +15,34 @@ const Header: React.FC<HeaderProps> = ({ vaultTabsVisible = false, activeVaultTa
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [activeSection, setActiveSection] = useState<string>('');
   const { isConnected, isConnecting, isCorrectChain, shortAddress, connect, disconnect, switchToMantle, error } = useWalletContext();
+
+  // IntersectionObserver to track active homepage section
+  useEffect(() => {
+    if (!compact) return;
+
+    const sectionIds = ['hero-section', 'poc-simulator', 'how-it-works', 'faq'];
+    const observers: IntersectionObserver[] = [];
+
+    sectionIds.forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) {
+            setActiveSection(id);
+          }
+        },
+        { rootMargin: '-40% 0px -55% 0px', threshold: 0 }
+      );
+      observer.observe(el);
+      observers.push(observer);
+    });
+
+    return () => observers.forEach((o) => o.disconnect());
+  }, [compact]);
 
   // Track scroll position to change background opacity
   useEffect(() => {
@@ -70,14 +97,14 @@ const Header: React.FC<HeaderProps> = ({ vaultTabsVisible = false, activeVaultTa
         alignItems: 'center',
         padding: compact ? '0.75rem 2rem' : '0.75rem 0',
         marginBottom: compact ? '0' : '1rem',
-        transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+        transition: 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
         background: compact 
           ? (isScrolled ? 'var(--bg-surface-glass)' : 'transparent') 
           : 'transparent',
-        backdropFilter: compact && isScrolled ? 'blur(16px)' : 'none',
-        WebkitBackdropFilter: compact && isScrolled ? 'blur(16px)' : 'none',
+        backdropFilter: compact && isScrolled ? 'blur(20px)' : 'none',
+        WebkitBackdropFilter: compact && isScrolled ? 'blur(20px)' : 'none',
         borderBottom: compact 
-          ? (isScrolled ? '1px solid oklch(100% 0 0 / 0.05)' : '1px solid transparent') 
+          ? (isScrolled ? '1px solid oklch(100% 0 0 / 0.08)' : '1px solid transparent') 
           : 'none',
       }}
     >
@@ -94,6 +121,8 @@ const Header: React.FC<HeaderProps> = ({ vaultTabsVisible = false, activeVaultTa
             Benchmark History
           </button>
         </div>
+      ) : compact ? (
+        <div style={{ width: '0px' }} />
       ) : (
         <div 
           style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer', zIndex: 1010 }} 
@@ -122,10 +151,10 @@ const Header: React.FC<HeaderProps> = ({ vaultTabsVisible = false, activeVaultTa
             gap: '2rem',
           }}
         >
-          <a href="#features" onClick={(e) => handleAnchorClick(e, 'features')} className="nav-link-item">Features</a>
-          <a href="#how-it-works" onClick={(e) => handleAnchorClick(e, 'how-it-works')} className="nav-link-item">How It Works</a>
-          <a href="/docs" onClick={(e) => { e.preventDefault(); navigateTo('/docs'); }} className="nav-link-item">Docs</a>
-          <a href="/verify" onClick={(e) => { e.preventDefault(); navigateTo('/verify'); }} className="nav-link-item">Verify Evidence</a>
+          <a href="#hero-section" onClick={(e) => handleAnchorClick(e, 'hero-section')} className={`nav-link-item ${activeSection === 'hero-section' ? 'active' : ''}`}>Home</a>
+          <a href="#poc-simulator" onClick={(e) => handleAnchorClick(e, 'poc-simulator')} className={`nav-link-item ${activeSection === 'poc-simulator' ? 'active' : ''}`}>Risk Simulator</a>
+          <a href="#how-it-works" onClick={(e) => handleAnchorClick(e, 'how-it-works')} className={`nav-link-item ${activeSection === 'how-it-works' ? 'active' : ''}`}>Security Protocol</a>
+          <a href="#faq" onClick={(e) => handleAnchorClick(e, 'faq')} className={`nav-link-item ${activeSection === 'faq' ? 'active' : ''}`}>FAQ</a>
 
           {/* MOBILE ACTIONS */}
           {isMobileMenuOpen && (
@@ -161,13 +190,13 @@ const Header: React.FC<HeaderProps> = ({ vaultTabsVisible = false, activeVaultTa
               title="Connect AI Agent to MCP"
               style={{ padding: '0.55rem 1.1rem', fontSize: '0.75rem' }}
             >
-              <span className="agent-dot"></span>
+              <span className="agent-dot agent-dot-active"></span>
               <span style={{ letterSpacing: '0.5px' }}>AGENT ACCESS</span>
             </button>
             
             <button 
               onClick={() => navigateTo('/app')}
-              className="btn-premium btn-premium-wallet"
+              className="btn-premium btn-premium-wallet shimmer-btn"
               style={{ padding: '0.55rem 1.1rem', fontSize: '0.75rem' }}
             >
               <span>LAUNCH TERMINAL</span>
@@ -241,7 +270,6 @@ const Header: React.FC<HeaderProps> = ({ vaultTabsVisible = false, activeVaultTa
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             aria-label="Toggle menu"
             style={{
-              display: 'none',
               cursor: 'pointer',
               padding: '0.5rem',
               flexDirection: 'column',
