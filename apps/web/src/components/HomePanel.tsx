@@ -21,6 +21,19 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate }) => {
   const [ilRisk, setIlRisk] = useState<'yes' | 'no'>('no');
   const [netFlow, setNetFlow] = useState<number>(150000); // Default $150k inflow
 
+  // Custom Select Dropdowns State
+  const [volDropdownOpen, setVolDropdownOpen] = useState<boolean>(false);
+  const [ilDropdownOpen, setIlDropdownOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleOutsideClick = () => {
+      setVolDropdownOpen(false);
+      setIlDropdownOpen(false);
+    };
+    window.addEventListener('click', handleOutsideClick);
+    return () => window.removeEventListener('click', handleOutsideClick);
+  }, []);
+
   // Interactive Bento Code State
   const [activeCodeTab, setActiveCodeTab] = useState<'mcp' | 'proof'>('mcp');
   const [mcpConsoleLines, setMcpConsoleLines] = useState<string[]>([
@@ -296,20 +309,6 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate }) => {
           NeuralRate grants AI agents mathematical risk profiling, Safe vault orchestration, and immutable receipt logs—delivered through a unified MCP endpoint on Mantle.
         </p>
 
-        <div className="hero-actions" style={{ zIndex: 10 }}>
-          <button className="btn-premium btn-premium-wallet hero-btn shimmer-btn" onClick={() => onNavigate('/app')}>
-            <span>Launch Terminal</span>
-          </button>
-
-          <button 
-            className="btn-premium btn-premium-agent hero-btn" 
-            onClick={() => setIsMcpModalOpen(true)}
-            title="Connect AI Agent to MCP"
-          >
-            <span className="agent-dot agent-dot-active"></span>
-            <span>AGENT ACCESS</span>
-          </button>
-        </div>
 
         {/* Hero Terminal with conic border gradient & floating animations */}
         <div className="hero-terminal-premium" style={{ zIndex: 10 }}>
@@ -473,15 +472,88 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate }) => {
                     <div className="control-header" style={{ marginBottom: '0.35rem', fontSize: '0.85rem' }}>
                       <label style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Asset Vol</label>
                     </div>
-                    <select 
-                      value={volatility} 
-                      onChange={(e) => setVolatility(e.target.value as any)} 
-                      style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '8px', background: 'var(--bg-surface-elevated)', border: '1px solid oklch(100% 0 0 / 0.08)', color: '#fff', fontSize: '0.8rem', outline: 'none' }}
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                    </select>
+                    <div className="custom-select-container" style={{ position: 'relative', width: '100%' }}>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setVolDropdownOpen(!volDropdownOpen);
+                          setIlDropdownOpen(false);
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '0.45rem 0.65rem',
+                          borderRadius: '8px',
+                          background: 'var(--bg-surface-elevated)',
+                          border: '1px solid oklch(100% 0 0 / 0.08)',
+                          color: '#fff',
+                          fontSize: '0.8rem',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          cursor: 'pointer',
+                          fontFamily: 'var(--font-mono)',
+                          textTransform: 'uppercase',
+                          outline: 'none',
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.borderColor = 'rgba(223, 246, 81, 0.25)'}
+                        onMouseLeave={(e) => e.currentTarget.style.borderColor = 'oklch(100% 0 0 / 0.08)'}
+                      >
+                        <span style={{ fontWeight: 600 }}>{volatility}</span>
+                        <span style={{ fontSize: '0.6rem', color: 'var(--color-lime)', transform: volDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block' }}>▼</span>
+                      </button>
+                      {volDropdownOpen && (
+                        <div 
+                          style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            width: '100%',
+                            marginTop: '4px',
+                            background: 'oklch(16% 0.012 240 / 0.95)',
+                            backdropFilter: 'blur(12px)',
+                            border: '1px solid oklch(100% 0 0 / 0.12)',
+                            borderRadius: '8px',
+                            zIndex: 50,
+                            boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {(['low', 'medium', 'high'] as const).map((val) => (
+                            <button
+                              key={val}
+                              onClick={() => {
+                                setVolatility(val);
+                                setVolDropdownOpen(false);
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '0.45rem 0.65rem',
+                                border: 'none',
+                                background: volatility === val ? 'rgba(223, 246, 81, 0.1)' : 'transparent',
+                                color: volatility === val ? 'var(--color-lime)' : 'var(--text-secondary)',
+                                fontSize: '0.75rem',
+                                textAlign: 'left',
+                                cursor: 'pointer',
+                                fontFamily: 'var(--font-mono)',
+                                textTransform: 'uppercase',
+                                display: 'block',
+                                transition: 'all 0.2s',
+                              }}
+                              onMouseEnter={(e) => {
+                                if (volatility !== val) e.currentTarget.style.color = '#fff';
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                              }}
+                              onMouseLeave={(e) => {
+                                if (volatility !== val) e.currentTarget.style.color = 'var(--text-secondary)';
+                                e.currentTarget.style.background = volatility === val ? 'rgba(223, 246, 81, 0.1)' : 'transparent';
+                              }}
+                            >
+                              {val}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -534,14 +606,91 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate }) => {
                   {!isStablecoin && (
                     <div className="control-group" style={{ width: '120px' }}>
                       <div className="control-header" style={{ marginBottom: '0.35rem', fontSize: '0.85rem' }}><label style={{ fontWeight: 700 }}>IL Exposure</label></div>
-                      <select 
-                        value={ilRisk} 
-                        onChange={(e) => setIlRisk(e.target.value as any)} 
-                        style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '8px', background: 'var(--bg-surface-elevated)', border: '1px solid oklch(100% 0 0 / 0.08)', color: '#fff', fontSize: '0.8rem', outline: 'none' }}
-                      >
-                        <option value="no">No IL (Lending)</option>
-                        <option value="yes">Yes (LP Pool)</option>
-                      </select>
+                      <div className="custom-select-container" style={{ position: 'relative', width: '100%' }}>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIlDropdownOpen(!ilDropdownOpen);
+                            setVolDropdownOpen(false);
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '0.45rem 0.65rem',
+                            borderRadius: '8px',
+                            background: 'var(--bg-surface-elevated)',
+                            border: '1px solid oklch(100% 0 0 / 0.08)',
+                            color: '#fff',
+                            fontSize: '0.8rem',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            cursor: 'pointer',
+                            fontFamily: 'var(--font-mono)',
+                            textTransform: 'uppercase',
+                            outline: 'none',
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.borderColor = 'rgba(223, 246, 81, 0.25)'}
+                          onMouseLeave={(e) => e.currentTarget.style.borderColor = 'oklch(100% 0 0 / 0.08)'}
+                        >
+                          <span style={{ fontWeight: 600 }}>{ilRisk === 'yes' ? 'Yes (LP)' : 'No IL'}</span>
+                          <span style={{ fontSize: '0.6rem', color: 'var(--color-lime)', transform: ilDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block' }}>▼</span>
+                        </button>
+                        {ilDropdownOpen && (
+                          <div 
+                            style={{
+                              position: 'absolute',
+                              top: '100%',
+                              left: 0,
+                              width: '100%',
+                              marginTop: '4px',
+                              background: 'oklch(16% 0.012 240 / 0.95)',
+                              backdropFilter: 'blur(12px)',
+                              border: '1px solid oklch(100% 0 0 / 0.12)',
+                              borderRadius: '8px',
+                              zIndex: 50,
+                              boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                              overflow: 'hidden',
+                            }}
+                          >
+                            {[
+                              { value: 'no', label: 'No IL' },
+                              { value: 'yes', label: 'Yes (LP)' }
+                            ].map((opt) => (
+                              <button
+                                key={opt.value}
+                                onClick={() => {
+                                  setIlRisk(opt.value as any);
+                                  setIlDropdownOpen(false);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '0.45rem 0.65rem',
+                                  border: 'none',
+                                  background: ilRisk === opt.value ? 'rgba(223, 246, 81, 0.1)' : 'transparent',
+                                  color: ilRisk === opt.value ? 'var(--color-lime)' : 'var(--text-secondary)',
+                                  fontSize: '0.75rem',
+                                  textAlign: 'left',
+                                  cursor: 'pointer',
+                                  fontFamily: 'var(--font-mono)',
+                                  textTransform: 'uppercase',
+                                  display: 'block',
+                                  transition: 'all 0.2s',
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (ilRisk !== opt.value) e.currentTarget.style.color = '#fff';
+                                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (ilRisk !== opt.value) e.currentTarget.style.color = 'var(--text-secondary)';
+                                  e.currentTarget.style.background = ilRisk === opt.value ? 'rgba(223, 246, 81, 0.1)' : 'transparent';
+                                }}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1348,21 +1497,35 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate }) => {
           Your Vault. Your Rules. Verified On-Chain.
         </h2>
         <p style={{ fontSize: '0.96rem', color: 'var(--text-secondary)', maxWidth: '600px', margin: '0 auto 0.5rem', lineHeight: 1.65 }}>
-          Explore our permanent advisory receipts or review technical manuals to verify the system's architecture.
+          Launch your intelligence workspace, connect autonomous agents via WebMCP, or audit the permanent cryptographic evidence ledger.
         </p>
         <div className="hero-actions" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-          <button className="btn-premium hero-btn shimmer-btn" onClick={() => onNavigate('/verify')} style={{ padding: '0.75rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <button className="btn-premium btn-premium-wallet hero-btn shimmer-btn" onClick={() => onNavigate('/app')}>
+            <span>Launch Terminal</span>
+          </button>
+
+          <button 
+            className="btn-premium btn-premium-agent hero-btn" 
+            onClick={() => setIsMcpModalOpen(true)}
+            title="Connect AI Agent to MCP"
+          >
+            <span className="agent-dot agent-dot-active"></span>
+            <span>AGENT ACCESS</span>
+          </button>
+
+          <button className="btn-premium hero-btn" onClick={() => onNavigate('/verify')} style={{ padding: '0.75rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
             </svg>
-            <span>Verify Evidence Ledger</span>
+            <span>Verify Evidence</span>
           </button>
+          
           <button className="btn-premium hero-btn" onClick={() => onNavigate('/docs')} style={{ padding: '0.75rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
               <polyline points="14 2 14 8 20 8"></polyline>
             </svg>
-            <span>Read Specifications</span>
+            <span>Read Specs</span>
           </button>
         </div>
       </section>
