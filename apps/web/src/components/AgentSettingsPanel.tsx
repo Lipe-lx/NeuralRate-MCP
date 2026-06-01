@@ -17,9 +17,25 @@ const parseCsv = (value: string) =>
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
-
 const AgentSettingsPanel: React.FC<Props> = ({ config, busy, onSave }) => {
   const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  // Custom Select Dropdowns State
+  const [objectiveOpen, setObjectiveOpen] = useState(false);
+  const [riskOpen, setRiskOpen] = useState(false);
+  const [autoModeOpen, setAutoModeOpen] = useState(false);
+  const [restrictionOpen, setRestrictionOpen] = useState(false);
+
+  useEffect(() => {
+    const handleOutsideClick = () => {
+      setObjectiveOpen(false);
+      setRiskOpen(false);
+      setAutoModeOpen(false);
+      setRestrictionOpen(false);
+    };
+    window.addEventListener("click", handleOutsideClick);
+    return () => window.removeEventListener("click", handleOutsideClick);
+  }, []);
   const [form, setForm] = useState({
     objective: "income",
     riskProfile: "medium",
@@ -114,47 +130,357 @@ const AgentSettingsPanel: React.FC<Props> = ({ config, busy, onSave }) => {
       <div className={`agent-settings-layout ${advancedOpen ? "advanced-open" : ""}`}>
         <div className="agent-settings-primary">
           <div className="agent-settings-simple-grid">
-            <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+            <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)", display: "block", position: "relative" }}>
               Objective
-              <select value={form.objective} onChange={(event) => setForm((current) => ({ ...current, objective: event.target.value }))} style={{ width: "100%", marginTop: "0.25rem" }}>
-                {objectiveOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <div className="custom-select-container" style={{ position: "relative", width: "100%", marginTop: "0.25rem" }}>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setObjectiveOpen(!objectiveOpen);
+                    setRiskOpen(false);
+                    setAutoModeOpen(false);
+                    setRestrictionOpen(false);
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "0.45rem 0.65rem",
+                    borderRadius: "8px",
+                    background: "var(--bg-surface-elevated)",
+                    border: "1px solid oklch(100% 0 0 / 0.08)",
+                    color: "#fff",
+                    fontSize: "0.8rem",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    cursor: "pointer",
+                    fontFamily: "var(--font-mono)",
+                    textTransform: "uppercase",
+                    outline: "none",
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.borderColor = "rgba(223, 246, 81, 0.25)"}
+                  onMouseLeave={(e) => e.currentTarget.style.borderColor = "oklch(100% 0 0 / 0.08)"}
+                >
+                  <span style={{ fontWeight: 600 }}>{objectiveOptions.find(o => o.value === form.objective)?.label || form.objective}</span>
+                  <span style={{ fontSize: "0.6rem", color: "var(--color-lime)", transform: objectiveOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s", display: "inline-block" }}>▼</span>
+                </button>
+                {objectiveOpen && (
+                  <div 
+                    style={{
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      width: "100%",
+                      marginTop: "4px",
+                      background: "oklch(16% 0.012 240 / 0.95)",
+                      backdropFilter: "blur(12px)",
+                      border: "1px solid oklch(100% 0 0 / 0.12)",
+                      borderRadius: "8px",
+                      zIndex: 50,
+                      boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {objectiveOptions.map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => {
+                          setForm((current) => ({ ...current, objective: opt.value }));
+                          setObjectiveOpen(false);
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "0.45rem 0.65rem",
+                          border: "none",
+                          background: form.objective === opt.value ? "rgba(223, 246, 81, 0.1)" : "transparent",
+                          color: form.objective === opt.value ? "var(--color-lime)" : "var(--text-secondary)",
+                          fontSize: "0.75rem",
+                          textAlign: "left",
+                          cursor: "pointer",
+                          fontFamily: "var(--font-mono)",
+                          textTransform: "uppercase",
+                          display: "block",
+                          transition: "all 0.2s",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (form.objective !== opt.value) e.currentTarget.style.color = "#fff";
+                          e.currentTarget.style.background = "rgba(255, 255, 255, 0.03)";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (form.objective !== opt.value) e.currentTarget.style.color = "var(--text-secondary)";
+                          e.currentTarget.style.background = form.objective === opt.value ? "rgba(223, 246, 81, 0.1)" : "transparent";
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </label>
-            <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+            <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)", display: "block", position: "relative" }}>
               Risk Profile
-              <select value={form.riskProfile} onChange={(event) => setForm((current) => ({ ...current, riskProfile: event.target.value }))} style={{ width: "100%", marginTop: "0.25rem" }}>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-              </select>
+              <div className="custom-select-container" style={{ position: "relative", width: "100%", marginTop: "0.25rem" }}>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setRiskOpen(!riskOpen);
+                    setObjectiveOpen(false);
+                    setAutoModeOpen(false);
+                    setRestrictionOpen(false);
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "0.45rem 0.65rem",
+                    borderRadius: "8px",
+                    background: "var(--bg-surface-elevated)",
+                    border: "1px solid oklch(100% 0 0 / 0.08)",
+                    color: "#fff",
+                    fontSize: "0.8rem",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    cursor: "pointer",
+                    fontFamily: "var(--font-mono)",
+                    textTransform: "uppercase",
+                    outline: "none",
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.borderColor = "rgba(223, 246, 81, 0.25)"}
+                  onMouseLeave={(e) => e.currentTarget.style.borderColor = "oklch(100% 0 0 / 0.08)"}
+                >
+                  <span style={{ fontWeight: 600 }}>{form.riskProfile}</span>
+                  <span style={{ fontSize: "0.6rem", color: "var(--color-lime)", transform: riskOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s", display: "inline-block" }}>▼</span>
+                </button>
+                {riskOpen && (
+                  <div 
+                    style={{
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      width: "100%",
+                      marginTop: "4px",
+                      background: "oklch(16% 0.012 240 / 0.95)",
+                      backdropFilter: "blur(12px)",
+                      border: "1px solid oklch(100% 0 0 / 0.12)",
+                      borderRadius: "8px",
+                      zIndex: 50,
+                      boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {["low", "medium", "high"].map((val) => (
+                      <button
+                        key={val}
+                        onClick={() => {
+                          setForm((current) => ({ ...current, riskProfile: val }));
+                          setRiskOpen(false);
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "0.45rem 0.65rem",
+                          border: "none",
+                          background: form.riskProfile === val ? "rgba(223, 246, 81, 0.1)" : "transparent",
+                          color: form.riskProfile === val ? "var(--color-lime)" : "var(--text-secondary)",
+                          fontSize: "0.75rem",
+                          textAlign: "left",
+                          cursor: "pointer",
+                          fontFamily: "var(--font-mono)",
+                          textTransform: "uppercase",
+                          display: "block",
+                          transition: "all 0.2s",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (form.riskProfile !== val) e.currentTarget.style.color = "#fff";
+                          e.currentTarget.style.background = "rgba(255, 255, 255, 0.03)";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (form.riskProfile !== val) e.currentTarget.style.color = "var(--text-secondary)";
+                          e.currentTarget.style.background = form.riskProfile === val ? "rgba(223, 246, 81, 0.1)" : "transparent";
+                        }}
+                      >
+                        {val}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </label>
             <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
               Horizon (hours)
               <input type="number" value={form.horizonHours} onChange={(event) => setForm((current) => ({ ...current, horizonHours: Number(event.target.value) }))} style={{ width: "100%", marginTop: "0.25rem" }} />
             </label>
-            <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+            <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)", display: "block", position: "relative" }}>
               Automation Mode
-              <select value={form.automationMode} onChange={(event) => setForm((current) => ({ ...current, automationMode: event.target.value }))} style={{ width: "100%", marginTop: "0.25rem" }}>
-                {automationModeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <div className="custom-select-container" style={{ position: "relative", width: "100%", marginTop: "0.25rem" }}>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setAutoModeOpen(!autoModeOpen);
+                    setObjectiveOpen(false);
+                    setRiskOpen(false);
+                    setRestrictionOpen(false);
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "0.45rem 0.65rem",
+                    borderRadius: "8px",
+                    background: "var(--bg-surface-elevated)",
+                    border: "1px solid oklch(100% 0 0 / 0.08)",
+                    color: "#fff",
+                    fontSize: "0.8rem",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    cursor: "pointer",
+                    fontFamily: "var(--font-mono)",
+                    textTransform: "uppercase",
+                    outline: "none",
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.borderColor = "rgba(223, 246, 81, 0.25)"}
+                  onMouseLeave={(e) => e.currentTarget.style.borderColor = "oklch(100% 0 0 / 0.08)"}
+                >
+                  <span style={{ fontWeight: 600 }}>{automationModeOptions.find(o => o.value === form.automationMode)?.label || form.automationMode}</span>
+                  <span style={{ fontSize: "0.6rem", color: "var(--color-lime)", transform: autoModeOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s", display: "inline-block" }}>▼</span>
+                </button>
+                {autoModeOpen && (
+                  <div 
+                    style={{
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      width: "100%",
+                      marginTop: "4px",
+                      background: "oklch(16% 0.012 240 / 0.95)",
+                      backdropFilter: "blur(12px)",
+                      border: "1px solid oklch(100% 0 0 / 0.12)",
+                      borderRadius: "8px",
+                      zIndex: 50,
+                      boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {automationModeOptions.map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => {
+                          setForm((current) => ({ ...current, automationMode: opt.value }));
+                          setAutoModeOpen(false);
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "0.45rem 0.65rem",
+                          border: "none",
+                          background: form.automationMode === opt.value ? "rgba(223, 246, 81, 0.1)" : "transparent",
+                          color: form.automationMode === opt.value ? "var(--color-lime)" : "var(--text-secondary)",
+                          fontSize: "0.75rem",
+                          textAlign: "left",
+                          cursor: "pointer",
+                          fontFamily: "var(--font-mono)",
+                          textTransform: "uppercase",
+                          display: "block",
+                          transition: "all 0.2s",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (form.automationMode !== opt.value) e.currentTarget.style.color = "#fff";
+                          e.currentTarget.style.background = "rgba(255, 255, 255, 0.03)";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (form.automationMode !== opt.value) e.currentTarget.style.color = "var(--text-secondary)";
+                          e.currentTarget.style.background = form.automationMode === opt.value ? "rgba(223, 246, 81, 0.1)" : "transparent";
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </label>
-            <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)", gridColumn: "1 / -1" }}>
+            <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)", gridColumn: "1 / -1", display: "block", position: "relative" }}>
               Restriction Preset
-              <select value={form.restrictionPreset} onChange={(event) => setForm((current) => ({ ...current, restrictionPreset: event.target.value }))} style={{ width: "100%", marginTop: "0.25rem" }}>
-                {restrictionPresetOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <div className="custom-select-container" style={{ position: "relative", width: "100%", marginTop: "0.25rem" }}>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setRestrictionOpen(!restrictionOpen);
+                    setObjectiveOpen(false);
+                    setRiskOpen(false);
+                    setAutoModeOpen(false);
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "0.45rem 0.65rem",
+                    borderRadius: "8px",
+                    background: "var(--bg-surface-elevated)",
+                    border: "1px solid oklch(100% 0 0 / 0.08)",
+                    color: "#fff",
+                    fontSize: "0.8rem",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    cursor: "pointer",
+                    fontFamily: "var(--font-mono)",
+                    textTransform: "uppercase",
+                    outline: "none",
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.borderColor = "rgba(223, 246, 81, 0.25)"}
+                  onMouseLeave={(e) => e.currentTarget.style.borderColor = "oklch(100% 0 0 / 0.08)"}
+                >
+                  <span style={{ fontWeight: 600 }}>{restrictionPresetOptions.find(o => o.value === form.restrictionPreset)?.label || form.restrictionPreset}</span>
+                  <span style={{ fontSize: "0.6rem", color: "var(--color-lime)", transform: restrictionOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s", display: "inline-block" }}>▼</span>
+                </button>
+                {restrictionOpen && (
+                  <div 
+                    style={{
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      width: "100%",
+                      marginTop: "4px",
+                      background: "oklch(16% 0.012 240 / 0.95)",
+                      backdropFilter: "blur(12px)",
+                      border: "1px solid oklch(100% 0 0 / 0.12)",
+                      borderRadius: "8px",
+                      zIndex: 50,
+                      boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {restrictionPresetOptions.map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => {
+                          setForm((current) => ({ ...current, restrictionPreset: opt.value }));
+                          setRestrictionOpen(false);
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "0.45rem 0.65rem",
+                          border: "none",
+                          background: form.restrictionPreset === opt.value ? "rgba(223, 246, 81, 0.1)" : "transparent",
+                          color: form.restrictionPreset === opt.value ? "var(--color-lime)" : "var(--text-secondary)",
+                          fontSize: "0.75rem",
+                          textAlign: "left",
+                          cursor: "pointer",
+                          fontFamily: "var(--font-mono)",
+                          textTransform: "uppercase",
+                          display: "block",
+                          transition: "all 0.2s",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (form.restrictionPreset !== opt.value) e.currentTarget.style.color = "#fff";
+                          e.currentTarget.style.background = "rgba(255, 255, 255, 0.03)";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (form.restrictionPreset !== opt.value) e.currentTarget.style.color = "var(--text-secondary)";
+                          e.currentTarget.style.background = form.restrictionPreset === opt.value ? "rgba(223, 246, 81, 0.1)" : "transparent";
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </label>
           </div>
 

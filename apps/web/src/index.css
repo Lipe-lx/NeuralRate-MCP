@@ -2797,3 +2797,54 @@ input[type="checkbox"] {
   }
 }
 
+/* 12. Premium Custom Styled Dropdowns for App Select Elements */
+.agent-settings-panel select,
+.tab-pane select,
+main select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg fill='%23DFF651' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/><path d='M0 0h24v24H0z' fill='none'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 18px;
+  padding-right: 32px !important;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  background-color: var(--bg-surface-elevated);
+  border: 1px solid oklch(100% 0 0 / 0.08);
+  color: #fff;
+  border-radius: 8px;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.8rem;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
+.agent-settings-panel select:hover,
+.tab-pane select:hover,
+main select:hover {
+  border-color: rgba(223, 246, 81, 0.25);
+  box-shadow: 0 0 10px rgba(223, 246, 81, 0.02);
+}
+
+.agent-settings-panel select:focus,
+.tab-pane select:focus,
+main select:focus {
+  border-color: var(--color-lime);
+  box-shadow: 0 0 12px rgba(223, 246, 81, 0.08);
+}
+
+.agent-settings-panel select option,
+.tab-pane select option,
+main select option {
+  background-color: var(--bg-surface-elevated);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  padding: 0.5rem;
+}
+
