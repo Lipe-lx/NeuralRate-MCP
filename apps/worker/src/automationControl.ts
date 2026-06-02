@@ -7,12 +7,25 @@ import {
   type AutomationGrantDomain,
   verifyAutomationGrantSignature,
 } from "./grants";
+import { withOnchainPolicyState } from "./onchainState";
+import { encodeFunctionData, toFunctionSelector, type Address } from "viem";
 
 type ExecutorEnv = {
   EXECUTOR_BASE_URL?: string;
   INTERNAL_API_TOKEN?: string;
+  NEURALRATE_INTERNAL_API_TOKEN?: string;
   NEURALRATE_BENCHMARK_CONTRACT: string;
   NEURALRATE_CHAIN_ID?: string;
+  NEURALRATE_POLICY_REGISTRY_CONTRACT?: string;
+  NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS?: string;
+  NEURALRATE_VAULT_MODULE_ADDRESS?: string;
+  NEURALRATE_EXECUTION_GUARD_CONTRACT?: string;
+  NEURALRATE_SAFE_7579_ADAPTER_ADDRESS?: string;
+  NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS?: string;
+  NEURALRATE_DELEGATE_VALIDATOR_ADDRESS?: string;
+  NEURALRATE_4337_ENTRYPOINT_ADDRESS?: string;
+  NEURALRATE_ERC7484_REGISTRY_ADDRESS?: string;
+  MANTLE_SEPOLIA_RPC_URL?: string;
 };
 
 export type ScopedAutomationAccess = {
@@ -29,7 +42,72 @@ export type ScopedAutomationAccess = {
   authMode: "session" | "signed";
 };
 
+type PreparedTxRequest = {
+  from: string;
+  to: string;
+  data: string;
+  value: string;
+};
+
+export type ExpectedPublishedPolicy = {
+  ownerEoa: string;
+  vaultAddress: string;
+  delegate: string;
+  maxPerUse: number;
+  maxDaily: number;
+  maxTotal: number;
+  validAfter: number;
+  validUntil: number;
+  maxSlippageBps: number;
+  requireSnapshot: boolean;
+  policyVersion: string;
+  allowedAssets: string[];
+  allowedProtocols: string[];
+  allowedTargets: string[];
+  allowedSelectors: string[];
+};
+
+const policyRegistryAbi = [
+  {
+    type: "function",
+    name: "publishPolicy",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "ownerEoa", type: "address" },
+      { name: "vaultAddress", type: "address" },
+      { name: "delegate", type: "address" },
+      { name: "maxPerUse", type: "uint256" },
+      { name: "maxDaily", type: "uint256" },
+      { name: "maxTotal", type: "uint256" },
+      { name: "validAfter", type: "uint256" },
+      { name: "validUntil", type: "uint256" },
+      { name: "maxSlippageBps", type: "uint256" },
+      { name: "requireSnapshot", type: "bool" },
+      { name: "policyVersion", type: "string" },
+      { name: "allowedAssets", type: "string[]" },
+      { name: "allowedProtocols", type: "string[]" },
+      { name: "allowedTargets", type: "address[]" },
+      { name: "allowedSelectors", type: "bytes4[]" },
+    ],
+    outputs: [{ name: "policyId", type: "bytes32" }],
+  },
+  {
+    type: "function",
+    name: "revokeActivePolicy",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "ownerEoa", type: "address" },
+      { name: "vaultAddress", type: "address" },
+    ],
+    outputs: [],
+  },
+] as const;
+
 const makeId = (prefix: string) => `${prefix}_${crypto.randomUUID()}`;
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const EXECUTE_VAULT_CALL_SELECTOR = toFunctionSelector(
+  "executeVaultCall(address,address,address,uint256,bytes,bytes32)"
+);
 
 const asNumber = (value: unknown, fallback: number) => {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -52,6 +130,114 @@ const normalizeDomainList = (domains?: readonly string[]) =>
         .filter(Boolean)
     )
   );
+
+const normalizeStringList = (values: unknown, transform: "upper" | "lower" | "trim" = "trim") =>
+  Array.from(
+    new Set(
+      (Array.isArray(values) ? values : [])
+        .map((value) => String(value).trim())
+        .filter(Boolean)
+        .map((value) =>
+          transform === "upper" ? value.toUpperCase() : transform === "lower" ? value.toLowerCase() : value
+        )
+    )
+  );
+
+const buildPreparedTxRequest = (
+  ownerEoa: string,
+  to: string,
+  data: string
+): PreparedTxRequest => ({
+  from: ownerEoa,
+  to,
+  data,
+  value: "0x0",
+});
+
+const buildCanonicalExecutionSurface = (env: ExecutorEnv) => {
+  const vaultModuleAddress = env.NEURALRATE_VAULT_MODULE_ADDRESS?.trim();
+  if (!vaultModuleAddress) {
+    throw new Error("NEURALRATE_VAULT_MODULE_ADDRESS is required to publish a canonical execution policy.");
+  }
+  const allowedTargets = [vaultModuleAddress.toLowerCase()];
+  const allowedSelectors = [EXECUTE_VAULT_CALL_SELECTOR.toLowerCase()];
+
+  return {
+    allowedTargets,
+    allowedSelectors,
+  };
+};
+
+const asRecord = (value: unknown) =>
+  value && typeof value === "object" ? value as Record<string, unknown> : null;
+
+const buildExpectedPublishedPolicy = (
+  access: ScopedAutomationAccess,
+  env: ExecutorEnv,
+  state: Awaited<ReturnType<typeof withOnchainPolicyState<Record<string, unknown>>>>,
+  validAfter: number,
+  validUntil: number
+): ExpectedPublishedPolicy => {
+  const draft = asRecord(state.draftPolicy ?? state.config);
+  const vault = asRecord(state.vault);
+  if (!draft) {
+    throw new Error("No draft policy found for this owner.");
+  }
+  const vaultAddress = typeof vault?.vault_address === "string" ? vault.vault_address : null;
+  if (!vaultAddress) {
+    throw new Error("Bootstrap the vault before publishing policy.");
+  }
+  if (!env.NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS?.trim() || /^0x0{40}$/i.test(env.NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS)) {
+    throw new Error("NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS is not configured.");
+  }
+
+  const executionSurface = buildCanonicalExecutionSurface(env);
+
+  return {
+    ownerEoa: access.ownerEoa.toLowerCase(),
+    vaultAddress: vaultAddress.toLowerCase(),
+    delegate: env.NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS.toLowerCase(),
+    maxPerUse: Math.max(0, Math.trunc(asNumber(draft["max_action_usd"], 1000))),
+    maxDaily: Math.max(0, Math.trunc(asNumber(draft["max_daily_usd"], 2500))),
+    maxTotal: Math.max(0, Math.trunc(asNumber(draft["max_automation_usd"], 10000))),
+    validAfter,
+    validUntil,
+    maxSlippageBps: Math.max(0, Math.trunc(asNumber(draft["max_slippage_bps"], 50))),
+    requireSnapshot: true,
+    policyVersion: String(draft["policy_version"] ?? access.policyVersion ?? "vault-v1"),
+    allowedAssets: normalizeStringList(draft["allowed_assets"], "upper"),
+    allowedProtocols: normalizeStringList(draft["allowed_protocols"], "upper"),
+    allowedTargets: executionSurface.allowedTargets,
+    allowedSelectors: executionSurface.allowedSelectors,
+  };
+};
+
+const matchesExpectedPublishedPolicy = (
+  activePolicy: Record<string, unknown> | null | undefined,
+  expected: ExpectedPublishedPolicy
+) => {
+  if (!activePolicy) {
+    return false;
+  }
+
+  return (
+    String(activePolicy.ownerEoa ?? "").toLowerCase() === expected.ownerEoa &&
+    String(activePolicy.vaultAddress ?? "").toLowerCase() === expected.vaultAddress &&
+    String(activePolicy.delegate ?? "").toLowerCase() === expected.delegate &&
+    asNumber(activePolicy.maxPerUse, -1) === expected.maxPerUse &&
+    asNumber(activePolicy.maxDaily, -1) === expected.maxDaily &&
+    asNumber(activePolicy.maxTotal, -1) === expected.maxTotal &&
+    asNumber(activePolicy.validAfter, -1) === expected.validAfter &&
+    asNumber(activePolicy.validUntil, -1) === expected.validUntil &&
+    asNumber(activePolicy.maxSlippageBps, -1) === expected.maxSlippageBps &&
+    Boolean(activePolicy.requireSnapshot) === expected.requireSnapshot &&
+    String(activePolicy.policyVersion ?? "") === expected.policyVersion &&
+    JSON.stringify(normalizeStringList(activePolicy.allowedAssets, "upper")) === JSON.stringify(expected.allowedAssets) &&
+    JSON.stringify(normalizeStringList(activePolicy.allowedProtocols, "upper")) === JSON.stringify(expected.allowedProtocols) &&
+    JSON.stringify(normalizeStringList(activePolicy.allowedTargets, "lower")) === JSON.stringify(expected.allowedTargets) &&
+    JSON.stringify(normalizeStringList(activePolicy.allowedSelectors, "lower")) === JSON.stringify(expected.allowedSelectors)
+  );
+};
 
 const assertVaultReadyForGrant = (state: Awaited<ReturnType<AutomationStore["getAutomationState"]>>) => {
   if (!state.vault?.vault_id || !state.vault.vault_address) {
@@ -287,6 +473,7 @@ export async function revokeAutomationGrant(
   grantId: string,
   revokedAt = new Date().toISOString()
 ) {
+  const resolvedChainId = 5003;
   const grant = await store.getAutomationGrant(grantId);
   if (!grant) {
     throw new Error("Automation grant not found.");
@@ -443,16 +630,328 @@ export async function updateAgentPolicyFromScopedAccess(
   });
 }
 
+export async function preparePolicyPublish(
+  store: AutomationStore,
+  env: ExecutorEnv,
+  access: ScopedAutomationAccess
+) {
+  if (!env.NEURALRATE_POLICY_REGISTRY_CONTRACT?.trim()) {
+    throw new Error("NEURALRATE_POLICY_REGISTRY_CONTRACT is not configured.");
+  }
+  if (!env.NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS?.trim() || /^0x0{40}$/i.test(env.NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS)) {
+    throw new Error("NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS is not configured.");
+  }
+
+  const state = await withOnchainPolicyState(await store.getAutomationState(access.ownerEoa), env);
+  if (!state.vault?.vault_address) {
+    throw new Error("Bootstrap the vault before publishing policy.");
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const validUntil = now + 12 * 60 * 60;
+  const expectedPolicy = buildExpectedPublishedPolicy(access, env, state, now, validUntil);
+
+  const data = encodeFunctionData({
+    abi: policyRegistryAbi,
+    functionName: "publishPolicy",
+    args: [
+      access.ownerEoa as Address,
+      String(state.vault.vault_address) as Address,
+      env.NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS as Address,
+      BigInt(expectedPolicy.maxPerUse),
+      BigInt(expectedPolicy.maxDaily),
+      BigInt(expectedPolicy.maxTotal),
+      BigInt(expectedPolicy.validAfter),
+      BigInt(expectedPolicy.validUntil),
+      BigInt(expectedPolicy.maxSlippageBps),
+      expectedPolicy.requireSnapshot,
+      expectedPolicy.policyVersion,
+      expectedPolicy.allowedAssets,
+      expectedPolicy.allowedProtocols,
+      expectedPolicy.allowedTargets as Address[],
+      expectedPolicy.allowedSelectors as `0x${string}`[],
+    ],
+  });
+
+  return {
+    success: true,
+    policySyncStatus: state.policySyncStatus,
+    draftPolicy: state.draftPolicy,
+    activeOnchainPolicy: state.activeOnchainPolicy,
+    expectedPolicy,
+    txRequest: buildPreparedTxRequest(
+      access.ownerEoa,
+      env.NEURALRATE_POLICY_REGISTRY_CONTRACT,
+      data
+    ),
+  };
+}
+
+export async function submitPolicyPublish(
+  store: AutomationStore,
+  env: ExecutorEnv,
+  access: ScopedAutomationAccess,
+  args?: {
+    txHash?: string | null;
+    expectedPolicy?: ExpectedPublishedPolicy | null;
+  }
+) {
+  const state = await withOnchainPolicyState(await store.getAutomationState(access.ownerEoa), env);
+  if (!state.activeOnchainPolicy) {
+    throw new Error("No active on-chain policy found after publish.");
+  }
+  if (!args?.expectedPolicy) {
+    throw new Error("expectedPolicy is required to verify the published on-chain policy.");
+  }
+  if (!matchesExpectedPublishedPolicy(asRecord(state.activeOnchainPolicy), args.expectedPolicy)) {
+    throw new Error("Published on-chain policy does not match the prepared draft.");
+  }
+
+  return {
+    success: true,
+    txHash: args.txHash ?? null,
+    policySyncStatus: state.policySyncStatus,
+    draftPolicy: state.draftPolicy,
+    activeOnchainPolicy: state.activeOnchainPolicy,
+  };
+}
+
+export async function preparePolicyRevoke(
+  store: AutomationStore,
+  env: ExecutorEnv,
+  access: ScopedAutomationAccess
+) {
+  if (!env.NEURALRATE_POLICY_REGISTRY_CONTRACT?.trim()) {
+    throw new Error("NEURALRATE_POLICY_REGISTRY_CONTRACT is not configured.");
+  }
+
+  const state = await withOnchainPolicyState(await store.getAutomationState(access.ownerEoa), env);
+  if (!state.vault?.vault_address) {
+    throw new Error("Bootstrap the vault before revoking policy.");
+  }
+
+  const data = encodeFunctionData({
+    abi: policyRegistryAbi,
+    functionName: "revokeActivePolicy",
+    args: [access.ownerEoa as Address, String(state.vault.vault_address) as Address],
+  });
+
+  return {
+    success: true,
+    policySyncStatus: state.activeOnchainPolicy ? "pending_revoke" : state.policySyncStatus,
+    activeOnchainPolicy: state.activeOnchainPolicy,
+    txRequest: buildPreparedTxRequest(
+      access.ownerEoa,
+      env.NEURALRATE_POLICY_REGISTRY_CONTRACT,
+      data
+    ),
+  };
+}
+
+export async function submitPolicyRevoke(
+  store: AutomationStore,
+  env: ExecutorEnv,
+  access: ScopedAutomationAccess,
+  txHash?: string | null
+) {
+  const state = await withOnchainPolicyState(await store.getAutomationState(access.ownerEoa), env);
+  if (state.activeOnchainPolicy) {
+    throw new Error("On-chain policy is still active after revoke.");
+  }
+
+  return {
+    success: true,
+    txHash: txHash ?? null,
+    policySyncStatus: state.policySyncStatus,
+    draftPolicy: state.draftPolicy,
+    activeOnchainPolicy: null,
+  };
+}
+
+export async function prepareVaultRuntimeEnable(
+  store: AutomationStore,
+  env: ExecutorEnv,
+  access: ScopedAutomationAccess
+) {
+  const state = await withOnchainPolicyState(await store.getAutomationState(access.ownerEoa), env);
+  if (!state.vault?.vault_address) {
+    throw new Error("Bootstrap the vault before enabling runtime.");
+  }
+
+  const runtime = state.runtimeState;
+  const needsSafe7579 =
+    Boolean(env.NEURALRATE_SAFE_7579_ADAPTER_ADDRESS) &&
+    Boolean(env.NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS) &&
+    Boolean(env.NEURALRATE_DELEGATE_VALIDATOR_ADDRESS);
+
+  const actions = [
+    !runtime?.safeDeployed
+      ? {
+          key: "deploy_safe",
+          label: "Deploy Safe",
+          required: true,
+          mode: "wallet_tx",
+        }
+      : null,
+    env.NEURALRATE_VAULT_MODULE_ADDRESS && !runtime?.vaultModuleEnabled
+      ? {
+          key: "enable_vault_module",
+          label: "Enable vault module",
+          required: true,
+          mode: "wallet_tx",
+        }
+      : null,
+    needsSafe7579 && !runtime?.safe7579Enabled
+      ? {
+          key: "install_safe7579",
+          label: "Install Safe7579",
+          required: true,
+          mode: "wallet_tx",
+        }
+      : null,
+    needsSafe7579 && !runtime?.delegateReady
+      ? {
+          key: "configure_delegate_validator",
+          label: runtime?.installedDelegate && runtime.installedDelegate !== ZERO_ADDRESS ? "Rotate delegate validator" : "Install delegate validator",
+          required: true,
+          mode: "wallet_tx",
+        }
+      : null,
+    env.NEURALRATE_EXECUTION_GUARD_CONTRACT && !runtime?.moduleGuardReady
+      ? {
+          key: "enable_execution_guard",
+          label: "Enable execution guard",
+          required: true,
+          mode: "wallet_tx",
+        }
+      : null,
+    needsSafe7579 && !runtime?.fallbackReady
+      ? {
+          key: "enable_fallback_handler",
+          label: "Enable fallback handler",
+          required: true,
+          mode: "wallet_tx",
+        }
+      : null,
+  ].filter(Boolean);
+
+  return {
+    success: true,
+    runtimeState: runtime,
+    actions,
+    targetRuntime: {
+      vaultAddress: state.vault.vault_address,
+      moduleAddress: env.NEURALRATE_VAULT_MODULE_ADDRESS ?? null,
+      safe7579AdapterAddress: env.NEURALRATE_SAFE_7579_ADAPTER_ADDRESS ?? null,
+      safe7579LaunchpadAddress: env.NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS ?? null,
+      delegateValidatorAddress: env.NEURALRATE_DELEGATE_VALIDATOR_ADDRESS ?? null,
+      executionGuardAddress: env.NEURALRATE_EXECUTION_GUARD_CONTRACT ?? null,
+    },
+  };
+}
+
+export async function submitVaultRuntimeEnable(
+  store: AutomationStore,
+  env: ExecutorEnv,
+  access: ScopedAutomationAccess,
+  txHashes?: Record<string, string>
+) {
+  const state = await withOnchainPolicyState(await store.getAutomationState(access.ownerEoa), env);
+  const runtime = state.runtimeState;
+  const requiresVaultModule = Boolean(env.NEURALRATE_VAULT_MODULE_ADDRESS);
+  const requiresSafe7579 =
+    Boolean(env.NEURALRATE_SAFE_7579_ADAPTER_ADDRESS) &&
+    Boolean(env.NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS) &&
+    Boolean(env.NEURALRATE_DELEGATE_VALIDATOR_ADDRESS);
+  const requiresExecutionGuard = Boolean(env.NEURALRATE_EXECUTION_GUARD_CONTRACT);
+  const ready = Boolean(
+    runtime?.safeDeployed &&
+    (!requiresVaultModule || runtime.vaultModuleEnabled) &&
+    (!requiresSafe7579 || (runtime.safe7579Enabled && runtime.delegateReady && runtime.fallbackReady)) &&
+    (!requiresExecutionGuard || runtime.moduleGuardReady)
+  );
+  if (!ready) {
+    throw new Error("Vault runtime is not yet fully enabled on-chain.");
+  }
+
+  if (state.vault?.vault_id) {
+    await store.upsertVault({
+      ownerEoa: access.ownerEoa,
+      userId: access.userId,
+      vaultId: access.vaultId,
+      vaultAddress: String(state.vault.vault_address),
+      automationStatus: "runtime_enabled",
+      safeDeploymentStatus: runtime?.safeDeployed ? "deployed" : "pending",
+      status: runtime?.safeDeployed ? "active" : typeof state.vault.status === "string" ? state.vault.status : undefined,
+    });
+  }
+
+  return {
+    success: true,
+    txHashes: txHashes ?? {},
+    runtimeState: runtime,
+  };
+}
+
+export async function prepareVaultRuntimeDisable(
+  store: AutomationStore,
+  env: ExecutorEnv,
+  access: ScopedAutomationAccess
+) {
+  const state = await withOnchainPolicyState(await store.getAutomationState(access.ownerEoa), env);
+
+  return {
+    success: true,
+    runtimeState: state.runtimeState,
+    actions: state.runtimeState?.vaultModuleEnabled
+      ? [
+          {
+            key: "disable_vault_module",
+            label: "Disable vault module",
+            required: true,
+            mode: "wallet_tx",
+          },
+        ]
+      : [],
+  };
+}
+
+export async function submitVaultRuntimeDisable(
+  store: AutomationStore,
+  env: ExecutorEnv,
+  access: ScopedAutomationAccess,
+  txHashes?: Record<string, string>
+) {
+  const state = await withOnchainPolicyState(await store.getAutomationState(access.ownerEoa), env);
+  if (state.vault?.vault_id) {
+    await store.upsertVault({
+      ownerEoa: access.ownerEoa,
+      userId: access.userId,
+      vaultId: access.vaultId,
+      vaultAddress: String(state.vault.vault_address),
+      automationStatus: state.runtimeState?.vaultModuleEnabled ? "runtime_partial" : "runtime_disabled",
+      safeDeploymentStatus: state.runtimeState?.safeDeployed ? "deployed" : "pending",
+    });
+  }
+
+  return {
+    success: true,
+    txHashes: txHashes ?? {},
+    runtimeState: state.runtimeState,
+  };
+}
+
 async function callExecutor<T>(
   env: ExecutorEnv,
   path: string,
   body: Record<string, unknown>
 ) {
   const executorBaseUrl = env.EXECUTOR_BASE_URL?.trim();
+  const internalApiToken = env.NEURALRATE_INTERNAL_API_TOKEN?.trim() || env.INTERNAL_API_TOKEN?.trim();
   if (!executorBaseUrl) {
     throw new Error("Worker EXECUTOR_BASE_URL is not configured.");
   }
-  if (!env.INTERNAL_API_TOKEN?.trim()) {
+  if (!internalApiToken) {
     throw new Error("Worker INTERNAL_API_TOKEN is not configured.");
   }
 
@@ -460,7 +959,7 @@ async function callExecutor<T>(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-NeuralRate-Internal-Token": env.INTERNAL_API_TOKEN,
+      "X-NeuralRate-Internal-Token": internalApiToken,
     },
     body: JSON.stringify(body),
   });

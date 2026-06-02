@@ -21,7 +21,7 @@ import {
   resolveUserSafeVault,
 } from "../lib/automation";
 import { signedGetJsonFetch, signedJsonFetch } from "../lib/auth";
-import { buildLocalSnapshotHash, publishActivePolicy, revokeActivePolicy } from "../lib/policyRegistry";
+import { buildLocalSnapshotHash, sendPreparedTransaction, type PreparedTxRequest } from "../lib/policyRegistry";
 import type { AutomationState } from "../lib/userState";
 
 const fetchJson = async <T>(url: string, options?: RequestInit) => {
@@ -57,6 +57,36 @@ type AutomationGrantChallenge = {
   issuedAt: string;
   expiresAt: string;
   message: string;
+};
+
+type PreparedPolicyPublish = {
+  expectedPolicy: {
+    ownerEoa: string;
+    vaultAddress: string;
+    delegate: string;
+    maxPerUse: number;
+    maxDaily: number;
+    maxTotal: number;
+    validAfter: number;
+    validUntil: number;
+    maxSlippageBps: number;
+    requireSnapshot: boolean;
+    policyVersion: string;
+    allowedAssets: string[];
+    allowedProtocols: string[];
+    allowedTargets: string[];
+    allowedSelectors: string[];
+  };
+  txRequest: PreparedTxRequest;
+};
+
+type PreparedRuntimePlan = {
+  actions: Array<{
+    key: string;
+    label: string;
+    required: boolean;
+    mode: string;
+  }>;
 };
 
 const DEFAULT_AUTOMATION_DOMAINS = ["state", "config", "benchmark", "execution"] as const;
@@ -188,22 +218,6 @@ export const useNeuralRateUser = ({
         },
       });
 
-      if (state?.vault?.vault_address) {
-        await publishActivePolicy({
-          ownerEoa,
-          vaultAddress: state.vault.vault_address,
-          wallet: { getEthereumProvider },
-          policyVersion: String((patch.policyVersion as string | undefined) ?? state?.config?.policy_version ?? SESSION_POLICY_VERSION),
-          allowedAssets: Array.isArray(patch.allowedAssets) ? patch.allowedAssets.map(String) : (state?.config?.allowed_assets ?? []),
-          allowedProtocols: Array.isArray(patch.allowedProtocols) ? patch.allowedProtocols.map(String) : (state?.config?.allowed_protocols ?? []),
-          maxPerUse: Number((patch.maxActionUsd as number | undefined) ?? state?.config?.max_action_usd ?? 1000),
-          maxDaily: Number((patch.maxDailyUsd as number | undefined) ?? state?.config?.max_daily_usd ?? 2500),
-          maxTotal: Number((patch.maxAutomationUsd as number | undefined) ?? state?.config?.max_automation_usd ?? 10000),
-          maxSlippageBps: Number((patch.maxSlippageBps as number | undefined) ?? state?.config?.max_slippage_bps ?? 50),
-          requireSnapshot: true,
-        });
-      }
-
       await refresh(ownerEoa);
       setNotice("Agent settings updated.");
       return response.config;
@@ -278,6 +292,186 @@ export const useNeuralRateUser = ({
     }
   };
 
+  const publishDraftPolicy = async () => {
+    if (!ownerEoa) {
+      throw new Error("Connect a wallet before publishing policy.");
+    }
+
+    const prepared = await signedJsonFetch<PreparedPolicyPublish>({
+      ownerEoa,
+      signMessage,
+      url: `${API_BASE_URL}/automation/policy/prepare-publish`,
+      method: "POST",
+      body: { ownerEoa },
+    });
+
+    const txHash = await sendPreparedTransaction({
+      wallet: { getEthereumProvider },
+      txRequest: prepared.txRequest,
+    });
+
+    return signedJsonFetch({
+      ownerEoa,
+      signMessage,
+      url: `${API_BASE_URL}/automation/policy/submit-publish`,
+      method: "POST",
+      body: {
+        ownerEoa,
+        txHash,
+        expectedPolicy: prepared.expectedPolicy,
+      },
+    });
+  };
+
+  const finalizeAutomationGrant = async (current: AutomationState) => {
+    if (!ownerEoa) {
+      throw new Error("Connect a wallet before issuing the automation grant.");
+    }
+
+    const agentSubject = `erc8004:${ERC8004_AGENT_ID}`;
+    const challengeResponse = await signedJsonFetch<{
+      success: boolean;
+      challenge: AutomationGrantChallenge;
+    }>({
+      ownerEoa,
+      signMessage,
+      url: `${API_BASE_URL}/automation/grants/prepare`,
+      method: "POST",
+      body: {
+        ownerEoa,
+        agentSubject,
+        allowedDomains: [...DEFAULT_AUTOMATION_DOMAINS],
+        policyVersion: current.config?.policy_version ?? SESSION_POLICY_VERSION,
+      },
+    });
+
+    const grantSignature = await signMessage(challengeResponse.challenge.message);
+    const result = await fetchJson<{
+      success: boolean;
+      requiresSignature: boolean;
+      grantId?: string;
+    }>(`${API_BASE_URL}/automation/grants/submit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ownerEoa,
+        agentSubject,
+        allowedDomains: challengeResponse.challenge.allowedDomains,
+        policyVersion: challengeResponse.challenge.policyVersion,
+        issuedAt: challengeResponse.challenge.issuedAt,
+        expiresAt: challengeResponse.challenge.expiresAt,
+        nonce: challengeResponse.challenge.nonce,
+        signature: grantSignature,
+        issuedVia: "web",
+      }),
+    });
+
+    if (result.requiresSignature) {
+      throw new Error("Automation grant was not finalized after signing.");
+    }
+  };
+
+  const enableRuntimeFromPlan = async () => {
+    if (!ownerEoa) {
+      throw new Error("Connect a wallet before enabling the runtime.");
+    }
+
+    const prepared = await signedJsonFetch<PreparedRuntimePlan>({
+      ownerEoa,
+      signMessage,
+      url: `${API_BASE_URL}/automation/runtime/prepare-enable`,
+      method: "POST",
+      body: { ownerEoa },
+    });
+
+    const txHashes: Record<string, string> = {};
+    if (prepared.actions.length > 0 && VAULT_MODULE_ENABLED) {
+      const aaReady = Boolean(
+        SAFE_7579_ADAPTER_ADDRESS &&
+        SAFE_7579_LAUNCHPAD_ADDRESS &&
+        DELEGATE_VALIDATOR_ADDRESS
+      );
+      if (aaReady && prepared.actions.some((action) =>
+        ["install_safe7579", "configure_delegate_validator", "enable_execution_guard", "enable_fallback_handler"].includes(action.key)
+      )) {
+        const runtimeResult = await ensureAutonomousVaultRuntime(
+          ownerEoa,
+          {
+            getEthereumProvider,
+            signMessage,
+          },
+          VAULT_MODULE_ADDRESS
+        );
+        if (runtimeResult.deploymentTxHash) txHashes.deploy_safe = runtimeResult.deploymentTxHash;
+        if (runtimeResult.moduleTxHash) txHashes.enable_vault_module = runtimeResult.moduleTxHash;
+        if (runtimeResult.safe7579InstallTxHash) txHashes.install_safe7579 = runtimeResult.safe7579InstallTxHash;
+        if (runtimeResult.validatorInstallTxHash) txHashes.configure_delegate_validator = runtimeResult.validatorInstallTxHash;
+        if (runtimeResult.validatorRotateTxHash) txHashes.rotate_delegate_validator = runtimeResult.validatorRotateTxHash;
+        if (runtimeResult.moduleGuardTxHash) txHashes.enable_execution_guard = runtimeResult.moduleGuardTxHash;
+        if (runtimeResult.fallbackTxHash) txHashes.enable_fallback_handler = runtimeResult.fallbackTxHash;
+      } else if (prepared.actions.some((action) => ["deploy_safe", "enable_vault_module"].includes(action.key))) {
+        const moduleResult = await ensureVaultModuleEnabled(ownerEoa, {
+          getEthereumProvider,
+          signMessage,
+        }, VAULT_MODULE_ADDRESS);
+        if (moduleResult.deploymentTxHash) txHashes.deploy_safe = moduleResult.deploymentTxHash;
+        if (moduleResult.moduleTxHash) txHashes.enable_vault_module = moduleResult.moduleTxHash;
+      }
+    }
+
+    return signedJsonFetch({
+      ownerEoa,
+      signMessage,
+      url: `${API_BASE_URL}/automation/runtime/submit-enable`,
+      method: "POST",
+      body: {
+        ownerEoa,
+        txHashes,
+      },
+    });
+  };
+
+  const disableRuntimeFromPlan = async () => {
+    if (!ownerEoa) {
+      throw new Error("Connect a wallet before disabling the runtime.");
+    }
+
+    const prepared = await signedJsonFetch<PreparedRuntimePlan>({
+      ownerEoa,
+      signMessage,
+      url: `${API_BASE_URL}/automation/runtime/prepare-disable`,
+      method: "POST",
+      body: { ownerEoa },
+    });
+
+    const txHashes: Record<string, string> = {};
+    if (prepared.actions.some((action) => action.key === "disable_vault_module") && state?.vault?.vault_address) {
+      const disableTxHash = await disableVaultModule(
+        ownerEoa,
+        {
+          getEthereumProvider,
+          signMessage,
+        },
+        state.vault.vault_address,
+        VAULT_MODULE_ADDRESS,
+      );
+      if (disableTxHash) {
+        txHashes.disable_vault_module = disableTxHash;
+      }
+    }
+
+    return signedJsonFetch({
+      ownerEoa,
+      signMessage,
+      url: `${API_BASE_URL}/automation/runtime/submit-disable`,
+      method: "POST",
+      body: {
+        ownerEoa,
+        txHashes,
+      },
+    });
+  };
+
   const enableAutomation = async () => {
     if (!ownerEoa) {
       throw new Error("Connect a wallet before enabling automation.");
@@ -295,101 +489,13 @@ export const useNeuralRateUser = ({
         throw new Error("Acknowledge vault ownership before issuing an automation grant.");
       }
 
-      if (current.vault.vault_address) {
-        const effectivePolicy = current.config ?? {
-          allowed_assets: [],
-          allowed_protocols: [],
-          max_action_usd: 1000,
-          max_daily_usd: 2500,
-          max_automation_usd: 10000,
-          max_slippage_bps: 50,
-          policy_version: SESSION_POLICY_VERSION,
-        };
+      await publishDraftPolicy();
+      await finalizeAutomationGrant(current);
 
-        await publishActivePolicy({
-          ownerEoa,
-          vaultAddress: current.vault.vault_address,
-          wallet: { getEthereumProvider },
-          policyVersion: effectivePolicy.policy_version,
-          allowedAssets: effectivePolicy.allowed_assets,
-          allowedProtocols: effectivePolicy.allowed_protocols,
-          maxPerUse: effectivePolicy.max_action_usd,
-          maxDaily: effectivePolicy.max_daily_usd,
-          maxTotal: effectivePolicy.max_automation_usd,
-          maxSlippageBps: effectivePolicy.max_slippage_bps,
-          requireSnapshot: true,
-        });
-      }
-
-      const agentSubject = `erc8004:${ERC8004_AGENT_ID}`;
-      const challengeResponse = await signedJsonFetch<{
-        success: boolean;
-        challenge: AutomationGrantChallenge;
-      }>({
-        ownerEoa,
-        signMessage,
-        url: `${API_BASE_URL}/automation/grants/challenge`,
-        method: "POST",
-        body: {
-          ownerEoa,
-          agentSubject,
-          allowedDomains: [...DEFAULT_AUTOMATION_DOMAINS],
-          policyVersion: current.config?.policy_version ?? SESSION_POLICY_VERSION,
-        },
-      });
-
-      const grantSignature = await signMessage(challengeResponse.challenge.message);
-      const result = await fetchJson<{
-        success: boolean;
-        requiresSignature: boolean;
-        grantId?: string;
-      }>(`${API_BASE_URL}/automation/grants/issue`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ownerEoa,
-          agentSubject,
-          allowedDomains: challengeResponse.challenge.allowedDomains,
-          policyVersion: challengeResponse.challenge.policyVersion,
-          issuedAt: challengeResponse.challenge.issuedAt,
-          expiresAt: challengeResponse.challenge.expiresAt,
-          nonce: challengeResponse.challenge.nonce,
-          signature: grantSignature,
-          issuedVia: "web",
-        }),
-      });
-      if (result.requiresSignature) {
-        throw new Error("Automation grant was not finalized after signing.");
-      }
-
-      let moduleMessage = "Grant recorded off-chain.";
+      let moduleMessage = "Grant recorded and policy synchronized.";
       if (VAULT_MODULE_ENABLED) {
-        const aaReady = Boolean(
-          SAFE_7579_ADAPTER_ADDRESS &&
-          SAFE_7579_LAUNCHPAD_ADDRESS &&
-          DELEGATE_VALIDATOR_ADDRESS
-        );
-        if (aaReady) {
-          const runtimeResult = await ensureAutonomousVaultRuntime(
-            ownerEoa,
-            {
-              getEthereumProvider,
-              signMessage,
-            },
-            VAULT_MODULE_ADDRESS
-          );
-          moduleMessage = runtimeResult.safe7579InstallTxHash || runtimeResult.validatorInstallTxHash
-            ? "AA runtime installed on-chain with Safe7579, delegate validator and vault module."
-            : "AA runtime was already installed on-chain for this vault.";
-        } else {
-          const moduleResult = await ensureVaultModuleEnabled(ownerEoa, {
-            getEthereumProvider,
-            signMessage,
-          }, VAULT_MODULE_ADDRESS);
-          moduleMessage = moduleResult.alreadyEnabled
-            ? "Safe module was already enabled on-chain."
-            : "Safe module enabled on-chain for real vault execution.";
-        }
+        await enableRuntimeFromPlan();
+        moduleMessage = "Grant recorded, policy synchronized and runtime verified on-chain.";
       }
 
       await refresh(ownerEoa);
@@ -412,19 +518,9 @@ export const useNeuralRateUser = ({
     setError(null);
     try {
       let moduleMessage = "";
-      if (VAULT_MODULE_ENABLED && state.vault?.vault_address) {
-        const disableTxHash = await disableVaultModule(
-          ownerEoa,
-          {
-            getEthereumProvider,
-            signMessage,
-          },
-          state.vault.vault_address,
-          VAULT_MODULE_ADDRESS,
-        );
-        moduleMessage = disableTxHash
-          ? " Safe module disabled on-chain."
-          : " Safe module was already disabled on-chain.";
+      if (VAULT_MODULE_ENABLED) {
+        await disableRuntimeFromPlan();
+        moduleMessage = " Runtime disable verified on-chain.";
       }
 
       await signedJsonFetch({
@@ -437,13 +533,27 @@ export const useNeuralRateUser = ({
           grantId: state.activeGrant.grant_id,
         },
       });
-      if (state.vault?.vault_address) {
-        await revokeActivePolicy({
+      const preparedRevoke = await signedJsonFetch<{ txRequest: PreparedTxRequest }>({
+        ownerEoa,
+        signMessage,
+        url: `${API_BASE_URL}/automation/policy/prepare-revoke`,
+        method: "POST",
+        body: { ownerEoa },
+      });
+      const txHash = await sendPreparedTransaction({
+        wallet: { getEthereumProvider },
+        txRequest: preparedRevoke.txRequest,
+      });
+      await signedJsonFetch({
+        ownerEoa,
+        signMessage,
+        url: `${API_BASE_URL}/automation/policy/submit-revoke`,
+        method: "POST",
+        body: {
           ownerEoa,
-          vaultAddress: state.vault.vault_address,
-          wallet: { getEthereumProvider },
-        });
-      }
+          txHash,
+        },
+      });
       await refresh(ownerEoa);
       setNotice(`Automation revoked for this vault.${moduleMessage}`);
     } catch (err) {

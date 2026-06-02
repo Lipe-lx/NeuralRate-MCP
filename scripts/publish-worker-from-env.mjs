@@ -36,11 +36,8 @@ const parseEnvFile = (source) => {
 const childEnv = { ...process.env };
 if (fs.existsSync(envPath)) {
   const envValues = parseEnvFile(fs.readFileSync(envPath, "utf8"));
-  const useLocalAuth = (process.env.CLOUDFLARE_USE_LOCAL_AUTH || envValues.get("CLOUDFLARE_USE_LOCAL_AUTH") || "")
-    .trim()
-    .toLowerCase() === "true";
   for (const [key, value] of envValues) {
-    if (useLocalAuth && (key === "CLOUDFLARE_API_TOKEN" || key === "CLOUDFLARE_ACCOUNT_ID")) {
+    if (key === "CLOUDFLARE_API_TOKEN" || key === "CLOUDFLARE_ACCOUNT_ID" || key === "CLOUDFLARE_USE_LOCAL_AUTH") {
       continue;
     }
     if (typeof childEnv[key] === "undefined") {
@@ -48,6 +45,8 @@ if (fs.existsSync(envPath)) {
     }
   }
 }
+delete childEnv.CLOUDFLARE_API_TOKEN;
+delete childEnv.CLOUDFLARE_ACCOUNT_ID;
 
 const run = (command, args, cwd = repoRoot) => {
   console.log(`[worker-publish] ${command} ${args.join(" ")}`);

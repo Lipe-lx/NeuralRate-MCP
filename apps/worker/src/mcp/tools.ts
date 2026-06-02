@@ -46,8 +46,6 @@ export const riskAssessSchema = {
 };
 
 export const optimalAllocationSchema = {
-  ownerEoa: z.string().optional().describe("User owner EOA for personalized policy resolution"),
-  userId: z.string().optional().describe("Optional internal user identifier"),
   amountUsd: z.number().describe("Total amount to allocate in USD"),
   objective: z.enum(["preserve", "income", "growth"]).optional().default("income").describe("Primary portfolio objective"),
   riskProfile: z.enum(["low", "medium", "high"]).describe("The investor's risk tolerance"),
@@ -90,12 +88,9 @@ export const logDecisionSchema = {
 
 export const getDecisionsSchema = {
   limit: z.number().optional().default(50),
-  ownerEoa: z.string().optional()
 };
 
-export const getUserStateSchema = {
-  sessionToken: z.string().describe("Active MCP mutation session token"),
-};
+export const getUserStateSchema = {};
 
 export const bootstrapUserVaultSchema = {
   ownerEoa: z.string().describe("Owner EOA for the dedicated vault"),
@@ -123,15 +118,6 @@ export const bootstrapUserVaultSchema = {
 };
 
 export const updateAgentPolicySchema = {
-  sessionToken: z.string().optional(),
-  ownerEoa: z.string().optional(),
-  auth: z.object({
-    ownerEoa: z.string(),
-    nonce: z.string(),
-    issuedAt: z.string(),
-    expiresAt: z.string(),
-    signature: z.string(),
-  }).optional(),
   objective: z.enum(["preserve", "income", "growth"]).optional(),
   riskProfile: z.enum(["low", "medium", "high"]).optional(),
   horizonHours: z.number().optional(),
@@ -156,7 +142,6 @@ export const updateAgentPolicySchema = {
 };
 
 export const issueAutomationGrantSchema = {
-  ownerEoa: z.string(),
   agentSubject: z.string().describe("Stable subject for the agent session, e.g. erc8004:49"),
   allowedDomains: z.array(z.enum(["state", "config", "benchmark", "execution"])).optional(),
   policyVersion: z.string().optional(),
@@ -169,42 +154,15 @@ export const issueAutomationGrantSchema = {
 
 export const revokeAutomationGrantSchema = {
   grantId: z.string().optional(),
-  sessionToken: z.string().optional(),
-  ownerEoa: z.string().optional(),
-  auth: z.object({
-    ownerEoa: z.string(),
-    nonce: z.string(),
-    issuedAt: z.string(),
-    expiresAt: z.string(),
-    signature: z.string(),
-  }).optional(),
 };
 
 export const queueBenchmarkSchema = {
-  sessionToken: z.string().optional(),
-  ownerEoa: z.string().optional(),
-  auth: z.object({
-    ownerEoa: z.string(),
-    nonce: z.string(),
-    issuedAt: z.string(),
-    expiresAt: z.string(),
-    signature: z.string(),
-  }).optional(),
   decisionId: z.string(),
   dataSnapshotHash: z.string().optional(),
   payload: z.record(z.string(), z.unknown()).optional(),
 };
 
 export const executeStrategySchema = {
-  sessionToken: z.string().optional(),
-  ownerEoa: z.string().optional(),
-  auth: z.object({
-    ownerEoa: z.string(),
-    nonce: z.string(),
-    issuedAt: z.string(),
-    expiresAt: z.string(),
-    signature: z.string(),
-  }).optional(),
   strategyKey: z.string(),
   intent: z.object({
     targetAsset: z.string(),
@@ -219,8 +177,69 @@ export const executeStrategySchema = {
   payload: z.record(z.string(), z.unknown()).optional(),
 };
 
-export const listJobsSchema = {
-  sessionToken: z.string(),
+export const listJobsSchema = {};
+
+export const getDecisionLineageSchema = {
+  decisionId: z.string(),
+};
+
+export const preparePolicyPublishSchema = {};
+
+export const submitPolicyPublishSchema = {
+  txHash: z.string().optional(),
+  expectedPolicy: z.object({
+    ownerEoa: z.string(),
+    vaultAddress: z.string(),
+    delegate: z.string(),
+    maxPerUse: z.number(),
+    maxDaily: z.number(),
+    maxTotal: z.number(),
+    validAfter: z.number(),
+    validUntil: z.number(),
+    maxSlippageBps: z.number(),
+    requireSnapshot: z.boolean(),
+    policyVersion: z.string(),
+    allowedAssets: z.array(z.string()),
+    allowedProtocols: z.array(z.string()),
+    allowedTargets: z.array(z.string()),
+    allowedSelectors: z.array(z.string()),
+  }),
+};
+
+export const preparePolicyRevokeSchema = {};
+
+export const submitPolicyRevokeSchema = {
+  txHash: z.string().optional(),
+};
+
+export const prepareVaultRuntimeEnableSchema = {};
+
+export const submitVaultRuntimeEnableSchema = {
+  txHashes: z.record(z.string(), z.string()).optional(),
+};
+
+export const prepareVaultRuntimeDisableSchema = {};
+
+export const submitVaultRuntimeDisableSchema = {
+  txHashes: z.record(z.string(), z.string()).optional(),
+};
+
+export const prepareAutomationGrantSchema = {
+  agentSubject: z.string().describe("Stable subject for the agent session, e.g. erc8004:49"),
+  allowedDomains: z.array(z.enum(["state", "config", "benchmark", "execution"])).optional(),
+  policyVersion: z.string().optional(),
+  expiresAt: z.string().optional(),
+};
+
+export const submitAutomationGrantSchema = {
+  agentSubject: z.string().describe("Stable subject for the agent session, e.g. erc8004:49"),
+  allowedDomains: z.array(z.enum(["state", "config", "benchmark", "execution"])).optional(),
+  policyVersion: z.string().optional(),
+  issuedAt: z.string().optional(),
+  expiresAt: z.string().optional(),
+  nonce: z.string().optional(),
+  signature: z.string().describe("Owner signature over the canonical grant message"),
+  issuedVia: z.string().optional(),
 };
 
 const PRESET_RULES = {
@@ -499,7 +518,6 @@ export class McpToolHandlers {
     amountUsd: number;
     riskProfile: string;
     horizonHours: number;
-    ownerEoa?: string;
     objective?: string;
     allowedAssets?: string[];
     deniedAssets?: string[];
@@ -513,55 +531,31 @@ export class McpToolHandlers {
     automationMode?: string;
     restrictionPreset?: string;
   }) {
-    const ownerEoa = (args as any).ownerEoa ? String((args as any).ownerEoa).toLowerCase() : null;
-    let resolvedConfig: Record<string, unknown> | null = null;
-
-    if (ownerEoa && this.db) {
-      const record = await this.db
-        .prepare("SELECT * FROM user_agent_configs WHERE owner_eoa = ? LIMIT 1")
-        .bind(ownerEoa)
-        .first<Record<string, unknown>>();
-
-      if (record) {
-        resolvedConfig = {
-          ...record,
-          allowed_assets: asJson(record.allowed_assets_json, [] as string[]),
-          denied_assets: asJson(record.denied_assets_json, [] as string[]),
-          allowed_protocols: asJson(record.allowed_protocols_json, [] as string[]),
-          denied_protocols: asJson(record.denied_protocols_json, [] as string[]),
-        };
-      }
-    }
-
-    const presetName = String((args as any).restrictionPreset ?? resolvedConfig?.restriction_preset ?? "blue-chip-defi") as keyof typeof PRESET_RULES;
+    const presetName = String((args as any).restrictionPreset ?? "blue-chip-defi") as keyof typeof PRESET_RULES;
     const preset = PRESET_RULES[presetName] ?? PRESET_RULES["blue-chip-defi"];
-    const objective = String((args as any).objective ?? resolvedConfig?.objective ?? "income");
-    const automationMode = String((args as any).automationMode ?? resolvedConfig?.automation_mode ?? "recommend-only");
+    const objective = String((args as any).objective ?? "income");
+    const automationMode = String((args as any).automationMode ?? "recommend-only");
     const stableOnly = Boolean((args as any).stableOnly ?? preset.stableOnly);
     const allowedAssets = uniqueList([
-      ...normalizeList((resolvedConfig?.allowed_assets as string[] | undefined) ?? []),
       ...normalizeList((args as any).allowedAssets ?? []),
     ]);
     const deniedAssets = uniqueList([
-      ...normalizeList((resolvedConfig?.denied_assets as string[] | undefined) ?? []),
       ...normalizeList((args as any).deniedAssets ?? []),
     ]);
     const allowedProtocols = uniqueList([
       ...normalizeList(preset.allowedProtocols as string[]),
-      ...normalizeList((resolvedConfig?.allowed_protocols as string[] | undefined) ?? []),
       ...normalizeList((args as any).allowedProtocols ?? []),
     ]);
     const deniedProtocols = uniqueList([
       ...normalizeList(preset.deniedProtocols as string[]),
-      ...normalizeList((resolvedConfig?.denied_protocols as string[] | undefined) ?? []),
       ...normalizeList((args as any).deniedProtocols ?? []),
     ]);
-    const maxProtocolWeightBps = Number((args as any).maxProtocolWeightBps ?? resolvedConfig?.max_protocol_weight_bps ?? 5000);
-    const maxAssetWeightBps = Number((args as any).maxAssetWeightBps ?? resolvedConfig?.max_asset_weight_bps ?? 5000);
-    const minSpreadOverTbillBps = Number((args as any).minSpreadOverTbillBps ?? resolvedConfig?.min_spread_over_tbill_bps ?? 0);
-    const maxActionUsd = Number((args as any).maxActionUsd ?? resolvedConfig?.max_action_usd ?? 1000);
-    const horizonHours = Number((args as any).horizonHours ?? resolvedConfig?.horizon_hours ?? 24);
-    const riskProfile = String((args as any).riskProfile ?? resolvedConfig?.risk_profile ?? "medium");
+    const maxProtocolWeightBps = Number((args as any).maxProtocolWeightBps ?? 5000);
+    const maxAssetWeightBps = Number((args as any).maxAssetWeightBps ?? 5000);
+    const minSpreadOverTbillBps = Number((args as any).minSpreadOverTbillBps ?? 0);
+    const maxActionUsd = Number((args as any).maxActionUsd ?? 1000);
+    const horizonHours = Number((args as any).horizonHours ?? 24);
+    const riskProfile = String((args as any).riskProfile ?? "medium");
 
     const pools = await this.defillama.getPools("Mantle", 100000);
     const tbillRate = await this.fred.getLatestTBillRate();
@@ -644,7 +638,6 @@ export class McpToolHandlers {
     const result = {
       status: "optimal_allocation",
       amountAllocated: args.amountUsd,
-      ownerEoa,
       objective,
       riskProfile,
       horizon: horizonHours,
@@ -663,7 +656,7 @@ export class McpToolHandlers {
         maxAssetWeightBps,
         maxActionUsd,
         minSpreadOverTbillBps,
-        policyVersion: String(resolvedConfig?.policy_version ?? "vault-v1"),
+        policyVersion: "market-only-v1",
       },
       rationale: {
         datasetScope: "global market data, user-scoped decision policy",

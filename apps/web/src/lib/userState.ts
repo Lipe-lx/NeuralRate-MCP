@@ -198,6 +198,37 @@ export interface AutomationState {
   automationJobs: AutomationJob[];
   benchmarkJobs: BenchmarkJob[];
   automationReady: boolean;
+  draftPolicy?: AgentConfig | null;
+  activeOnchainPolicy?: {
+    policyId: string;
+    ownerEoa: string;
+    vaultAddress: string;
+    delegate: string;
+    maxPerUse: string;
+    maxDaily: string;
+    maxTotal: string;
+    validAfter: number;
+    validUntil: number;
+    maxSlippageBps: number;
+    requireSnapshot: boolean;
+    hasTargetAllowlist: boolean;
+    hasSelectorAllowlist: boolean;
+    policyVersion: string;
+    allowedAssets: string[];
+    allowedProtocols: string[];
+    allowedTargets: string[];
+    allowedSelectors: string[];
+  } | null;
+  policySyncStatus?: "not_published" | "in_sync" | "drifted" | "pending_publish" | "pending_revoke" | null;
+  runtimeState?: {
+    safeDeployed: boolean;
+    vaultModuleEnabled: boolean;
+    safe7579Enabled: boolean;
+    fallbackReady: boolean;
+    moduleGuardReady: boolean;
+    delegateReady: boolean;
+    installedDelegate: string | null;
+  } | null;
   onchainPolicy?: {
     policyId: string;
     ownerEoa: string;

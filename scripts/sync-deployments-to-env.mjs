@@ -210,6 +210,11 @@ updateEnvFile(
 
 updateEnvFile("apps/worker/.dev.vars", [
   { key: "NEURALRATE_BENCHMARK_CONTRACT", value: benchmarkAddress, after: "NANSEN_API_KEY", style: "quoted" },
+  { key: "NEURALRATE_VAULT_MODULE_ADDRESS", value: vaultModuleAddress, after: "NANSEN_API_KEY", style: "quoted" },
+  { key: "NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS", value: readOptionalEnv("NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS"), after: "NEURALRATE_VAULT_MODULE_ADDRESS", style: "quoted" },
+  { key: "NEURALRATE_CHAIN_ID", value: readOptionalEnv("NEURALRATE_CHAIN_ID"), after: "NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS", style: "quoted" },
+  { key: "NEURALRATE_CHAIN_NAME", value: readOptionalEnv("NEURALRATE_CHAIN_NAME"), after: "NEURALRATE_CHAIN_ID", style: "quoted" },
+  { key: "NEURALRATE_ENV_PROFILE", value: readOptionalEnv("NEURALRATE_ENV_PROFILE"), after: "NEURALRATE_CHAIN_NAME", style: "quoted" },
   { key: "NEURALRATE_POLICY_REGISTRY_CONTRACT", value: policyRegistryAddress, after: "NEURALRATE_BENCHMARK_CONTRACT", style: "quoted" },
   { key: "NEURALRATE_EXECUTION_GUARD_CONTRACT", value: executionGuardAddress, after: "NEURALRATE_POLICY_REGISTRY_CONTRACT", style: "quoted" },
   { key: "NEURALRATE_SAFE_4337_MODULE_ADDRESS", value: safe4337ModuleAddress, after: "NEURALRATE_EXECUTION_GUARD_CONTRACT", style: "quoted" },
@@ -223,6 +228,11 @@ updateEnvFile("apps/worker/.dev.vars", [
 
 updateEnvFile("apps/worker/.dev.vars.example", [
   { key: "NEURALRATE_BENCHMARK_CONTRACT", value: benchmarkAddress, after: "NANSEN_API_KEY", style: "quoted" },
+  { key: "NEURALRATE_VAULT_MODULE_ADDRESS", value: vaultModuleAddress || ZERO_ADDRESS, after: "NANSEN_API_KEY", style: "quoted" },
+  { key: "NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS", value: readOptionalEnv("NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS") || ZERO_ADDRESS, after: "NEURALRATE_VAULT_MODULE_ADDRESS", style: "quoted" },
+  { key: "NEURALRATE_CHAIN_ID", value: readOptionalEnv("NEURALRATE_CHAIN_ID") || "5003", after: "NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS", style: "quoted" },
+  { key: "NEURALRATE_CHAIN_NAME", value: readOptionalEnv("NEURALRATE_CHAIN_NAME") || "Mantle Sepolia", after: "NEURALRATE_CHAIN_ID", style: "quoted" },
+  { key: "NEURALRATE_ENV_PROFILE", value: readOptionalEnv("NEURALRATE_ENV_PROFILE") || "production", after: "NEURALRATE_CHAIN_NAME", style: "quoted" },
   { key: "NEURALRATE_POLICY_REGISTRY_CONTRACT", value: policyRegistryAddress || ZERO_ADDRESS, after: "NEURALRATE_BENCHMARK_CONTRACT", style: "quoted" },
   { key: "NEURALRATE_EXECUTION_GUARD_CONTRACT", value: executionGuardAddress || ZERO_ADDRESS, after: "NEURALRATE_POLICY_REGISTRY_CONTRACT", style: "quoted" },
   { key: "NEURALRATE_SAFE_4337_MODULE_ADDRESS", value: safe4337ModuleAddress || ZERO_ADDRESS, after: "NEURALRATE_EXECUTION_GUARD_CONTRACT", style: "quoted" },
@@ -236,6 +246,11 @@ updateEnvFile("apps/worker/.dev.vars.example", [
 
 updateEnvFile("apps/worker/wrangler.toml", [
   { key: "NEURALRATE_BENCHMARK_CONTRACT", value: benchmarkAddress, style: "tomlQuoted" },
+  { key: "NEURALRATE_VAULT_MODULE_ADDRESS", value: vaultModuleAddress || "", after: "NEURALRATE_BENCHMARK_CONTRACT", style: "tomlQuoted" },
+  { key: "NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS", value: readOptionalEnv("NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS") || "", after: "NEURALRATE_VAULT_MODULE_ADDRESS", style: "tomlQuoted" },
+  { key: "NEURALRATE_CHAIN_ID", value: readOptionalEnv("NEURALRATE_CHAIN_ID") || "", after: "NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS", style: "tomlQuoted" },
+  { key: "NEURALRATE_CHAIN_NAME", value: readOptionalEnv("NEURALRATE_CHAIN_NAME") || "", after: "NEURALRATE_CHAIN_ID", style: "tomlQuoted" },
+  { key: "NEURALRATE_ENV_PROFILE", value: readOptionalEnv("NEURALRATE_ENV_PROFILE") || "", after: "NEURALRATE_CHAIN_NAME", style: "tomlQuoted" },
   { key: "NEURALRATE_POLICY_REGISTRY_CONTRACT", value: policyRegistryAddress || "", after: "NEURALRATE_BENCHMARK_CONTRACT", style: "tomlQuoted" },
   { key: "NEURALRATE_EXECUTION_GUARD_CONTRACT", value: executionGuardAddress || "", after: "NEURALRATE_POLICY_REGISTRY_CONTRACT", style: "tomlQuoted" },
   { key: "NEURALRATE_SAFE_4337_MODULE_ADDRESS", value: safe4337ModuleAddress || "", after: "NEURALRATE_EXECUTION_GUARD_CONTRACT", style: "tomlQuoted" },

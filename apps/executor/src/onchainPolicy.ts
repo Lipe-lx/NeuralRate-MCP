@@ -93,6 +93,10 @@ export type OnchainActivePolicy = {
   hasTargetAllowlist: boolean;
   hasSelectorAllowlist: boolean;
   policyVersion: string;
+  allowedAssets: string[];
+  allowedProtocols: string[];
+  allowedTargets: string[];
+  allowedSelectors: string[];
 } | null;
 
 const normalizeHash = (value: string | null | undefined): Hex | null => {
@@ -137,6 +141,13 @@ export async function getActivePolicy(vaultAddress: string): Promise<OnchainActi
     return null;
   }
 
+  const [allowedAssets, allowedProtocols, allowedTargets, allowedSelectors] = await Promise.all([
+    contract.read.getAllowedAssets([policy.policyId]),
+    contract.read.getAllowedProtocols([policy.policyId]),
+    contract.read.getAllowedTargets([policy.policyId]),
+    contract.read.getAllowedSelectors([policy.policyId]),
+  ]);
+
   return {
     policyId: policy.policyId,
     ownerEoa: policy.ownerEoa.toLowerCase(),
@@ -153,6 +164,10 @@ export async function getActivePolicy(vaultAddress: string): Promise<OnchainActi
     hasTargetAllowlist: policy.hasTargetAllowlist,
     hasSelectorAllowlist: policy.hasSelectorAllowlist,
     policyVersion: policy.policyVersion,
+    allowedAssets: allowedAssets.map((value) => value.trim().toUpperCase()).filter(Boolean),
+    allowedProtocols: allowedProtocols.map((value) => value.trim().toUpperCase()).filter(Boolean),
+    allowedTargets: allowedTargets.map((value) => value.toLowerCase()),
+    allowedSelectors: allowedSelectors.map((value) => value.toLowerCase()),
   };
 }
 

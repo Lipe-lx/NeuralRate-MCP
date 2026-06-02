@@ -9,6 +9,13 @@ type WalletAccess = {
   getEthereumProvider: () => Promise<EIP1193Provider>;
 };
 
+export type PreparedTxRequest = {
+  from: string;
+  to: string;
+  data: string;
+  value?: string;
+};
+
 const policyRegistryAbi = [
   {
     type: "function",
@@ -165,6 +172,25 @@ export async function revokeActivePolicy(args: {
       to: NEURALRATE_POLICY_REGISTRY_CONTRACT,
       data,
       value: "0x0",
+    }],
+  });
+
+  await waitForTransactionReceipt(provider, String(txHash));
+  return String(txHash);
+}
+
+export async function sendPreparedTransaction(args: {
+  wallet: WalletAccess;
+  txRequest: PreparedTxRequest;
+}) {
+  const provider = await args.wallet.getEthereumProvider();
+  const txHash = await provider.request({
+    method: "eth_sendTransaction",
+    params: [{
+      from: args.txRequest.from,
+      to: args.txRequest.to,
+      data: args.txRequest.data,
+      value: args.txRequest.value ?? "0x0",
     }],
   });
 

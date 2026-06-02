@@ -657,9 +657,16 @@ createServer(async (request, response) => {
             chainId: config.chainId,
             policyVersion: onchainPolicy.policyVersion || scoped.policyVersion,
             maxActionUsd: Number(onchainPolicy.maxPerUse),
+            maxDailyUsd: Number(onchainPolicy.maxDaily),
             maxAutomationUsd: Number(onchainPolicy.maxTotal),
-            allowedAssets: Array.isArray(scoped.config.allowed_assets) ? scoped.config.allowed_assets as string[] : [],
-            allowedProtocols: Array.isArray(scoped.config.allowed_protocols) ? scoped.config.allowed_protocols as string[] : [],
+            maxSlippageBps: Number(onchainPolicy.maxSlippageBps),
+            validAfter: Number(onchainPolicy.validAfter),
+            validUntil: Number(onchainPolicy.validUntil),
+            requireSnapshot: onchainPolicy.requireSnapshot,
+            allowedAssets: onchainPolicy.allowedAssets,
+            allowedProtocols: onchainPolicy.allowedProtocols,
+            allowedTargets: onchainPolicy.allowedTargets,
+            allowedSelectors: onchainPolicy.allowedSelectors,
           },
         );
 

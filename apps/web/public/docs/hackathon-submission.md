@@ -29,7 +29,7 @@ NeuralRate MCP is a Mantle Sepolia worker and MCP server that anchors per-user v
 - **Web**
   User/operator panel. Shows state and gathers signatures.
 - **Receipt registry**
-  `NeuralRateDecisionReceiptRegistry.sol` for new deployments, with the legacy benchmark registry still present in the current Sepolia manifest until redeploy.
+  `NeuralRateDecisionReceiptRegistry.sol` on Mantle Sepolia, fully synchronized in the deployment manifest.
 - **Vault module**
   `NeuralRateVaultModule.sol` on Mantle Sepolia.
 
@@ -69,4 +69,3 @@ NeuralRate MCP is a Mantle Sepolia worker and MCP server that anchors per-user v
 - generalized Sepolia USDY execution against a canonical third-party venue
 - universal cross-protocol execution for arbitrary assets
 - mainnet deployment by default
-- fully deployed policy-registry / execution-guard / receipt-registry addresses in the current checked-in Sepolia manifest

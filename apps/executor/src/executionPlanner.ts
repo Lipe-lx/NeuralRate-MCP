@@ -23,9 +23,16 @@ type ScopedExecutionContext = {
   chainId: number;
   policyVersion: string;
   maxActionUsd: number;
+  maxDailyUsd: number;
   maxAutomationUsd: number;
+  maxSlippageBps: number;
+  validAfter: number;
+  validUntil: number;
+  requireSnapshot: boolean;
   allowedAssets: string[];
   allowedProtocols: string[];
+  allowedTargets: string[];
+  allowedSelectors: string[];
 };
 
 type PublicClientLike = {
@@ -152,6 +159,8 @@ export const resolveExecutionPlan = async (
 
   const normalizedAllowedAssets = unique(normalizeList(context.allowedAssets));
   const normalizedAllowedProtocols = unique(normalizeList(context.allowedProtocols));
+  const normalizedAllowedTargets = unique(context.allowedTargets.map((value) => value.trim().toLowerCase()).filter(Boolean));
+  const normalizedAllowedSelectors = unique(context.allowedSelectors.map((value) => value.trim().toLowerCase()).filter(Boolean));
   const normalizedTargetAsset = token.symbol.toUpperCase();
   const amountUsd = Number(intent.amountUsd);
   const amountToken = intent.amountToken ?? null;
@@ -196,17 +205,30 @@ export const resolveExecutionPlan = async (
       `Requested ${amountUsd} USD vs max automation ${context.maxAutomationUsd} USD.`,
     ),
     makePolicyCheck(
+      "policy-max-slippage-bps",
+      slippageBps <= context.maxSlippageBps,
+      `Requested ${slippageBps} bps slippage vs max ${context.maxSlippageBps} bps.`,
+    ),
+    makePolicyCheck(
       "snapshot-hash-present",
-      /^0x[a-fA-F0-9]{64}$/.test(snapshotHash),
-      /^0x[a-fA-F0-9]{64}$/.test(snapshotHash)
+      !context.requireSnapshot || /^0x[a-fA-F0-9]{64}$/.test(snapshotHash),
+      !context.requireSnapshot
+        ? "Active policy does not require snapshot anchoring for this execution."
+        : /^0x[a-fA-F0-9]{64}$/.test(snapshotHash)
         ? `Snapshot hash ${snapshotHash} is present.`
         : "Execution intents must include a 32-byte snapshot hash.",
     ),
     makePolicyCheck(
       "deadline-valid",
-      Number.isFinite(deadlineTs) && deadlineTs > Math.floor(Date.now() / 1000),
-      Number.isFinite(deadlineTs) && deadlineTs > Math.floor(Date.now() / 1000)
-        ? `Execution deadline ${deadlineTs} is still in the future.`
+      Number.isFinite(deadlineTs) &&
+        deadlineTs > Math.floor(Date.now() / 1000) &&
+        deadlineTs >= context.validAfter &&
+        deadlineTs <= context.validUntil,
+      Number.isFinite(deadlineTs) &&
+        deadlineTs > Math.floor(Date.now() / 1000) &&
+        deadlineTs >= context.validAfter &&
+        deadlineTs <= context.validUntil
+        ? `Execution deadline ${deadlineTs} is inside the policy validity window.`
         : "Execution intents must include a future ISO-8601 deadline.",
     ),
     makePolicyCheck(
@@ -403,7 +425,26 @@ export const resolveExecutionPlan = async (
     }
   }
 
-  const finalValidationFailure = policyChecks.find((check) => !check.ok);
+  if (targetContract && targetSelector) {
+    policyChecks.push(
+      makePolicyCheck(
+        "policy-allowed-targets",
+        normalizedAllowedTargets.length === 0 || normalizedAllowedTargets.includes(targetContract.toLowerCase()),
+        normalizedAllowedTargets.length === 0
+          ? "Active on-chain policy does not narrow allowed target contracts."
+          : `${targetContract.toLowerCase()} ${normalizedAllowedTargets.includes(targetContract.toLowerCase()) ? "is" : "is not"} present in the on-chain target allowlist.`,
+      ),
+      makePolicyCheck(
+        "policy-allowed-selectors",
+        normalizedAllowedSelectors.length === 0 || normalizedAllowedSelectors.includes(targetSelector.toLowerCase()),
+        normalizedAllowedSelectors.length === 0
+          ? "Active on-chain policy does not narrow allowed selectors."
+          : `${targetSelector.toLowerCase()} ${normalizedAllowedSelectors.includes(targetSelector.toLowerCase()) ? "is" : "is not"} present in the on-chain selector allowlist.`,
+      ),
+    );
+  }
+
+  const effectiveFinalValidationFailure = policyChecks.find((check) => !check.ok);
 
   return {
     strategyKey,
@@ -419,8 +460,8 @@ export const resolveExecutionPlan = async (
     riskFlags,
     policyChecks,
     bytecodeValidation,
-    validationStatus: finalValidationFailure ? "blocked" : "ready",
-    validationReason: finalValidationFailure?.detail ?? null,
+    validationStatus: effectiveFinalValidationFailure ? "blocked" : "ready",
+    validationReason: effectiveFinalValidationFailure?.detail ?? null,
     intent: {
       targetAsset: normalizedTargetAsset,
       amountUsd,

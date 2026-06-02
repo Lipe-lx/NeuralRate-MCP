@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "presync-docs": "node ../../scripts/sync-public-docs.mjs",
-    "prebuild": "npm run presync-docs",
+    "presync-env": "node ../../scripts/sync-web-public-env.mjs",
+    "prebuild": "npm run presync-docs && npm run presync-env",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"

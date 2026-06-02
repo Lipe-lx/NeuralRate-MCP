@@ -44,5 +44,7 @@ This directory contains the current documentation split into two groups:
 
 - [SPRINT_PLAN.md](SPRINT_PLAN.md)
 - [neuralrate-mcp-consolidated.md](neuralrate-mcp-consolidated.md)
+- [e2e-live-audit-2026-05-27.md](e2e-live-audit-2026-05-27.md)
+- [e2e-mcp-live-audit-2026-05-27.md](e2e-mcp-live-audit-2026-05-27.md)
 
-These files are preserved for planning history and narrative context only.
+These files are preserved for planning history and audit context only.

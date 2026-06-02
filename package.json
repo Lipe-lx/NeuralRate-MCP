@@ -9,10 +9,11 @@
   ],
   "scripts": {
     "install:all": "npm install",
-    "sync:deployments": "node scripts/sync-deployments-to-env.mjs",
+    "sync:deployments": "node scripts/sync-deployments-to-env.mjs && node scripts/sync-web-public-env.mjs",
     "cf:secrets:sync": "node scripts/push-cloudflare-secrets.mjs",
     "cf:worker:publish": "node scripts/publish-worker-from-env.mjs",
     "env:sync:runtime": "node scripts/sync-runtime-envs.mjs",
+    "env:sync:web": "node scripts/sync-web-public-env.mjs",
     "preflight:release": "node scripts/preflight-release.mjs",
     "preflight:public": "node scripts/preflight-public-proof.mjs",
     "release:audit": "node scripts/generate-release-audit.mjs",

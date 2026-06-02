@@ -27,10 +27,13 @@ The following controls are on-chain and independently verifiable:
   - `NeuralRateExecutionGuard.sol`
 - vault module execution path
   - `NeuralRateVaultModule.sol`
+- delegate UserOperation verification (ERC-7579/4337)
+  - `NeuralRateDelegateValidator.sol`
+  - Restricts the delegate key's execution capability to ONLY call `NeuralRateVaultModule` or the `NeuralRatePolicyRegistry` contract.
 - decision receipt anchoring
   - `NeuralRateDecisionReceiptRegistry.sol`
 
-If worker/executor state diverges, on-chain policy and guard still gate execution validity.
+If worker/executor state diverges, on-chain policy, delegate validator boundaries, and guard constraints still gate execution validity.
 
 ## Off-Chain Coordination
 

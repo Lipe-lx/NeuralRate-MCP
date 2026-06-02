@@ -4,6 +4,25 @@ import { keccak256, type Address, type Hex } from "viem";
 import { protocolRegistry, tokenRegistry } from "./executionRegistry.js";
 import { resolveExecutionPlan, validateProtocolDeployment } from "./executionPlanner.js";
 
+const makeContext = (overrides: Record<string, unknown>) => ({
+  ownerEoa: "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
+  vaultAddress: "0x1111111111111111111111111111111111111111",
+  chainId: 5003,
+  policyVersion: "v1",
+  maxActionUsd: 1500,
+  maxDailyUsd: 2500,
+  maxAutomationUsd: 10000,
+  maxSlippageBps: 50,
+  validAfter: Math.floor(Date.now() / 1000) - 60,
+  validUntil: Math.floor(Date.now() / 1000) + 2 * 60 * 60,
+  requireSnapshot: true,
+  allowedAssets: ["USDY"],
+  allowedProtocols: ["neuralrate-usdy-adapter"],
+  allowedTargets: [],
+  allowedSelectors: [],
+  ...overrides,
+});
+
 const withConfiguredUsdYToken = async (fn: () => Promise<void>) => {
   const originalAddress = tokenRegistry.USDY.address;
   tokenRegistry.USDY.address = "0x2222222222222222222222222222222222222222" as Address;
@@ -54,16 +73,7 @@ test("resolveExecutionPlan blocks when runtime bytecode is missing on-chain", as
           snapshotHash: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           deadline: futureDeadline,
         },
-        {
-          ownerEoa: "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
-          vaultAddress: "0x1111111111111111111111111111111111111111",
-          chainId: 5003,
-          policyVersion: "v1",
-          maxActionUsd: 1500,
-          maxAutomationUsd: 10000,
-          allowedAssets: ["USDY"],
-          allowedProtocols: ["neuralrate-usdy-adapter"],
-        },
+        makeContext({}),
       );
 
       assert.equal(plan.strategyKey, "usdy-stable-allocation");
@@ -96,16 +106,14 @@ test("resolveExecutionPlan prepares a real MNT Safe-module transfer on Mantle Se
         snapshotHash: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         deadline: futureDeadline,
       },
-      {
-        ownerEoa: "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
-        vaultAddress: "0x1111111111111111111111111111111111111111",
-        chainId: 5003,
-        policyVersion: "v1",
+      makeContext({
         maxActionUsd: 10,
+        maxDailyUsd: 10,
         maxAutomationUsd: 100,
+        maxSlippageBps: 0,
         allowedAssets: ["MNT"],
         allowedProtocols: [],
-      },
+      }),
     );
 
     assert.equal(plan.validationStatus, "ready");
@@ -132,16 +140,7 @@ test("resolveExecutionPlan throws for unsupported strategy keys", async () => {
           targetAsset: "USDY",
           amountUsd: 1000,
         },
-        {
-          ownerEoa: "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
-          vaultAddress: "0x1111111111111111111111111111111111111111",
-          chainId: 5003,
-          policyVersion: "v1",
-          maxActionUsd: 1500,
-          maxAutomationUsd: 10000,
-          allowedAssets: ["USDY"],
-          allowedProtocols: ["neuralrate-usdy-adapter"],
-        },
+        makeContext({}),
       ),
     /Unsupported strategyKey/,
   );
@@ -166,16 +165,11 @@ test("resolveExecutionPlan blocks when amount exceeds policy limits", async () =
         snapshotHash: "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         deadline: futureDeadline,
       },
-      {
-        ownerEoa: "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
-        vaultAddress: "0x1111111111111111111111111111111111111111",
-        chainId: 5003,
-        policyVersion: "v1",
+      makeContext({
         maxActionUsd: 1000,
+        maxDailyUsd: 1000,
         maxAutomationUsd: 3000,
-        allowedAssets: ["USDY"],
-        allowedProtocols: ["neuralrate-usdy-adapter"],
-      },
+      }),
     );
 
     const actionCheck = plan.policyChecks.find((check) => check.check === "policy-max-action-usd");
@@ -203,16 +197,14 @@ test("resolveExecutionPlan blocks when the snapshot hash is missing", async () =
         slippageBps: 0,
         deadline: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
       },
-      {
-        ownerEoa: "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
-        vaultAddress: "0x1111111111111111111111111111111111111111",
-        chainId: 5003,
-        policyVersion: "v1",
+      makeContext({
         maxActionUsd: 10,
+        maxDailyUsd: 10,
         maxAutomationUsd: 100,
+        maxSlippageBps: 0,
         allowedAssets: ["MNT"],
         allowedProtocols: [],
-      },
+      }),
     );
 
     const snapshotCheck = plan.policyChecks.find((check) => check.check === "snapshot-hash-present");

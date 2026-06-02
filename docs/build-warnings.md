@@ -4,13 +4,15 @@
 
 ## Privy / Rolldown PURE Annotation Warnings
 
-During `apps/web` production builds, Rolldown may emit `INVALID_ANNOTATION` warnings for third-party modules (notably `@privy-io/react-auth` and transitive `ox` packages).
+During `apps/web` production builds, Rolldown may emit `INVALID_ANNOTATION` warnings for third-party modules, notably `@privy-io/react-auth`, `@base-org/account`, `@walletconnect`, and transitive `ox` packages.
 
 ### Current Assessment
 
 - build succeeds
 - output artifacts are generated normally
 - warnings are emitted from dependency code, not local app code
+- this warning is about bundler optimization metadata, not authorization, routing, or code injection
+- by itself it does not create new entry points or expand the app's externally reachable surface
 
 ### Action Policy
 

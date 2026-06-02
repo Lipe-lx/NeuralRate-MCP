@@ -1,5 +1,4 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -13,7 +12,7 @@ const workerDir = path.join(repoRoot, "apps", "worker");
 const defaultSecretBindings = [
   { target: "FRED_API_KEY", sources: ["FRED_API_KEY"] },
   { target: "NANSEN_API_KEY", sources: ["NANSEN_API_KEY"] },
-  { target: "INTERNAL_API_TOKEN", sources: ["INTERNAL_API_TOKEN", "NEURALRATE_INTERNAL_API_TOKEN"] },
+  { target: "NEURALRATE_INTERNAL_API_TOKEN", sources: ["NEURALRATE_INTERNAL_API_TOKEN", "INTERNAL_API_TOKEN"] },
 ];
 
 const parseEnvFile = (source) => {
@@ -79,27 +78,48 @@ if (secretKeys.length === 0) {
   );
 }
 
-const tempFile = path.join(os.tmpdir(), `neuralrate-worker-secrets-${Date.now()}.json`);
-fs.writeFileSync(tempFile, JSON.stringify(payload, null, 2));
-
-try {
+{
   console.log(`[cloudflare-secrets] publishing ${secretKeys.length} secret(s): ${secretKeys.join(", ")}`);
   const childEnv = { ...process.env };
-  const useLocalAuth = (process.env.CLOUDFLARE_USE_LOCAL_AUTH || envValues.get("CLOUDFLARE_USE_LOCAL_AUTH") || "")
-    .trim()
-    .toLowerCase() === "true";
-  if (!useLocalAuth) {
-    for (const key of ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]) {
-      if (!childEnv[key] && envValues.get(key)?.trim()) {
-        childEnv[key] = envValues.get(key).trim();
+  delete childEnv.CLOUDFLARE_API_TOKEN;
+  delete childEnv.CLOUDFLARE_ACCOUNT_ID;
+  try {
+    for (const [key, value] of Object.entries(payload)) {
+      console.log(`[cloudflare-secrets] updating ${key}`);
+      const output = execFileSync("npx", ["wrangler", "secret", "put", key], {
+        cwd: workerDir,
+        stdio: "pipe",
+        env: childEnv,
+        encoding: "utf8",
+        input: `${value}\n`,
+      });
+      if (output) {
+        process.stdout.write(output);
       }
     }
+  } catch (error) {
+    const stdout = typeof error?.stdout === "string" ? error.stdout : "";
+    const stderr = typeof error?.stderr === "string" ? error.stderr : "";
+    if (stdout) process.stdout.write(stdout);
+    if (stderr) process.stderr.write(stderr);
+
+    const combined = `${stdout}\n${stderr}`;
+    const authError =
+      combined.includes("Authentication error") ||
+      combined.includes("Invalid access token") ||
+      combined.includes("[code: 10000]") ||
+      combined.includes("[code: 9109]");
+
+    if (authError) {
+      throw new Error(
+        [
+          "Cloudflare Wrangler auth failed.",
+          "This repo now publishes secrets only through your local `wrangler login` session.",
+          "Run `npx wrangler login` first, then retry `npm run cf:secrets:sync`.",
+        ].join(" ")
+      );
+    }
+
+    throw error;
   }
-  execFileSync("npx", ["wrangler", "secret", "bulk", tempFile], {
-    cwd: workerDir,
-    stdio: "inherit",
-    env: childEnv,
-  });
-} finally {
-  fs.rmSync(tempFile, { force: true });
 }

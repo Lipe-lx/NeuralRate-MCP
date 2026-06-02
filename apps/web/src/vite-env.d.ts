@@ -3,9 +3,15 @@
 interface ImportMetaEnv {
   readonly VITE_PUBLIC_API_BASE_URL?: string;
   readonly VITE_PUBLIC_MCP_HTTP_URL?: string;
+  readonly VITE_PUBLIC_MCP_SCOPED_HTTP_URL?: string;
   readonly VITE_PUBLIC_MCP_SSE_URL?: string;
+  readonly VITE_PUBLIC_MCP_SCOPED_SSE_URL?: string;
   readonly VITE_PUBLIC_MANTLE_RPC_URL?: string;
   readonly VITE_PUBLIC_MANTLE_EXPLORER_BASE_URL?: string;
+  readonly VITE_PUBLIC_MANTLE_CHAIN_ID?: string;
+  readonly VITE_PUBLIC_MANTLE_CHAIN_NAME?: string;
+  readonly VITE_PUBLIC_MANTLE_NETWORK_KEY?: string;
+  readonly VITE_PUBLIC_ENV_PROFILE?: string;
   readonly VITE_PUBLIC_NEURALRATE_BENCHMARK_CONTRACT?: string;
   readonly VITE_PUBLIC_NEURALRATE_POLICY_REGISTRY_CONTRACT?: string;
   readonly VITE_PUBLIC_NEURALRATE_EXECUTION_GUARD_CONTRACT?: string;

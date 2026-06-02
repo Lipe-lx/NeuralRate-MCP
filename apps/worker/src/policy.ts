@@ -15,9 +15,12 @@ export type PolicyRequest = {
 };
 
 const parseRuntimeChainId = () => {
+  const runtime = globalThis as typeof globalThis & {
+    process?: { env?: Record<string, string | undefined> };
+  };
   const raw =
-    typeof process !== "undefined" && process.env
-      ? Number.parseInt(process.env.NEURALRATE_CHAIN_ID || "", 10)
+    runtime.process?.env
+      ? Number.parseInt(runtime.process.env.NEURALRATE_CHAIN_ID || "", 10)
       : Number.NaN;
   return Number.isFinite(raw) ? raw : 5003;
 };

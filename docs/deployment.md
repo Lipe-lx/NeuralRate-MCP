@@ -21,6 +21,7 @@ For the public surfaces already wired in Cloudflare:
 
 - pushing the tracked branch is enough to trigger web deployment
 - pushing the tracked branch is enough to trigger worker deployment
+- the web deploy now reads a tracked `apps/web/.env.production` file for public `VITE_PUBLIC_*` bindings
 
 This repository does **not** rely on versioned GitHub Actions workflows to publish those two services.
 
@@ -31,6 +32,44 @@ A Git push alone does not:
 - upload local secrets from `/.env`
 - sync Worker secrets unless you explicitly publish them
 - guarantee executor host rollout unless that host has its own deployment path outside this repository
+- provision non-public frontend secrets; only public `VITE_PUBLIC_*` bindings are tracked for Pages builds
+
+## Worker Auth
+
+Commands:
+
+```bash
+npm run cf:secrets:sync
+npm run cf:worker:publish
+```
+
+This repository publishes Worker secrets and deploys only through your local `wrangler login` session.
+
+Before publishing secrets or deploying the worker, run:
+
+```bash
+unset CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID
+npx wrangler login
+```
+
+Then use:
+
+```bash
+npm run cf:secrets:sync
+npm run cf:worker:publish
+```
+
+If `wrangler login` says you are still authenticated with an API token, that token is coming from your shell environment or shell profile, not from this repository.
+
+If OAuth login succeeds but secret publish still returns `Authentication error [code: 10000]`, your logged-in Cloudflare user does not have access to the target account that owns the Worker. In that case:
+
+```bash
+npx wrangler logout
+unset CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID
+npx wrangler login
+```
+
+Then confirm you are logged into the Cloudflare user that has access to the Worker account before retrying the publish.
 
 ## Recommended Local Check Before Push
 

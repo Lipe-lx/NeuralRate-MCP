@@ -6,6 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..");
 const envPath = path.join(repoRoot, ".env");
+const webEnvPath = path.join(repoRoot, "apps", "web", ".env.production");
 const zeroAddress = "0x0000000000000000000000000000000000000000";
 
 function parseEnv(filePath) {
@@ -42,6 +43,7 @@ function printStatus(label, ok, detail) {
 }
 
 const env = parseEnv(envPath);
+const webEnv = fs.existsSync(webEnvPath) ? parseEnv(webEnvPath) : {};
 let hasBlockers = false;
 
 const checks = [
@@ -54,6 +56,7 @@ const checks = [
   ["Turnkey Wallet Address", !isUnset(env.TURNKEY_WALLET_ACCOUNT_ADDRESS), env.TURNKEY_WALLET_ACCOUNT_ADDRESS || "missing"],
   ["Agent smart wallet", !isUnset(env.NEURALRATE_AGENT_SMART_WALLET), env.NEURALRATE_AGENT_SMART_WALLET || "missing"],
   ["Agent session signer", !isUnset(env.NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS), env.NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS || "missing"],
+  ["Vault module", !isUnset(env.NEURALRATE_VAULT_MODULE_ADDRESS), env.NEURALRATE_VAULT_MODULE_ADDRESS || "missing"],
   ["Receipt registry", !isUnset(env.NEURALRATE_BENCHMARK_CONTRACT), env.NEURALRATE_BENCHMARK_CONTRACT || "missing"],
   ["Policy registry", !isUnset(env.NEURALRATE_POLICY_REGISTRY_CONTRACT), env.NEURALRATE_POLICY_REGISTRY_CONTRACT || "missing"],
   ["Execution guard", !isUnset(env.NEURALRATE_EXECUTION_GUARD_CONTRACT), env.NEURALRATE_EXECUTION_GUARD_CONTRACT || "missing"],
@@ -61,6 +64,17 @@ const checks = [
   ["Safe7579 adapter", !isUnset(env.NEURALRATE_SAFE_7579_ADAPTER_ADDRESS), env.NEURALRATE_SAFE_7579_ADAPTER_ADDRESS || "missing"],
   ["Safe7579 launchpad", !isUnset(env.NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS), env.NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS || "missing"],
   ["Delegate validator", !isUnset(env.NEURALRATE_DELEGATE_VALIDATOR_ADDRESS), env.NEURALRATE_DELEGATE_VALIDATOR_ADDRESS || "missing"],
+  ["Tracked web public env", fs.existsSync(webEnvPath), fs.existsSync(webEnvPath) ? "present" : "missing"],
+  [
+    "Tracked web API base URL",
+    !isUnset(webEnv.VITE_PUBLIC_API_BASE_URL),
+    webEnv.VITE_PUBLIC_API_BASE_URL || "missing",
+  ],
+  [
+    "Tracked web scoped MCP URL",
+    !isUnset(webEnv.VITE_PUBLIC_MCP_SCOPED_HTTP_URL),
+    webEnv.VITE_PUBLIC_MCP_SCOPED_HTTP_URL || "missing",
+  ],
 ];
 
 for (const [label, ok, detail] of checks) {

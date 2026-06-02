@@ -147,7 +147,6 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ownerEoa,
           amountUsd,
           objective: state.config.objective,
           riskProfile: state.config.risk_profile,
