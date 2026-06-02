@@ -1,209 +1,185 @@
 # NeuralRate MCP
 
-**Status:** Canonical doc
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Mantle Sepolia](https://img.shields.io/badge/Network-Mantle_Sepolia_(5003)-5c6bc0.svg)](https://explorer.sepolia.mantle.xyz)
 
-NeuralRate MCP is a Mantle Sepolia (`5003`) project with three public-facing outcomes implemented in code:
+NeuralRate MCP is a decentralized yield optimization and risk assessment terminal deployed on **Mantle Sepolia (`5003`)**. It enables AI agents and operator panels to securely scan yields, assess protocol risk, benchmark allocation decisions, and dispatch automated vault execution transactions within owner-defined, on-chain policy limits.
 
-- a Cloudflare Worker that exposes a public read-only MCP surface plus scoped mutation catalogs
-- a web panel that lets a user inspect state and sign manual actions
-- an internal executor that writes on-chain decision receipts, anchors snapshots, and dispatches vault-scoped execution jobs
+The project features a **Cloudflare Worker public control plane**, an **internal executor for transaction dispatch**, a **Vite React operator panel**, and a suite of **Solidity smart contracts** acting as the ultimate execution guards.
 
-The current live Sepolia execution demo is a real native `MNT` transfer routed through a pinned Safe module. The preserved `usdy-stable-allocation` path is intentionally blocked on Sepolia unless a canonical venue is configured.
+---
 
-## Current Product Shape
+## Key Features & Capabilities
 
-- **Worker is the public control plane.**
-  It serves the MCP endpoint and the REST API used by the web app.
-- **Executor is internal.**
-  The browser should not call it directly. The worker forwards validated jobs to it with an internal token.
-- **Web is an operator/user panel.**
-  It bootstraps a user vault, displays policies, asks for wallet signatures, and shows grants, sessions, jobs, and benchmark history.
-- **On-chain execution policy is now registry-driven.**
-  The web app publishes an active policy on-chain and the executor resolves authority from the policy registry before dispatch.
-- **On-chain receipts are first-class.**
-  Benchmark-style writes target `NeuralRateDecisionReceiptRegistry.sol` on Sepolia and the deployment manifest tracks that registry.
-- **Vault execution is real.**
-  The `NeuralRateVaultModule` executes real calls from the user Safe and can defer enforcement to `NeuralRateExecutionGuard`.
+1. **Deterministic Multi-Factor Risk Engine**: A deterministic scoring system evaluating TVL depth, volume utilization, APY volatility, yield composition (base vs. rewards), IL exposure, and institutional flow metrics to classify pool risk (Low, Medium, High, Critical).
+2. **Public Model Context Protocol (MCP) Server**: A read-only MCP catalog allowing LLMs to scan Mantle yields, check T-Bill spreads, retrieve token context, and request optimal asset allocations.
+3. **Session-Scoped Mutation Catalogs**: Scoped mutation routes (`/mcp/scoped/config`, `/mcp/scoped/benchmark`, `/mcp/scoped/execution`) that expose sensitive tools only to authorized agents holding a valid, owner-signed session token.
+4. **On-Chain Policy Enforcement**: Decentralized verification where all automation boundaries (spend caps, allowlisted assets, selectors, delegates, validity windows) are stored directly in `NeuralRatePolicyRegistry.sol` and enforced by `NeuralRateExecutionGuard.sol`.
+5. **On-Chain Decision Receipts**: Immutable logging of yield-allocation decisions to `NeuralRateDecisionReceiptRegistry.sol` with cryptographic data snapshots for third-party auditability and performance settlement.
+6. **Real Safe-Module Vault Execution**: Automated execution executed from the user's Safe vault through the `NeuralRateVaultModule.sol`, validating delegate authority and intent limits on-chain before transaction dispatch.
 
-## Repository Layout
+---
 
-- `apps/worker`
-  Public worker. Hosts the REST API, MCP server, auth nonce flow, grant/session flow, and D1/KV-backed state.
-- `apps/executor`
-  Internal job runner. Validates execution plans, checks pinned manifests and runtime bytecode, and submits benchmark or vault execution transactions.
-- `apps/web`
-  Vite React frontend. Connects the wallet, shows vault state, manages settings, and displays execution and benchmark traces.
-- `contracts`
-  Hardhat workspace for the on-chain policy registry, execution guard, receipt registry, Safe vault module, and preserved USDY adapter.
-- `docs`
-  Canonical and historical documentation. See [docs/README.md](docs/README.md).
-
-## Architecture Summary
+## System Architecture & Topology
 
 ```mermaid
 graph TD
-    User[User Wallet + Web Panel] -->|REST + signed actions| Worker[Cloudflare Worker]
-    Agent[External MCP Agent] -->|Read-only MCP| Worker
-    Worker -->|D1| D1[(Cloudflare D1)]
-    Worker -->|KV| KV[(Cloudflare KV)]
-    Worker -->|internal token| Executor[Internal Executor]
-    Worker -->|policy + session discovery| PolicyRegistry[NeuralRatePolicyRegistry]
-    Executor -->|receipt tx| ReceiptRegistry[NeuralRateDecisionReceiptRegistry]
-    Executor -->|vault module tx| VaultModule[NeuralRateVaultModule]
+    User[Operator Wallet + Web Panel] -->|REST + EIP-712 Signatures| Worker[Cloudflare Worker]
+    Agent[AI Agent / LLM] -->|Read-only MCP /mcp| Worker
+    Worker -->|D1 Storage| D1[(Cloudflare D1)]
+    Worker -->|KV Cache| KV[(Cloudflare KV)]
+    Worker -->|Internal API Token| Executor[Internal Executor]
+    Worker -->|Policy & Session Discovery| PolicyRegistry[NeuralRatePolicyRegistry]
+    Executor -->|Anchor Snapshot / Read Policy| PolicyRegistry
+    Executor -->|Anchor Receipt Tx| ReceiptRegistry[NeuralRateDecisionReceiptRegistry]
+    Executor -->|Vault Module Dispatch| VaultModule[NeuralRateVaultModule]
     VaultModule --> Guard[NeuralRateExecutionGuard]
     VaultModule --> Safe[User Safe Vault]
 ```
 
-## Public MCP Surface
+### Component Breakdown
 
-The worker advertises the public read-only MCP endpoint in [agent-card.json](agent-card.json) at:
+*   **`apps/worker` (Public Control Plane)**: Exposes public REST endpoints and the MCP server. Resolves market data (DefiLlama, FRED API, Nansen), manages user/vault records in D1, handles EIP-712 nonce authentication, manages short-lived MCP sessions, and queues jobs to the executor.
+*   **`apps/executor` (Internal Dispatcher)**: An internal execution service that receives authorized jobs from the Worker, checks strategy parameters, anchors data snapshots to the policy registry, and dispatches on-chain transactions (decision receipts and Safe module calls) using Turnkey-managed keys and AA bundlers.
+*   **`apps/web` (Vite React Operator Panel)**: React application providing wallet connection (via Privy), dedicated Safe vault bootstrapping, policy publication/revocation directly on-chain, and an operator panel to view historical allocations, jobs, and telemetry.
+*   **`contracts` (Solidity Framework)**: Deployed contract workspace providing the secure foundation for policy validation, benchmark receipt logging, and Safe module execution guards.
 
-- `https://neuralrate-worker.neuralrate.workers.dev/mcp`
+---
 
-The public tool list is:
+## Smart Contract Registry (Mantle Sepolia)
 
-- `yield_scan`
-- `tbill_spread`
-- `nansen_context`
-- `risk_assess`
-- `optimal_allocation`
-- `get_decisions`
-- `get_user_state`
-- `list_jobs`
+All production contracts are deployed on Mantle Sepolia (`5003`):
 
-Scoped mutation catalogs are exposed separately at:
+| Contract | Role / Purpose | Deployed Address |
+| :--- | :--- | :--- |
+| **`NeuralRateDecisionReceiptRegistry`** | Immutable decision receipt registry for benchmarking | [`0xC0C836A220D006398cdE4D5caf529196E63f81A8`](https://sepolia.mantlescan.xyz/address/0xC0C836A220D006398cdE4D5caf529196E63f81A8) |
+| **`NeuralRatePolicyRegistry`** | Anchors owner policy parameters & snapshot references | [`0xc4580b5831f36eCc3E4865e635c970C75DD9869C`](https://sepolia.mantlescan.xyz/address/0xc4580b5831f36eCc3E4865e635c970C75DD9869C) |
+| **`NeuralRateExecutionGuard`** | On-chain guard validating vault transaction limits | [`0xe6a70b147fB54F693d1ADAF566Fa52d871D2412b`](https://sepolia.mantlescan.xyz/address/0xe6a70b147fB54F693d1ADAF566Fa52d871D2412b) |
+| **`NeuralRateVaultModule`** | Safe Module executing automated transactions | [`0xf7061501a464e893636a5BF8eB4ab7Ba2819154D`](https://sepolia.mantlescan.xyz/address/0xf7061501a464e893636a5BF8eB4ab7Ba2819154D) |
+| **`NeuralRateUsdYStrategyAdapter`** | Preserved strategy adapter for USDY allocation | [`0xFeE16FAd13789e9bBA4779D025186341e58799a3`](https://sepolia.mantlescan.xyz/address/0xFeE16FAd13789e9bBA4779D025186341e58799a3) |
 
-- `/mcp/scoped/config`
-- `/mcp/scoped/benchmark`
-- `/mcp/scoped/execution`
+---
 
-Each scoped route requires a valid `sessionToken` in the query string or `x-neuralrate-session-token` header before the mutation tool is even advertised.
+## Strategy Truth & execution Scope
 
-Details and auth rules are in [docs/mcp-server.md](docs/mcp-server.md).
+NeuralRate supports two execution targets under testnet demo profiles:
 
-## Mantle Sepolia Deployments
+1.  **`mnt-native-transfer` (Active Demo Target)**
+    *   **Asset**: Native `MNT`
+    *   **Mechanism**: A real transfer transaction executed from the user's Safe vault via `NeuralRateVaultModule.sol` to an allowlisted destination.
+    *   **Enforcement**: Fully verified against the active on-chain policy and execution guard.
+2.  **`usdy-stable-allocation` (Preserved Target)**
+    *   **Asset**: Ondo USDY Stablecoin
+    *   **Mechanism**: Intended to swap stablecoins for USDY yields.
+    *   **Sepolia Behavior**: Blocked with an explicit reason when no canonical venue is configured on testnet.
 
-- Decision receipt registry:
-  [`0xC0C836A220D006398cdE4D5caf529196E63f81A8`](https://sepolia.mantlescan.xyz/address/0xC0C836A220D006398cdE4D5caf529196E63f81A8)
-- Vault module:
-  [`0xDAbB583bDE28241F1e3C61B423CF456D07f4DA11`](https://sepolia.mantlescan.xyz/address/0xDAbB583bDE28241F1e3C61B423CF456D07f4DA11)
-- Vault module deploy tx:
-  [`0x363de6d6b9153986eb3eddb5089849c5943fc1c1a49b85f4e361f34a5976f556`](https://sepolia.mantlescan.xyz/tx/0x363de6d6b9153986eb3eddb5089849c5943fc1c1a49b85f4e361f34a5976f556)
-- Preserved USDY adapter:
-  [`0xFeE16FAd13789e9bBA4779D025186341e58799a3`](https://sepolia.mantlescan.xyz/address/0xFeE16FAd13789e9bBA4779D025186341e58799a3)
-- USDY adapter deploy tx:
-  [`0xee3a1caa73baaa8d3adcd103d44d9bf424b5612b660fc642bc40e11287a9e3c8`](https://sepolia.mantlescan.xyz/tx/0xee3a1caa73baaa8d3adcd103d44d9bf424b5612b660fc642bc40e11287a9e3c8)
+---
 
-## Strategy Truth on Sepolia
+## Model Context Protocol (MCP) Surface
 
-- **Default live demo:** `mnt-native-transfer`
-- **Default live asset:** `MNT`
-- **Execution type:** real native transfer through `NeuralRateVaultModule`
-- **Preserved strategy:** `usdy-stable-allocation`
-- **Sepolia behavior for USDY:** blocked with an explicit reason when no canonical venue is configured
+The Worker advertises the canonical read-only MCP endpoint in [agent-card.json](agent-card.json) at:
+`https://neuralrate-worker.neuralrate.workers.dev/mcp`
 
-The executor does not simulate an Ondo venue on testnet.
+### Tool Directory
 
-## Local Development
+#### Public Read-Only Tools (Advisory)
+*   `yield_scan`: Scans Mantle DeFi pools for current APY and TVL via DefiLlama.
+*   `tbill_spread`: Calculates the spread (in bps) between a DeFi pool APY and the real-time US 3-Month T-Bill rate.
+*   `nansen_context`: Fetches Smart Money flows for a specific token via Nansen API.
+*   `risk_assess`: Performs a deterministic 6-factor risk assessment.
+*   `optimal_allocation`: Computes an optimal allocation based on the user's risk profile and constraints.
+*   `get_decisions`: Fetches logged decisions from the database.
 
-The stack expects Mantle Sepolia and a local executor URL:
+#### Session-Locked Mutation Tools (Requires Authorization)
+*   `get_user_state` / `list_jobs`: Retrieves active configuration, session and background job logs (requires `sessionToken`).
+*   `update_agent_policy` (Config Scope): Modifies the owner's off-chain configuration limits (requires config domain session).
+*   `queue_benchmark` (Benchmark Scope): Submits a transaction to anchor a decision receipt on-chain.
+*   `execute_strategy` (Execution Scope): Dispatches an automated strategy call through the user's Safe module.
 
-```env
-EXECUTOR_BASE_URL=http://127.0.0.1:8788
-VITE_PUBLIC_NEURALRATE_VAULT_MODULE_ADDRESS=0xDAbB583bDE28241F1e3C61B423CF456D07f4DA11
-NEURALRATE_DEMO_STRATEGY_KEY=mnt-native-transfer
-NEURALRATE_DEMO_TARGET_ASSET=MNT
-NEURALRATE_MNT_STRATEGY_RECIPIENT_ADDRESS=
+---
+
+## Local Development Setup
+
+To run the entire NeuralRate monorepo locally, follow these steps:
+
+### 1. Configure Environments
+Copy the environment template files and insert your API keys and signer secrets:
+```bash
+# Root environment parameters (for preflight check and deployment sync)
+cp .env.example .env
+
+# Worker environment configuration
+cp apps/worker/.dev.vars.example apps/worker/.dev.vars
+
+# Executor environment configuration
+cp apps/executor/.env.example apps/executor/.env.local
+
+# Web application configuration
+cp apps/web/.env.example apps/web/.env
 ```
 
-Start the services in separate terminals:
+### 2. Boot Services
+Run the following commands in separate terminal sessions:
 
 ```bash
-cd apps/worker && npm install && npx wrangler dev
-cd apps/executor && npm install && npm run dev
-cd apps/web && npm install && npm run dev
+# Terminal 1: Start Worker (REST API + Local D1 Database)
+cd apps/worker
+npm install
+npx wrangler dev
+
+# Terminal 2: Start Executor (Transaction Dispatcher)
+cd apps/executor
+npm install
+npm run dev
+
+# Terminal 3: Start Web Operator App
+cd apps/web
+npm install
+npm run dev
 ```
 
-For the web app, the worker is the API surface. The executor is only for worker-to-executor calls.
+---
 
-## Release Workflow
+## Release & Deployment Workflow
 
-Before opening a PR or pushing a release commit, refresh the checked-in deployment metadata and run the release preflight:
+### 1. Synchronization and Verification Preflight
+Before committing or submitting a PR, make sure your build configurations are synchronized with the deployment contracts. Run the following preflight suite at the root directory:
 
 ```bash
+# 1. Sync deploy manifests with wrangler.toml and env examples
 npm run sync:deployments
+
+# 2. Perform public environment integrity checks
 npm run preflight:public
+
+# 3. Verify minimum local configuration requirements
 npm run preflight:release
 ```
 
-What these commands do:
+*   `npm run sync:deployments`: Automates copying canonical Mantle Sepolia deployment addresses from `deployments/*.json` into worker configurations (`wrangler.toml`), `.dev.vars`, and public `.env` files.
+*   `npm run preflight:release`: Validates local configuration parameters (Turnkey secrets, bundler URLs, smart contract addresses) to ensure local environments are deployment-ready.
 
-- `npm run sync:deployments`
-  - copies the canonical Mantle Sepolia deployment addresses from `deployments/*.json`
-  - updates checked-in examples and worker plaintext bindings such as `apps/worker/wrangler.toml`
-  - keeps the public AA contract addresses aligned across worker, web, and executor examples
-- `npm run preflight:release`
-  - checks the local root `/.env` for the minimum runtime required to operate Worker + executor + AA bundler flow
-  - validates the presence of the AA addresses, Turnkey configuration, internal token, and bundler source
+### 2. Continuous Deployment Model
+NeuralRate utilizes platform-level Git hooks for deployments:
+*   **Web Panel**: Deployed automatically via Cloudflare Pages on push events to connected branches.
+*   **Worker**: Deployed automatically via Cloudflare Workers Git integration.
+*   **Executor**: Hosted independently (e.g., VM) with secure runtime variables.
 
-If both commands pass, the repository is ready to be committed. This does **not** mean local secrets from `/.env` will be uploaded by Git push alone.
+*Note: Production credentials and API keys (`NANSEN_API_KEY`, `FRED_API_KEY`, `INTERNAL_API_TOKEN`) must be configured directly in the Cloudflare Dashboard secrets manager, not committed to repository files.*
 
-Operational rule:
-
-- if you changed runtime variables, public bindings, deployment metadata, or checked-in env examples, run `npm run sync:deployments` and `npm run preflight:release` before pushing
-
-## Deployment Trigger Model
-
-NeuralRate does **not** use GitHub Actions as the publish path for the public web or worker surfaces.
-
-- `apps/web`
-  Deploys through Cloudflare Pages Git integration configured in Cloudflare.
-- `apps/worker`
-  Deploys through Cloudflare Workers Git integration configured in Cloudflare.
-
-Operational rule:
-
-- if the connected branch is pushed, Cloudflare triggers the deployment
-- the trigger lives in Cloudflare platform configuration, not in versioned GitHub workflow files in this repository
-
-What still requires operator awareness:
-
-- local `/.env` values are not uploaded by a normal Git push
-- Worker secrets still depend on explicit Cloudflare secret management
-- the executor may have a separate deployment path outside this repository
-
-See [docs/deployment.md](docs/deployment.md) for the canonical deployment note.
-
-## Configuration Security
-
-NeuralRate now distinguishes between public Worker bindings and secret Worker/runtime credentials:
-
-- `apps/worker/wrangler.toml`
-  - stores **plaintext non-secret bindings** only
-  - examples: deployed contract addresses, `EXECUTOR_BASE_URL`
-- Cloudflare Worker secrets
-  - store **secret bindings** only
-  - examples: `FRED_API_KEY`, `NANSEN_API_KEY`, `INTERNAL_API_TOKEN`
-- root `/.env`
-  - local operator file
-  - used for local runtime sync and preflight checks
-  - must **not** be committed
-
-Important security rules:
-
-- Do not put API keys, internal tokens, or signer credentials in `wrangler.toml`.
-- Do not assume `/.env` is visible to GitHub Actions or Cloudflare just because it exists locally.
-- Treat `deployments/*.json` and `wrangler.toml` as the source of truth for non-secret contract addresses that should ship with the repository.
-- Treat secrets as external CI/platform configuration unless you explicitly publish them with Wrangler.
+---
 
 ## Documentation Index
 
-- [docs/architecture.md](docs/architecture.md)
-- [docs/mcp-server.md](docs/mcp-server.md)
-- [docs/database.md](docs/database.md)
-- [docs/smart-contract.md](docs/smart-contract.md)
-- [docs/frontend.md](docs/frontend.md)
-- [docs/risk-model.md](docs/risk-model.md)
-- [docs/trust-assumptions.md](docs/trust-assumptions.md)
-- [docs/hackathon-submission.md](docs/hackathon-submission.md)
-- [docs/README.md](docs/README.md)
+For detailed guides, please refer to the files in the `docs` folder:
+
+*   [docs/architecture.md](docs/architecture.md) — Topology, service boundaries, data flows, and trust limits.
+*   [docs/smart-contract.md](docs/smart-contract.md) — Hardhat workspace, inventory, and logic of smart contracts.
+*   [docs/mcp-server.md](docs/mcp-server.md) — Public and scoped mutation MCP endpoints and tool catalog rules.
+*   [docs/database.md](docs/database.md) — Cloudflare D1 schema migrations, indexes, and tables structure.
+*   [docs/risk-model.md](docs/risk-model.md) — Scoring formulas, weights, and depeg parameters of the risk engine.
+*   [docs/frontend.md](docs/frontend.md) — App states, Privy integration, and Safe actions.
+*   [docs/data-lineage.md](docs/data-lineage.md) — Snapshot layout and retrieval APIs for audit verification.
+*   [docs/trust-assumptions.md](docs/trust-assumptions.md) — Decentralized vs. centralized validation assumptions and residual risks.
+*   [docs/deployment.md](docs/deployment.md) — CI/CD setups, Wrangler scripts, and platform boundaries.
+*   [docs/README.md](docs/README.md) — Documentation index mapping and status.
