@@ -38,7 +38,7 @@ These checks are recommended to reduce regressions before pushing:
 
 ```bash
 npx tsc -p apps/worker/tsconfig.json
-node --import tsx --test apps/worker/src/auth.test.ts apps/worker/src/grants.test.ts apps/worker/src/services/nansen.test.ts
+node --import tsx --test apps/worker/src/auth.test.ts apps/worker/src/auth.smoke.test.ts apps/worker/src/grants.test.ts apps/worker/src/services/nansen.test.ts
 ```
 
 For release hygiene, the repository also keeps these commands:

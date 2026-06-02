@@ -10,6 +10,11 @@
 - `GET /api/audit/summary?ownerEoa=0x...`
   - requires signed read auth
   - summarizes policy, grant, session, blocked/executed jobs, and benchmark receipt presence
+- `POST /api/telemetry/error`
+  - receives error objects from frontend or worker components
+  - inserts event records into D1 `telemetry_events` table
+- `GET /api/telemetry/summary`
+  - returns aggregate counts of logged events from the last 24 hours grouped by severity level
 
 ## Audit Event Categories
 

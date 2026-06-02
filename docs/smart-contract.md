@@ -2,7 +2,7 @@
 
 **Status:** Canonical doc
 
-NeuralRate now centers its automation trust model on four Solidity surfaces in the repository, plus one preserved strategy adapter.
+NeuralRate centers its automation trust model on five Solidity surfaces in the repository, plus one ERC-7579-compliant validator and one preserved strategy adapter.
 
 ## Contract Inventory
 
@@ -10,6 +10,7 @@ NeuralRate now centers its automation trust model on four Solidity surfaces in t
 
 - file: `contracts/contracts/NeuralRatePolicyRegistry.sol`
 - role: active on-chain policy registry per owner vault
+- live Sepolia registry deployment: [`0xc4580b5831f36eCc3E4865e635c970C75DD9869C`](https://sepolia.mantlescan.xyz/address/0xc4580b5831f36eCc3E4865e635c970C75DD9869C)
 
 What it does:
 
@@ -30,6 +31,7 @@ Important functions:
 
 - file: `contracts/contracts/NeuralRateExecutionGuard.sol`
 - role: on-chain execution policy enforcement for the Safe module path
+- live Sepolia guard deployment: [`0xe6a70b147fB54F693d1ADAF566Fa52d871D2412b`](https://sepolia.mantlescan.xyz/address/0xe6a70b147fB54F693d1ADAF566Fa52d871D2412b)
 
 What it does:
 
@@ -48,6 +50,7 @@ Important functions:
 
 - file: `contracts/contracts/NeuralRateDecisionReceiptRegistry.sol`
 - role: public on-chain receipt registry for benchmarkable decisions
+- live Sepolia receipt registry deployment: [`0xC0C836A220D006398cdE4D5caf529196E63f81A8`](https://sepolia.mantlescan.xyz/address/0xC0C836A220D006398cdE4D5caf529196E63f81A8)
 
 What it does:
 
@@ -66,8 +69,7 @@ Important functions:
 
 - file: `contracts/contracts/NeuralRateVaultModule.sol`
 - role: Safe module used for real vault execution
-- live Sepolia module deployment:
-  [`0xDAbB583bDE28241F1e3C61B423CF456D07f4DA11`](https://sepolia.mantlescan.xyz/address/0xDAbB583bDE28241F1e3C61B423CF456D07f4DA11)
+- live Sepolia module deployment: [`0xf7061501a464e893636a5BF8eB4ab7Ba2819154D`](https://sepolia.mantlescan.xyz/address/0xf7061501a464e893636a5BF8eB4ab7Ba2819154D)
 
 What it does:
 
@@ -82,12 +84,29 @@ Important functions:
 - `setExecutionGuard(address)`
 - `executeVaultCall(address safe,address target,uint256 value,bytes calldata data,uint8 operation,bytes32 intentHash,bytes32 snapshotHash,uint256 slippageBps,uint256 deadline)`
 
-### 5. `NeuralRateUsdYStrategyAdapter.sol`
+### 5. `NeuralRateDelegateValidator.sol`
+
+- file: `contracts/contracts/NeuralRateDelegateValidator.sol`
+- role: ERC-7579-compliant validator for Smart Account delegate UserOperation validation
+- live Sepolia validator deployment: [`0x0A03F7763d53757183aD86C393eEfF6D8177e4cE`](https://sepolia.mantlescan.xyz/address/0x0A03F7763d53757183aD86C393eEfF6D8177e4cE)
+
+What it does:
+
+- implements the ERC-7579 `IValidator` interface to validate Smart Account UserOperations under ERC-4337.
+- recovers the signer from the signature and verifies it matches the authorized delegate key.
+- restricts the target contract: only allows the delegate to submit UserOperations that call `NeuralRateVaultModule` or the `NeuralRatePolicyRegistry` contract.
+
+Important functions:
+
+- `validateUserOp(PackedUserOperation calldata userOp, bytes32 userOpHash)`
+- `isValidSignatureWithSender(address sender, bytes32 hash, bytes calldata data)`
+- `setDelegate(address)`
+
+### 6. `NeuralRateUsdYStrategyAdapter.sol`
 
 - file: `contracts/contracts/NeuralRateUsdYStrategyAdapter.sol`
 - role: preserved USDY-specific execution adapter
-- live Sepolia adapter deployment:
-  [`0xFeE16FAd13789e9bBA4779D025186341e58799a3`](https://sepolia.mantlescan.xyz/address/0xFeE16FAd13789e9bBA4779D025186341e58799a3)
+- live Sepolia adapter deployment: [`0xFeE16FAd13789e9bBA4779D025186341e58799a3`](https://sepolia.mantlescan.xyz/address/0xFeE16FAd13789e9bBA4779D025186341e58799a3)
 
 Current status in the codebase:
 
@@ -95,9 +114,9 @@ Current status in the codebase:
 - not the default strategy path
 - still blocked by the executor on Sepolia unless a canonical venue is configured
 
-## Legacy Sepolia Note
+## Sepolia Deployment Sync
 
-The existing `deployments/mantle-sepolia.json` file still points to the earlier `NeuralRateDecisionBenchmark.sol` deployment on Sepolia. The repository code and deployment scripts now target `NeuralRateDecisionReceiptRegistry.sol` for new deployments, but that redeploy has not been recorded in the manifest yet.
+All deployed addresses are fully synchronized and validated via `npm run sync:deployments` across worker configs, env files, and executor parameters.
 
 ## Execution Truth on Sepolia
 

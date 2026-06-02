@@ -45,6 +45,34 @@ graph TD
 
 The browser should not call the executor directly.
 
+## Cloudflare Durable Objects MCP Routing
+
+To ensure high performance and isolation, `apps/worker` leverages Cloudflare Durable Objects (DO) to run the Model Context Protocol (MCP) server instances. The Worker resolves incoming HTTP requests (or SSE streams) and forwards them to the appropriate Durable Object based on the route and session domain:
+
+1. **Public Read-Only Catalog (`/mcp` / SSE `/sse`)**:
+   - Class: `NeuralRateReadonlyMcpAgent`
+   - Binding: `MCP_READONLY_OBJECT`
+   - Purpose: Exposes read-only tools publicly without requiring session authorization.
+2. **Scoped Configuration Catalog (`/mcp/scoped/config` / SSE `/sse/scoped/config`)**:
+   - Class: `NeuralRateConfigMcpAgent`
+   - Binding: `MCP_CONFIG_OBJECT`
+   - Purpose: Exposes the `update_agent_policy` tool, restricted to sessions carrying `config` domain approval.
+3. **Scoped Benchmarking Catalog (`/mcp/scoped/benchmark` / SSE `/sse/scoped/benchmark`)**:
+   - Class: `NeuralRateBenchmarkMcpAgent`
+   - Binding: `MCP_BENCHMARK_OBJECT`
+   - Purpose: Exposes the `queue_benchmark` tool, restricted to sessions carrying `benchmark` domain approval.
+4. **Scoped Strategy Execution Catalog (`/mcp/scoped/execution` / SSE `/sse/scoped/execution`)**:
+   - Class: `NeuralRateExecutionMcpAgent`
+   - Binding: `MCP_EXECUTION_OBJECT`
+   - Purpose: Exposes the `execute_strategy` tool, restricted to sessions carrying `execution` domain approval.
+
+## Client-Side Telemetry Pipeline
+
+To track client errors and system health, a logging pipeline is integrated:
+1. When a client-side exception or connection failure occurs, the **web app** POSTs a telemetry payload to the worker endpoint `/api/telemetry/error`.
+2. The **Worker** validates the payload and inserts the event details (source, level, message, route, and metadata JSON) into the D1 `telemetry_events` table.
+3. Operators can retrieve the last 24h error metrics via `/api/telemetry/summary`.
+
 ## Release and Configuration Boundary
 
 The repository now separates release-time address sync from secret injection:
@@ -88,8 +116,12 @@ The worker is now mostly a control plane and indexing layer.
 
 ### Executor
 
-The executor is the dispatch layer.
+The executor is the dispatch layer. It can execute transactions using two runtime modes:
 
+- **Safe7579/ERC-4337 Runtime**: Recommended mode. It builds an ERC-4337 `UserOperation` calling `execute` on the Safe, targetting the vault module or policy registry, signed by the managed signer and validated on-chain by `NeuralRateDelegateValidator.sol`.
+- **Legacy Signer Runtime**: Fallback mode. Submits standard transactions directly to `NeuralRateVaultModule.sol` from the authorized executor address.
+
+Core responsibilities:
 - requires `x-neuralrate-internal-token`
 - resolves the active on-chain policy before execution
 - anchors `snapshotHash` and `snapshotCid` in the policy registry when needed

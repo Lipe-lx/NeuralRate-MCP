@@ -2,7 +2,7 @@
 
 **Status:** Canonical doc
 
-NeuralRate stores persistent state in Cloudflare D1. This document reflects the migrations present in `apps/worker/migrations/0001_initial.sql` through `0008_mcp_grants.sql`.
+NeuralRate stores persistent state in Cloudflare D1. This document reflects the migrations present in `apps/worker/migrations/0001_initial.sql` through `0009_telemetry.sql`.
 
 ## Migration Set
 
@@ -14,6 +14,7 @@ NeuralRate stores persistent state in Cloudflare D1. This document reflects the 
 - `0006_vault_ownership_ack.sql`
 - `0007_auth_and_audit.sql`
 - `0008_mcp_grants.sql`
+- `0009_telemetry.sql`
 
 ## Table Inventory
 
@@ -32,6 +33,7 @@ Current tables created by migrations:
 - `auth_nonces`
 - `automation_grants`
 - `mcp_mutation_sessions`
+- `telemetry_events`
 
 ## Core Tables
 
@@ -361,6 +363,27 @@ Columns:
 - `last_used_at`
 - `revoked_at`
 
+## Telemetry Table
+
+### `telemetry_events`
+
+Logs application errors and events dispatched by the frontend or worker runtime.
+
+Columns:
+
+- `id` (INTEGER PRIMARY KEY AUTOINCREMENT)
+- `event_id` (TEXT UNIQUE NOT NULL)
+- `source` (TEXT NOT NULL)
+- `level` (TEXT NOT NULL)
+- `message` (TEXT NOT NULL)
+- `route` (TEXT)
+- `metadata_json` (TEXT)
+- `created_at` (TEXT DEFAULT (datetime('now')))
+
+Indexes:
+- `idx_telemetry_events_created_at` on `created_at`
+- `idx_telemetry_events_source` on `source`
+
 ## Compatibility Table
 
 ### `user_accounts`
@@ -375,6 +398,17 @@ Columns:
 - `account_provider`
 - `account_kind`
 - `deployment_status`
+
+## Durable Object Class Migration History
+
+Cloudflare wrangler migrations tracked in `wrangler.toml` for the Durable Object state classes:
+
+- **Tag `v1`**:
+  - Registered DO class: `StableSyncMcpAgent`
+- **Tag `v2`**:
+  - Renamed DO class: `StableSyncMcpAgent` -> `NeuralRateMcpAgent`
+- **Tag `v3`**:
+  - Registered DO classes: `NeuralRateReadonlyMcpAgent`, `NeuralRateConfigMcpAgent`, `NeuralRateBenchmarkMcpAgent`, `NeuralRateExecutionMcpAgent`
 
 ## Frontend-Visible State
 
