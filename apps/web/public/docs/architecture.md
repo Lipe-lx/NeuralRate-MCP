@@ -23,7 +23,7 @@ graph TD
     Agent[External MCP Agent] -->|Read-only MCP /mcp| Worker
     Worker --> D1[(D1)]
     Worker --> KV[(KV)]
-    Worker -->|x-neuralrate-internal-token| Executor[Executor]
+    Worker -->|service binding + x-neuralrate-internal-token| Executor[Private Executor Worker]
     Worker -->|policy discovery| PolicyRegistry[NeuralRatePolicyRegistry.sol]
     Executor -->|anchor snapshot / read policy| PolicyRegistry
     Executor -->|receipt tx| ReceiptRegistry[NeuralRateDecisionReceiptRegistry.sol]
@@ -41,7 +41,7 @@ graph TD
   - web frontend
 - **Internal**
   - executor HTTP API
-  - worker-to-executor token-authenticated calls
+  - worker-to-executor service-bound token-authenticated calls
 
 The browser should not call the executor directly.
 
@@ -87,7 +87,7 @@ The repository now separates release-time address sync from secret injection:
   - `apps/worker/.dev.vars`
 - platform-managed secrets
   - Cloudflare Worker secrets
-  - executor host secrets
+  - private executor Worker secrets
 
 Recommended release check:
 
@@ -122,6 +122,8 @@ The executor is the dispatch layer. It can execute transactions using two runtim
 - **Legacy Signer Runtime**: Fallback mode. Submits standard transactions directly to `NeuralRateVaultModule.sol` from the authorized executor address.
 
 Core responsibilities:
+- runs as a private Cloudflare Worker with `workers_dev = false`
+- accepts traffic only from the public worker through a Cloudflare service binding
 - requires `x-neuralrate-internal-token`
 - resolves the active on-chain policy before execution
 - anchors `snapshotHash` and `snapshotCid` in the policy registry when needed
@@ -189,11 +191,12 @@ This means catalog exposure is reduced before the model sees the tool list.
 ### 6. Strategy Execution Flow
 
 1. The worker validates scoped access and queues a strategy job.
-2. The executor resolves the active on-chain policy.
-3. The executor anchors the referenced snapshot if needed.
-4. The executor builds an intent with snapshot hash, slippage, deadline, and policy version.
-5. `NeuralRateExecutionGuard` validates the execution when the module call is made.
-6. The module executes the real Safe call with `execTransactionFromModule`.
+2. The worker forwards the job to the private executor through the internal service binding.
+3. The executor resolves the active on-chain policy.
+4. The executor anchors the referenced snapshot if needed.
+5. The executor builds an intent with snapshot hash, slippage, deadline, and policy version.
+6. `NeuralRateExecutionGuard` validates the execution when the module call is made.
+7. The module executes the real Safe call with `execTransactionFromModule`.
 
 ## Persistence and Cache
 
@@ -223,6 +226,6 @@ Current TTL behavior implemented in code:
 
 - Execution authority is intended to come from on-chain policy plus guard validation, not from the worker alone.
 - The worker still scopes MCP discovery and stores index state, but it is no longer the only meaningful execution gate.
-- The executor is internal, but it must still satisfy the on-chain policy and snapshot path.
+- The executor is private, but it must still satisfy the on-chain policy and snapshot path.
 - The Safe module address is pinned and verified before execution.
 - Public contract addresses are allowed in versioned Worker `vars`, but tokens, API keys, and internal auth material must stay in secret storage rather than `wrangler.toml`.

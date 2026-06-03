@@ -5,7 +5,7 @@
 
 NeuralRate MCP is a decentralized yield optimization and risk assessment terminal deployed on **Mantle Sepolia (`5003`)**. It enables AI agents and operator panels to securely scan yields, assess protocol risk, benchmark allocation decisions, and dispatch automated vault execution transactions within owner-defined, on-chain policy limits.
 
-The project features a **Cloudflare Worker public control plane**, an **internal executor for transaction dispatch**, a **Vite React operator panel**, and a suite of **Solidity smart contracts** acting as the ultimate execution guards.
+The project features a **Cloudflare Worker public control plane**, a **private Cloudflare Worker executor for transaction dispatch**, a **Vite React operator panel**, and a suite of **Solidity smart contracts** acting as the ultimate execution guards.
 
 ---
 
@@ -28,7 +28,7 @@ graph TD
     Agent[AI Agent / LLM] -->|Read-only MCP /mcp| Worker
     Worker -->|D1 Storage| D1[(Cloudflare D1)]
     Worker -->|KV Cache| KV[(Cloudflare KV)]
-    Worker -->|Internal API Token| Executor[Internal Executor]
+    Worker -->|Service Binding + Internal API Token| Executor[Private Executor Worker]
     Worker -->|Policy & Session Discovery| PolicyRegistry[NeuralRatePolicyRegistry]
     Executor -->|Anchor Snapshot / Read Policy| PolicyRegistry
     Executor -->|Anchor Receipt Tx| ReceiptRegistry[NeuralRateDecisionReceiptRegistry]
@@ -40,7 +40,7 @@ graph TD
 ### Component Breakdown
 
 *   **`apps/worker` (Public Control Plane)**: Exposes public REST endpoints and the MCP server. Resolves market data (DefiLlama, FRED API, Nansen), manages user/vault records in D1, handles EIP-712 nonce authentication, manages short-lived MCP sessions, and queues jobs to the executor.
-*   **`apps/executor` (Internal Dispatcher)**: An internal execution service that receives authorized jobs from the Worker, checks strategy parameters, anchors data snapshots to the policy registry, and dispatches on-chain transactions (decision receipts and Safe module calls) using Turnkey-managed keys and AA bundlers.
+*   **`apps/executor` (Internal Dispatcher)**: A private Cloudflare Worker that receives authorized jobs from the public Worker through service binding, checks strategy parameters, anchors data snapshots to the policy registry, and dispatches on-chain transactions (decision receipts and Safe module calls) using Turnkey-managed keys and AA bundlers.
 *   **`apps/web` (Vite React Operator Panel)**: React application providing wallet connection (via Privy), dedicated Safe vault bootstrapping, policy publication/revocation directly on-chain, and an operator panel to view historical allocations, jobs, and telemetry.
 *   **`contracts` (Solidity Framework)**: Deployed contract workspace providing the secure foundation for policy validation, benchmark receipt logging, and Safe module execution guards.
 
@@ -132,6 +132,10 @@ cd apps/executor
 npm install
 npm run dev
 
+# Optional: emulate the private Cloudflare Worker runtime locally
+cd apps/executor
+npm run dev:worker
+
 # Terminal 3: Start Web Operator App
 cd apps/web
 npm install
@@ -160,12 +164,20 @@ npm run preflight:release
 *   `npm run preflight:release`: Validates local configuration parameters (Turnkey secrets, bundler URLs, smart contract addresses) to ensure local environments are deployment-ready.
 
 ### 2. Continuous Deployment Model
-NeuralRate utilizes platform-level Git hooks for deployments:
+NeuralRate uses a mixed deployment model:
 *   **Web Panel**: Deployed automatically via Cloudflare Pages on push events to connected branches.
-*   **Worker**: Deployed automatically via Cloudflare Workers Git integration.
-*   **Executor**: Hosted independently (e.g., VM) with secure runtime variables.
+*   **Worker**: Published via local Wrangler CLI using repository scripts.
+*   **Executor**: Published as a private Cloudflare Worker via local Wrangler CLI using repository scripts.
 
-*Note: Production credentials and API keys (`NANSEN_API_KEY`, `FRED_API_KEY`, `INTERNAL_API_TOKEN`) must be configured directly in the Cloudflare Dashboard secrets manager, not committed to repository files.*
+Canonical production commands:
+
+```bash
+npm run cf:executor:secrets:sync
+npm run cf:worker:secrets:sync
+npm run cf:prod:publish
+```
+
+*Note: Production credentials and API keys (`NANSEN_API_KEY`, `FRED_API_KEY`, `NEURALRATE_INTERNAL_API_TOKEN`, Turnkey keys, Pimlico key) must be configured through Cloudflare Worker secrets, not committed to repository files.*
 
 ---
 

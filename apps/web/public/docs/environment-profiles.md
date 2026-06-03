@@ -32,7 +32,8 @@ NeuralRate now operates with three explicit environment profiles.
   - signed read auth
   - scoped MCP mutation session rules
 - execution runtime
-  - executor base URL
+  - executor service binding
+  - optional executor base URL fallback for local development only
   - signer/bundler connectivity
 
 ## Release Gate Expectations
