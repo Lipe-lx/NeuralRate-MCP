@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..");
 const envPath = path.join(repoRoot, ".env");
-const workerDir = path.join(repoRoot, "apps", "worker");
+const executorDir = path.join(repoRoot, "apps", "executor");
 
 const parseEnvFile = (source) => {
   const values = new Map();
@@ -48,17 +48,20 @@ if (fs.existsSync(envPath)) {
 delete childEnv.CLOUDFLARE_API_TOKEN;
 delete childEnv.CLOUDFLARE_ACCOUNT_ID;
 
-const run = (command, args, cwd = repoRoot) => {
-  console.log(`[worker-publish] ${command} ${args.join(" ")}`);
+const run = (command, args, cwd = repoRoot, env = childEnv) => {
+  console.log(`[executor-publish] ${command} ${args.join(" ")}`);
   execFileSync(command, args, {
     cwd,
     stdio: "inherit",
-    env: childEnv,
+    env,
   });
 };
 
 run("node", ["scripts/preflight-release.mjs"]);
 run("node", ["scripts/sync-deployments-to-env.mjs"]);
 run("node", ["scripts/sync-runtime-envs.mjs"]);
-run("node", ["scripts/push-cloudflare-secrets.mjs"]);
-run("npx", ["wrangler", "deploy", ...process.argv.slice(2)], workerDir);
+run("node", ["scripts/push-cloudflare-secrets.mjs"], repoRoot, {
+  ...childEnv,
+  CLOUDFLARE_SECRET_PROFILE: "executor",
+});
+run("npx", ["wrangler", "deploy", ...process.argv.slice(2)], executorDir);

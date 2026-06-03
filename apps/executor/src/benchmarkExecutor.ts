@@ -1,16 +1,7 @@
-import { createPublicClient, encodeFunctionData, http, parseEventLogs, defineChain } from "viem";
+import { encodeFunctionData, parseEventLogs } from "viem";
 import { type ManagedSigner } from "./managedSigner.js";
-import { config } from "./config.js";
 import { ensureAnchoredSnapshot, getActivePolicy } from "./onchainPolicy.js";
-
-const mantleSepolia = defineChain({
-  id: config.chainId,
-  name: config.chainName,
-  nativeCurrency: { name: "MNT", symbol: "MNT", decimals: 18 },
-  rpcUrls: {
-    default: { http: [config.mantleSepoliaRpcUrl] },
-  },
-});
+import { getExecutorRuntime } from "./runtime.js";
 
 const benchmarkAbi = [
   {
@@ -49,11 +40,6 @@ const benchmarkAbi = [
   },
 ] as const;
 
-const publicClient = createPublicClient({
-  chain: mantleSepolia,
-  transport: http(config.mantleSepoliaRpcUrl),
-});
-
 export function buildCreateDecisionCalldata(args: {
   ownerEoa: string;
   vaultAddress: string;
@@ -85,6 +71,9 @@ export function buildCreateDecisionCalldata(args: {
 }
 
 export function extractDecisionCreated(logs: readonly unknown[]) {
+  const {
+    config,
+  } = getExecutorRuntime();
   const parsedLogs = parseEventLogs({
     abi: benchmarkAbi,
     eventName: "DecisionReceiptCreated",
@@ -116,6 +105,7 @@ export async function executeBenchmarkJob(
     settlementHorizonHours: number;
   }
 ) {
+  const { config, publicClient } = getExecutorRuntime();
   const capabilities = signer.getCapabilities();
   if (!capabilities.canExecute) {
     throw new Error("Signer cannot execute transactions");

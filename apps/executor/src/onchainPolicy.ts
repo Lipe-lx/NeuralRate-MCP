@@ -1,15 +1,6 @@
-import { createPublicClient, defineChain, encodeFunctionData, getContract, http, keccak256, stringToHex, type Address, type Hex } from "viem";
+import { encodeFunctionData, getContract, keccak256, stringToHex, type Address, type Hex } from "viem";
 import type { ManagedSigner } from "./managedSigner.js";
-import { config } from "./config.js";
-
-const mantleSepolia = defineChain({
-  id: config.chainId,
-  name: config.chainName,
-  nativeCurrency: { name: "MNT", symbol: "MNT", decimals: 18 },
-  rpcUrls: {
-    default: { http: [config.mantleSepoliaRpcUrl] },
-  },
-});
+import { getExecutorRuntime } from "./runtime.js";
 
 const policyRegistryAbi = [
   {
@@ -60,6 +51,34 @@ const policyRegistryAbi = [
   },
   {
     type: "function",
+    name: "getAllowedAssets",
+    stateMutability: "view",
+    inputs: [{ name: "policyId", type: "bytes32" }],
+    outputs: [{ name: "", type: "string[]" }],
+  },
+  {
+    type: "function",
+    name: "getAllowedProtocols",
+    stateMutability: "view",
+    inputs: [{ name: "policyId", type: "bytes32" }],
+    outputs: [{ name: "", type: "string[]" }],
+  },
+  {
+    type: "function",
+    name: "getAllowedTargets",
+    stateMutability: "view",
+    inputs: [{ name: "policyId", type: "bytes32" }],
+    outputs: [{ name: "", type: "address[]" }],
+  },
+  {
+    type: "function",
+    name: "getAllowedSelectors",
+    stateMutability: "view",
+    inputs: [{ name: "policyId", type: "bytes32" }],
+    outputs: [{ name: "", type: "bytes4[]" }],
+  },
+  {
+    type: "function",
     name: "anchorSnapshot",
     stateMutability: "nonpayable",
     inputs: [
@@ -71,11 +90,6 @@ const policyRegistryAbi = [
     outputs: [],
   },
 ] as const;
-
-const publicClient = createPublicClient({
-  chain: mantleSepolia,
-  transport: http(config.mantleSepoliaRpcUrl),
-});
 
 export type OnchainActivePolicy = {
   policyId: string;
@@ -127,6 +141,7 @@ export const buildAnchorSnapshotCalldata = (args: {
   });
 
 export async function getActivePolicy(vaultAddress: string): Promise<OnchainActivePolicy> {
+  const { config, publicClient } = getExecutorRuntime();
   if (!config.policyRegistryContract) {
     return null;
   }
@@ -164,10 +179,10 @@ export async function getActivePolicy(vaultAddress: string): Promise<OnchainActi
     hasTargetAllowlist: policy.hasTargetAllowlist,
     hasSelectorAllowlist: policy.hasSelectorAllowlist,
     policyVersion: policy.policyVersion,
-    allowedAssets: allowedAssets.map((value) => value.trim().toUpperCase()).filter(Boolean),
-    allowedProtocols: allowedProtocols.map((value) => value.trim().toUpperCase()).filter(Boolean),
-    allowedTargets: allowedTargets.map((value) => value.toLowerCase()),
-    allowedSelectors: allowedSelectors.map((value) => value.toLowerCase()),
+    allowedAssets: allowedAssets.map((value: string) => value.trim().toUpperCase()).filter(Boolean),
+    allowedProtocols: allowedProtocols.map((value: string) => value.trim().toUpperCase()).filter(Boolean),
+    allowedTargets: allowedTargets.map((value: string) => value.toLowerCase()),
+    allowedSelectors: allowedSelectors.map((value: string) => value.toLowerCase()),
   };
 }
 
@@ -179,6 +194,7 @@ export async function ensureAnchoredSnapshot(args: {
   descriptor?: string | null;
   mode?: "submit" | "read-only";
 }) {
+  const { config, publicClient } = getExecutorRuntime();
   if (!config.policyRegistryContract || !args.snapshotHash) {
     return { anchored: false, snapshotHash: null as string | null };
   }

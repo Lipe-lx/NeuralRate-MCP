@@ -1,50 +1,13 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { createPublicClient, defineChain, http } from "viem";
-import { config } from "./config.js";
-import { DataApiClient } from "./dataApi.js";
-import {
-  AddressOnlyManagedSigner,
-  RemoteManagedSigner,
-  TurnkeyManagedSigner,
-  type ManagedSigner,
-} from "./managedSigner.js";
+import { httpServerHandler } from "cloudflare:node";
+import { fileURLToPath } from "node:url";
 import { buildBenchmarkPolicy, buildExecutionPolicy } from "./policy.js";
 import { executeBenchmarkJob } from "./benchmarkExecutor.js";
 import { getApprovedStrategySurface, resolveExecutionPlan } from "./executionPlanner.js";
 import type { StrategyIntent } from "./executionRegistry.js";
 import { canUseAARuntime, getAARuntimeStatus, sendAAVaultUserOperation } from "./aaRuntime.js";
 import { buildAnchorSnapshotCalldata, ensureAnchoredSnapshot, getActivePolicy } from "./onchainPolicy.js";
-
-const dataApi = new DataApiClient(config.dataApiBaseUrl.replace(/\/+$/, ""), config.internalApiToken);
-const mantleSepolia = defineChain({
-  id: config.chainId,
-  name: config.chainName,
-  nativeCurrency: { name: "MNT", symbol: "MNT", decimals: 18 },
-  rpcUrls: {
-    default: { http: [config.mantleSepoliaRpcUrl] },
-  },
-});
-const publicClient = createPublicClient({
-  chain: mantleSepolia,
-  transport: http(config.mantleSepoliaRpcUrl),
-});
-const managedSigner: ManagedSigner = config.managedSignerUrl
-  ? new RemoteManagedSigner(config.managedSignerUrl, config.managedSignerToken)
-  : (
-      config.turnkeyOrganizationId &&
-      config.turnkeyApiPublicKey &&
-      config.turnkeyApiPrivateKey &&
-      config.turnkeyWalletAccountAddress
-    )
-      ? new TurnkeyManagedSigner({
-          apiBaseUrl: config.turnkeyApiBaseUrl,
-          organizationId: config.turnkeyOrganizationId,
-          apiPublicKey: config.turnkeyApiPublicKey,
-          apiPrivateKey: config.turnkeyApiPrivateKey,
-          walletAccountAddress: config.turnkeyWalletAccountAddress,
-          walletAccountId: config.turnkeyWalletAccountId,
-        })
-      : new AddressOnlyManagedSigner(config.agentSessionSignerAddress);
+import { getExecutorRuntime, initializeExecutorRuntime, initializeLocalExecutorRuntime } from "./runtime.js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -77,6 +40,7 @@ const readJson = async <T>(request: IncomingMessage) => {
 const makeId = (prefix: string) => `${prefix}_${crypto.randomUUID()}`;
 
 const waitForConfirmation = async (txHash: `0x${string}`) => {
+  const { publicClient } = getExecutorRuntime();
   const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
 
   if (receipt.status !== "success") {
@@ -120,7 +84,7 @@ type MutationAuthPayload = {
 };
 
 const isInternalExecutorRequest = (request: IncomingMessage) =>
-  request.headers["x-neuralrate-internal-token"] === config.internalApiToken;
+  request.headers["x-neuralrate-internal-token"] === getExecutorRuntime().config.internalApiToken;
 
 const assertInternalExecutorRequest = (request: IncomingMessage) => {
   if (!isInternalExecutorRequest(request)) {
@@ -129,6 +93,7 @@ const assertInternalExecutorRequest = (request: IncomingMessage) => {
 };
 
 const resolveScopedState = async (ownerEoa: string) => {
+  const { config, dataApi } = getExecutorRuntime();
   const state = (await dataApi.getAutomationState(ownerEoa)) as AutomationStateResponse;
   const vaultAddress = String(state.vault?.vault_address ?? state.account?.user_smart_account ?? "");
 
@@ -147,7 +112,7 @@ const resolveScopedState = async (ownerEoa: string) => {
   };
 };
 
-createServer(async (request, response) => {
+const server = createServer(async (request, response) => {
   try {
     if (!request.url || !request.method) {
       sendJson(response, 400, { error: "Malformed request" });
@@ -163,6 +128,7 @@ createServer(async (request, response) => {
     const url = new URL(request.url, `http://${request.headers.host || "127.0.0.1"}`);
 
     if (url.pathname === "/health" && request.method === "GET") {
+      const { config, managedSigner } = getExecutorRuntime();
       const aaRuntimeStatus = await getAARuntimeStatus(managedSigner);
       sendJson(response, 200, {
         status: "ok",
@@ -191,6 +157,7 @@ createServer(async (request, response) => {
     }
 
     assertInternalExecutorRequest(request);
+    const { config, dataApi, publicClient, managedSigner } = getExecutorRuntime();
 
     if (url.pathname === "/v1/state" && request.method === "GET") {
       const ownerEoa = url.searchParams.get("ownerEoa");
@@ -845,6 +812,35 @@ createServer(async (request, response) => {
     const message = error instanceof Error ? error.message : "Unknown executor error";
     sendJson(response, 500, { error: message });
   }
-}).listen(config.port, () => {
-  console.log(`NeuralRate executor listening on http://127.0.0.1:${config.port}`);
 });
+
+type NodeStyleServerLike = {
+  listen(...args: unknown[]): NodeStyleServerLike;
+  address(): { port?: number | null | undefined };
+};
+
+const workerHandler = httpServerHandler(server as unknown as NodeStyleServerLike);
+
+export default {
+  async fetch(request: Request, env: Record<string, string | undefined>, ctx: ExecutionContext) {
+    initializeExecutorRuntime(env);
+    return workerHandler.fetch!(
+      request as unknown as Request<unknown, IncomingRequestCfProperties<unknown>>,
+      env,
+      ctx
+    );
+  },
+};
+
+const isDirectNodeExecution =
+  typeof process !== "undefined" &&
+  process.release?.name === "node" &&
+  process.argv[1] &&
+  fileURLToPath(import.meta.url) === process.argv[1];
+
+if (isDirectNodeExecution) {
+  const { config } = initializeLocalExecutorRuntime();
+  server.listen(config.port, () => {
+    console.log(`NeuralRate executor listening on http://127.0.0.1:${config.port}`);
+  });
+}

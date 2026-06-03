@@ -1,9 +1,6 @@
 import {
-  createPublicClient,
-  defineChain,
   encodeAbiParameters,
   encodeFunctionData,
-  http,
   type Address,
   type Hex,
 } from "viem";
@@ -14,17 +11,9 @@ import {
   toSmartAccount,
   type UserOperation,
 } from "viem/account-abstraction";
-import { config } from "./config.js";
 import type { ManagedSigner } from "./managedSigner.js";
-
-const mantleSepolia = defineChain({
-  id: config.chainId,
-  name: config.chainName,
-  nativeCurrency: { name: "MNT", symbol: "MNT", decimals: 18 },
-  rpcUrls: {
-    default: { http: [config.mantleSepoliaRpcUrl] },
-  },
-});
+import { getExecutorRuntime } from "./runtime.js";
+import { http } from "viem";
 
 const safe7579Abi = [
   {
@@ -76,11 +65,6 @@ export type AARuntimeStatus = {
   endpoints: BundlerEndpointStatus[];
 };
 
-const publicClient = createPublicClient({
-  chain: mantleSepolia,
-  transport: http(config.mantleSepoliaRpcUrl),
-});
-
 const encodeSingleExecution = (call: AARuntimeCall) =>
   `0x${[
     call.to.toLowerCase().replace(/^0x/, ""),
@@ -107,9 +91,9 @@ const encodeBatchExecution = (calls: readonly AARuntimeCall[]) =>
 
 const isAARuntimeConfigured = () =>
   Boolean(
-    config.safe7579AdapterAddress &&
-    config.delegateValidatorAddress &&
-    config.aaBundlerUrls.length > 0
+    getExecutorRuntime().config.safe7579AdapterAddress &&
+    getExecutorRuntime().config.delegateValidatorAddress &&
+    getExecutorRuntime().config.aaBundlerUrls.length > 0
   );
 
 let cachedBundlerStatus:
@@ -150,6 +134,7 @@ const callBundlerRpc = async (url: string, method: string, params: unknown[] = [
 };
 
 const probeBundlerEndpoint = async (url: string): Promise<BundlerEndpointStatus> => {
+  const { config, chain } = getExecutorRuntime();
   try {
     const chainIdHex = await callBundlerRpc(url, "eth_chainId");
     const supportedEntryPointsRaw = await callBundlerRpc(url, "eth_supportedEntryPoints");
@@ -158,7 +143,7 @@ const probeBundlerEndpoint = async (url: string): Promise<BundlerEndpointStatus>
       ? supportedEntryPointsRaw.filter((value): value is string => typeof value === "string").map(normalizeAddress)
       : [];
     const supportsConfiguredEntryPoint = supportedEntryPoints.includes(normalizeAddress(config.aaEntryPointAddress));
-    const healthy = Number.isFinite(chainId) && chainId === mantleSepolia.id && supportsConfiguredEntryPoint;
+    const healthy = Number.isFinite(chainId) && chainId === chain.id && supportsConfiguredEntryPoint;
 
     return {
       url,
@@ -181,6 +166,7 @@ const probeBundlerEndpoint = async (url: string): Promise<BundlerEndpointStatus>
 };
 
 export async function getAARuntimeStatus(signer: ManagedSigner, forceRefresh = false): Promise<AARuntimeStatus> {
+  const { config } = getExecutorRuntime();
   const signerCanSign = signer.getCapabilities().canSignUserOperations;
   if (!forceRefresh && cachedBundlerStatus && cachedBundlerStatus.expiresAt > Date.now()) {
     return {
@@ -208,6 +194,7 @@ export async function getAARuntimeStatus(signer: ManagedSigner, forceRefresh = f
 }
 
 const buildSafe7579Account = async (signer: ManagedSigner, vaultAddress: string) => {
+  const { config, publicClient, chain } = getExecutorRuntime();
   if (!config.safe7579AdapterAddress || !config.delegateValidatorAddress) {
     throw new Error("Safe7579 AA runtime is not fully configured.");
   }
@@ -269,7 +256,7 @@ const buildSafe7579Account = async (signer: ManagedSigner, vaultAddress: string)
     },
     async signUserOperation(parameters) {
       const userOperationHash = getUserOperationHash({
-        chainId: parameters.chainId ?? mantleSepolia.id,
+        chainId: parameters.chainId ?? chain.id,
         entryPointAddress: config.aaEntryPointAddress as Address,
         entryPointVersion: "0.7",
         userOperation: parameters as UserOperation<"0.7">,
@@ -284,6 +271,7 @@ export async function sendAAVaultUserOperation(args: {
   vaultAddress: string;
   calls: readonly AARuntimeCall[];
 }) {
+  const { config, chain } = getExecutorRuntime();
   const runtimeStatus = await getAARuntimeStatus(args.signer, true);
   if (!runtimeStatus.configured) {
     throw new Error("AA runtime is not configured with a Safe7579 adapter, validator and bundler URL.");
@@ -312,7 +300,7 @@ export async function sendAAVaultUserOperation(args: {
     try {
       const bundlerClient = createBundlerClient({
         account,
-        chain: mantleSepolia,
+        chain,
         transport: http(bundlerUrl),
       });
       userOpHash = await bundlerClient.sendUserOperation({
@@ -340,7 +328,7 @@ export async function sendAAVaultUserOperation(args: {
     try {
       const bundlerClient = createBundlerClient({
         account,
-        chain: mantleSepolia,
+        chain,
         transport: http(bundlerUrl),
       });
       const receipt = await bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });

@@ -131,6 +131,14 @@ const isTransientPolicyPublishVerificationError = (error: unknown) => {
     /Published on-chain policy does not match the prepared draft/i.test(message)
   );
 };
+const isExecutorReachabilityError = (error: unknown) => {
+  const message = getErrorMessage(error);
+  return (
+    /EXECUTOR_BASE_URL/i.test(message) ||
+    /Executor origin .*403\/1003/i.test(message) ||
+    /Executor 403 Forbidden: error code: 1003/i.test(message)
+  );
+};
 
 export const useNeuralRateUser = ({
   ownerEoa,
@@ -708,9 +716,13 @@ export const useNeuralRateUser = ({
             : `${DEMO_TARGET_ASSET} demo strategy was accepted, but the managed signer is not execution-capable in this environment.`,
       );
     } catch (err) {
-      const message = err instanceof Error ? err.message : `Failed to queue the ${DEMO_TARGET_ASSET} demo strategy.`;
+      const message = isExecutorReachabilityError(err)
+        ? "Automation is enabled, but the execution service is misconfigured or unreachable in this environment. Configure the deployed executor URL and redeploy the worker before queueing strategies."
+        : err instanceof Error
+          ? err.message
+          : `Failed to queue the ${DEMO_TARGET_ASSET} demo strategy.`;
       setError(message);
-      throw err;
+      throw new Error(message);
     } finally {
       setBusy(false);
     }

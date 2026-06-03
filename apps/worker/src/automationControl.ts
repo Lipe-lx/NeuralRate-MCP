@@ -10,10 +10,16 @@ import {
 import { withOnchainPolicyState } from "./onchainState";
 import { encodeFunctionData, toFunctionSelector, type Address } from "viem";
 
+type ExecutorServiceBinding = {
+  fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
+};
+
 type ExecutorEnv = {
+  EXECUTOR?: ExecutorServiceBinding;
   EXECUTOR_BASE_URL?: string;
   INTERNAL_API_TOKEN?: string;
   NEURALRATE_INTERNAL_API_TOKEN?: string;
+  NEURALRATE_ENV_PROFILE?: string;
   NEURALRATE_BENCHMARK_CONTRACT: string;
   NEURALRATE_CHAIN_ID?: string;
   NEURALRATE_POLICY_REGISTRY_CONTRACT?: string;
@@ -1007,26 +1013,69 @@ async function callExecutor<T>(
   path: string,
   body: Record<string, unknown>
 ) {
-  const executorBaseUrl = env.EXECUTOR_BASE_URL?.trim();
   const internalApiToken = env.NEURALRATE_INTERNAL_API_TOKEN?.trim() || env.INTERNAL_API_TOKEN?.trim();
-  if (!executorBaseUrl) {
-    throw new Error("Worker EXECUTOR_BASE_URL is not configured.");
-  }
   if (!internalApiToken) {
     throw new Error("Worker INTERNAL_API_TOKEN is not configured.");
   }
 
-  const response = await fetch(`${executorBaseUrl.replace(/\/+$/, "")}${path}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-NeuralRate-Internal-Token": internalApiToken,
-    },
-    body: JSON.stringify(body),
-  });
+  const envProfile = (env.NEURALRATE_ENV_PROFILE || "").trim().toLowerCase();
+  const isProductionProfile = envProfile === "production";
+  const serviceBinding = env.EXECUTOR;
+  let response: Response;
+  let executorOrigin = "service-binding://EXECUTOR";
+
+  if (serviceBinding) {
+    response = await serviceBinding.fetch(`https://executor.internal${path}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-NeuralRate-Internal-Token": internalApiToken,
+      },
+      body: JSON.stringify(body),
+    });
+  } else {
+    const executorBaseUrl = env.EXECUTOR_BASE_URL?.trim();
+    if (!executorBaseUrl) {
+      throw new Error("Worker EXECUTOR service binding is not configured, and EXECUTOR_BASE_URL fallback is empty.");
+    }
+
+    let executorUrl: URL;
+    try {
+      executorUrl = new URL(executorBaseUrl);
+    } catch {
+      throw new Error(`Worker EXECUTOR_BASE_URL is invalid: ${executorBaseUrl}`);
+    }
+
+    const isLoopbackHost =
+      executorUrl.hostname === "localhost" ||
+      executorUrl.hostname === "0.0.0.0" ||
+      executorUrl.hostname === "::1" ||
+      executorUrl.hostname.startsWith("127.");
+
+    if (isProductionProfile && isLoopbackHost) {
+      throw new Error(
+        `Worker EXECUTOR_BASE_URL points to a local-only host (${executorUrl.origin}). Production must use the EXECUTOR service binding or a non-loopback fallback during migration.`
+      );
+    }
+
+    executorOrigin = executorUrl.origin;
+    response = await fetch(`${executorUrl.origin}${path}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-NeuralRate-Internal-Token": internalApiToken,
+      },
+      body: JSON.stringify(body),
+    });
+  }
 
   if (!response.ok) {
     const text = await response.text();
+    if (response.status === 403 && /error code:\s*1003/i.test(text)) {
+      throw new Error(
+        `Executor origin ${executorOrigin} is not reachable from the worker. Cloudflare returned 403/1003, which usually means the fallback EXECUTOR_BASE_URL is pointing at the wrong host.`
+      );
+    }
     throw new Error(`Executor ${response.status} ${response.statusText}: ${text}`);
   }
 

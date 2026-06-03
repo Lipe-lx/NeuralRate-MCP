@@ -60,6 +60,10 @@ import {
 } from "./mcp/tools";
 import { withOnchainPolicyState } from "./onchainState";
 
+type ExecutorServiceBinding = {
+  fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
+};
+
 export interface Env {
   CACHE_KV: KVNamespace;
   DECISIONS_DB: D1Database;
@@ -86,6 +90,7 @@ export interface Env {
   NEURALRATE_ENV_PROFILE?: string;
   NEURALRATE_INTERNAL_API_TOKEN?: string;
   INTERNAL_API_TOKEN?: string;
+  EXECUTOR?: ExecutorServiceBinding;
   EXECUTOR_BASE_URL?: string;
 }
 
@@ -955,13 +960,30 @@ export default {
         }
 
         if (url.pathname === "/api/health" && request.method === "GET") {
+          const executorBaseUrl = env.EXECUTOR_BASE_URL?.trim() || "";
+          let executorBaseUrlIsLoopback = false;
+          if (executorBaseUrl) {
+            try {
+              const parsedExecutorUrl = new URL(executorBaseUrl);
+              executorBaseUrlIsLoopback =
+                parsedExecutorUrl.hostname === "localhost" ||
+                parsedExecutorUrl.hostname === "0.0.0.0" ||
+                parsedExecutorUrl.hostname === "::1" ||
+                parsedExecutorUrl.hostname.startsWith("127.");
+            } catch {
+              executorBaseUrlIsLoopback = false;
+            }
+          }
+
           const health = {
             ok: true,
             envProfile: env.NEURALRATE_ENV_PROFILE || "demo",
             env: {
               hasFredApiKey: Boolean(env.FRED_API_KEY),
               hasNansenApiKey: Boolean(env.NANSEN_API_KEY),
-              hasExecutorBaseUrl: Boolean(env.EXECUTOR_BASE_URL),
+              hasExecutorServiceBinding: Boolean(env.EXECUTOR),
+              hasExecutorBaseUrlFallback: Boolean(env.EXECUTOR_BASE_URL),
+              executorBaseUrlIsLoopback,
               hasRpcUrl: Boolean(env.MANTLE_SEPOLIA_RPC_URL),
               hasInternalToken: Boolean(getInternalApiToken(env)),
             },
@@ -1878,7 +1900,12 @@ export default {
 
         return new Response(JSON.stringify({ error: "Endpoint not found" }), { status: 404, headers: corsHeaders });
       } catch (err: any) {
-        return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
+        const message = err instanceof Error ? err.message : String(err);
+        const status =
+          /EXECUTOR service binding|EXECUTOR_BASE_URL|Executor origin .*403\/1003|Executor .* 5\d\d/i.test(message)
+            ? 503
+            : 500;
+        return new Response(JSON.stringify({ error: message }), { status, headers: corsHeaders });
       }
     }
 
