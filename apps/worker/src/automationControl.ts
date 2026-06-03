@@ -105,9 +105,11 @@ const policyRegistryAbi = [
 
 const makeId = (prefix: string) => `${prefix}_${crypto.randomUUID()}`;
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const ONCHAIN_SETTLEMENT_DELAYS_MS = [0, 1200, 2500, 4500] as const;
 const EXECUTE_VAULT_CALL_SELECTOR = toFunctionSelector(
   "executeVaultCall(address,address,address,uint256,bytes,bytes32)"
 );
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const asNumber = (value: unknown, fallback: number) => {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -238,6 +240,12 @@ const matchesExpectedPublishedPolicy = (
     JSON.stringify(normalizeStringList(activePolicy.allowedSelectors, "lower")) === JSON.stringify(expected.allowedSelectors)
   );
 };
+
+const readOnchainAutomationState = async (
+  store: AutomationStore,
+  env: ExecutorEnv,
+  access: ScopedAutomationAccess
+) => withOnchainPolicyState(await store.getAutomationState(access.ownerEoa), env);
 
 const assertVaultReadyForGrant = (state: Awaited<ReturnType<AutomationStore["getAutomationState"]>>) => {
   if (!state.vault?.vault_id || !state.vault.vault_address) {
@@ -696,12 +704,23 @@ export async function submitPolicyPublish(
     expectedPolicy?: ExpectedPublishedPolicy | null;
   }
 ) {
-  const state = await withOnchainPolicyState(await store.getAutomationState(access.ownerEoa), env);
-  if (!state.activeOnchainPolicy) {
-    throw new Error("No active on-chain policy found after publish.");
-  }
   if (!args?.expectedPolicy) {
     throw new Error("expectedPolicy is required to verify the published on-chain policy.");
+  }
+
+  let state: Awaited<ReturnType<typeof readOnchainAutomationState>> | null = null;
+  for (const delayMs of ONCHAIN_SETTLEMENT_DELAYS_MS) {
+    if (delayMs > 0) {
+      await wait(delayMs);
+    }
+    state = await readOnchainAutomationState(store, env, access);
+    if (matchesExpectedPublishedPolicy(asRecord(state.activeOnchainPolicy), args.expectedPolicy)) {
+      break;
+    }
+  }
+
+  if (!state?.activeOnchainPolicy) {
+    throw new Error("No active on-chain policy found after publish.");
   }
   if (!matchesExpectedPublishedPolicy(asRecord(state.activeOnchainPolicy), args.expectedPolicy)) {
     throw new Error("Published on-chain policy does not match the prepared draft.");
@@ -754,7 +773,20 @@ export async function submitPolicyRevoke(
   access: ScopedAutomationAccess,
   txHash?: string | null
 ) {
-  const state = await withOnchainPolicyState(await store.getAutomationState(access.ownerEoa), env);
+  let state: Awaited<ReturnType<typeof readOnchainAutomationState>> | null = null;
+  for (const delayMs of ONCHAIN_SETTLEMENT_DELAYS_MS) {
+    if (delayMs > 0) {
+      await wait(delayMs);
+    }
+    state = await readOnchainAutomationState(store, env, access);
+    if (!state.activeOnchainPolicy) {
+      break;
+    }
+  }
+
+  if (!state) {
+    throw new Error("Unable to refresh on-chain policy state after revoke.");
+  }
   if (state.activeOnchainPolicy) {
     throw new Error("On-chain policy is still active after revoke.");
   }
@@ -856,20 +888,36 @@ export async function submitVaultRuntimeEnable(
   access: ScopedAutomationAccess,
   txHashes?: Record<string, string>
 ) {
-  const state = await withOnchainPolicyState(await store.getAutomationState(access.ownerEoa), env);
-  const runtime = state.runtimeState;
   const requiresVaultModule = Boolean(env.NEURALRATE_VAULT_MODULE_ADDRESS);
   const requiresSafe7579 =
     Boolean(env.NEURALRATE_SAFE_7579_ADAPTER_ADDRESS) &&
     Boolean(env.NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS) &&
     Boolean(env.NEURALRATE_DELEGATE_VALIDATOR_ADDRESS);
   const requiresExecutionGuard = Boolean(env.NEURALRATE_EXECUTION_GUARD_CONTRACT);
-  const ready = Boolean(
-    runtime?.safeDeployed &&
-    (!requiresVaultModule || runtime.vaultModuleEnabled) &&
-    (!requiresSafe7579 || (runtime.safe7579Enabled && runtime.delegateReady && runtime.fallbackReady)) &&
-    (!requiresExecutionGuard || runtime.moduleGuardReady)
-  );
+
+  let state: Awaited<ReturnType<typeof readOnchainAutomationState>> | null = null;
+  let runtime: Record<string, unknown> | null = null;
+  let ready = false;
+  for (const delayMs of ONCHAIN_SETTLEMENT_DELAYS_MS) {
+    if (delayMs > 0) {
+      await wait(delayMs);
+    }
+    state = await readOnchainAutomationState(store, env, access);
+    runtime = state.runtimeState;
+    ready = Boolean(
+      runtime?.safeDeployed &&
+      (!requiresVaultModule || runtime.vaultModuleEnabled) &&
+      (!requiresSafe7579 || (runtime.safe7579Enabled && runtime.delegateReady && runtime.fallbackReady)) &&
+      (!requiresExecutionGuard || runtime.moduleGuardReady)
+    );
+    if (ready) {
+      break;
+    }
+  }
+
+  if (!state) {
+    throw new Error("Unable to refresh runtime state after enable.");
+  }
   if (!ready) {
     throw new Error("Vault runtime is not yet fully enabled on-chain.");
   }
@@ -922,7 +970,20 @@ export async function submitVaultRuntimeDisable(
   access: ScopedAutomationAccess,
   txHashes?: Record<string, string>
 ) {
-  const state = await withOnchainPolicyState(await store.getAutomationState(access.ownerEoa), env);
+  let state: Awaited<ReturnType<typeof readOnchainAutomationState>> | null = null;
+  for (const delayMs of ONCHAIN_SETTLEMENT_DELAYS_MS) {
+    if (delayMs > 0) {
+      await wait(delayMs);
+    }
+    state = await readOnchainAutomationState(store, env, access);
+    if (!state.runtimeState?.vaultModuleEnabled) {
+      break;
+    }
+  }
+
+  if (!state) {
+    throw new Error("Unable to refresh runtime state after disable.");
+  }
   if (state.vault?.vault_id) {
     await store.upsertVault({
       ownerEoa: access.ownerEoa,

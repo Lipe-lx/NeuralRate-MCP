@@ -340,10 +340,12 @@ export async function deployUserSafeVault(
     };
   }
 
-  const txHash = await provider.request({
-    method: 'eth_sendTransaction',
-    params: [predicted.deploymentRequest],
-  });
+  const txHash = await retryOnUnknownBlock(() =>
+    provider.request({
+      method: 'eth_sendTransaction',
+      params: [predicted.deploymentRequest],
+    })
+  );
 
   return {
     safeAddress: predicted.safeAddress,

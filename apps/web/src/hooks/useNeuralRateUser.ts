@@ -91,6 +91,7 @@ type PreparedRuntimePlan = {
 
 const DEFAULT_AUTOMATION_DOMAINS = ["state", "config", "benchmark", "execution"] as const;
 const AUTOMATION_RECOVERY_REFRESH_DELAYS_MS = [0, 800, 1800, 3200] as const;
+const POLICY_PUBLISH_RECOVERY_DELAYS_MS = [0, 1200, 2500, 4500] as const;
 
 const isUnknownBlockError = (error: unknown) => {
   if (!error || typeof error !== "object") {
@@ -118,6 +119,18 @@ const isUnknownBlockError = (error: unknown) => {
 };
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : String(error);
+const isTransientPolicyPublishVerificationError = (error: unknown) => {
+  if (isUnknownBlockError(error)) {
+    return true;
+  }
+
+  const message = getErrorMessage(error);
+  return (
+    /No active on-chain policy found after publish/i.test(message) ||
+    /Published on-chain policy does not match the prepared draft/i.test(message)
+  );
+};
 
 export const useNeuralRateUser = ({
   ownerEoa,
@@ -333,22 +346,50 @@ export const useNeuralRateUser = ({
       body: { ownerEoa },
     });
 
-    const txHash = await sendPreparedTransaction({
-      wallet: { getEthereumProvider },
-      txRequest: prepared.txRequest,
-    });
+    const submitPublishedPolicy = async (txHash?: string | null) => {
+      let lastError: unknown;
 
-    return signedJsonFetch({
-      ownerEoa,
-      signMessage,
-      url: `${API_BASE_URL}/automation/policy/submit-publish`,
-      method: "POST",
-      body: {
-        ownerEoa,
-        txHash,
-        expectedPolicy: prepared.expectedPolicy,
-      },
-    });
+      for (let attempt = 0; attempt < POLICY_PUBLISH_RECOVERY_DELAYS_MS.length; attempt += 1) {
+        const delayMs = POLICY_PUBLISH_RECOVERY_DELAYS_MS[attempt];
+        if (delayMs > 0) {
+          await wait(delayMs);
+        }
+
+        try {
+          return await signedJsonFetch({
+            ownerEoa,
+            signMessage,
+            url: `${API_BASE_URL}/automation/policy/submit-publish`,
+            method: "POST",
+            body: {
+              ownerEoa,
+              txHash,
+              expectedPolicy: prepared.expectedPolicy,
+            },
+          });
+        } catch (error) {
+          lastError = error;
+          if (!isTransientPolicyPublishVerificationError(error) || attempt === POLICY_PUBLISH_RECOVERY_DELAYS_MS.length - 1) {
+            throw error;
+          }
+        }
+      }
+
+      throw lastError;
+    };
+
+    try {
+      const txHash = await sendPreparedTransaction({
+        wallet: { getEthereumProvider },
+        txRequest: prepared.txRequest,
+      });
+      return await submitPublishedPolicy(txHash);
+    } catch (error) {
+      if (!isUnknownBlockError(error)) {
+        throw error;
+      }
+      return submitPublishedPolicy();
+    }
   };
 
   const finalizeAutomationGrant = async (current: AutomationState) => {

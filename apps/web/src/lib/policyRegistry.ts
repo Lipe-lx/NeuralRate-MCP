@@ -14,6 +14,10 @@ export type PreparedTxRequest = {
   to: string;
   data: string;
   value?: string;
+  gas?: string;
+  gasPrice?: string;
+  maxFeePerGas?: string;
+  maxPriorityFeePerGas?: string;
 };
 
 const policyRegistryAbi = [
@@ -53,6 +57,52 @@ const policyRegistryAbi = [
 ] as const;
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+const UNKNOWN_BLOCK_RETRY_DELAYS_MS = [800, 1500, 2500, 4000] as const;
+const POST_RECEIPT_PROPAGATION_DELAY_MS = 900;
+
+const isUnknownBlockError = (error: unknown) => {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const record = error as {
+    message?: unknown;
+    details?: unknown;
+    shortMessage?: unknown;
+    cause?: { message?: unknown; details?: unknown } | null;
+  };
+
+  const parts = [
+    record.message,
+    record.details,
+    record.shortMessage,
+    record.cause?.message,
+    record.cause?.details,
+  ]
+    .filter((value) => typeof value === "string")
+    .join(" ");
+
+  return /unknown block/i.test(parts);
+};
+
+const retryOnUnknownBlock = async <T>(action: () => Promise<T>) => {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= UNKNOWN_BLOCK_RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      return await action();
+    } catch (error) {
+      lastError = error;
+      if (!isUnknownBlockError(error) || attempt === UNKNOWN_BLOCK_RETRY_DELAYS_MS.length) {
+        throw error;
+      }
+
+      await wait(UNKNOWN_BLOCK_RETRY_DELAYS_MS[attempt]);
+    }
+  }
+
+  throw lastError;
+};
 
 const waitForTransactionReceipt = async (
   provider: EIP1193Provider,
@@ -61,12 +111,20 @@ const waitForTransactionReceipt = async (
   delayMs = 1500
 ) => {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const receipt = await provider.request({
-      method: "eth_getTransactionReceipt",
-      params: [txHash],
-    });
+    let receipt = null;
+    try {
+      receipt = await provider.request({
+        method: "eth_getTransactionReceipt",
+        params: [txHash],
+      });
+    } catch (error) {
+      if (!isUnknownBlockError(error)) {
+        throw error;
+      }
+    }
 
     if (receipt) {
+      await wait(POST_RECEIPT_PROPAGATION_DELAY_MS);
       return receipt;
     }
 
@@ -132,15 +190,17 @@ export async function publishActivePolicy(args: {
     ],
   });
 
-  const txHash = await provider.request({
-    method: "eth_sendTransaction",
-    params: [{
-      from: args.ownerEoa,
-      to: NEURALRATE_POLICY_REGISTRY_CONTRACT,
-      data,
-      value: "0x0",
-    }],
-  });
+  const txHash = await retryOnUnknownBlock(() =>
+    provider.request({
+      method: "eth_sendTransaction",
+      params: [{
+        from: args.ownerEoa,
+        to: NEURALRATE_POLICY_REGISTRY_CONTRACT,
+        data,
+        value: "0x0",
+      }],
+    })
+  );
 
   await waitForTransactionReceipt(provider, String(txHash));
   return String(txHash);
@@ -165,15 +225,17 @@ export async function revokeActivePolicy(args: {
     ],
   });
 
-  const txHash = await provider.request({
-    method: "eth_sendTransaction",
-    params: [{
-      from: args.ownerEoa,
-      to: NEURALRATE_POLICY_REGISTRY_CONTRACT,
-      data,
-      value: "0x0",
-    }],
-  });
+  const txHash = await retryOnUnknownBlock(() =>
+    provider.request({
+      method: "eth_sendTransaction",
+      params: [{
+        from: args.ownerEoa,
+        to: NEURALRATE_POLICY_REGISTRY_CONTRACT,
+        data,
+        value: "0x0",
+      }],
+    })
+  );
 
   await waitForTransactionReceipt(provider, String(txHash));
   return String(txHash);
@@ -184,15 +246,21 @@ export async function sendPreparedTransaction(args: {
   txRequest: PreparedTxRequest;
 }) {
   const provider = await args.wallet.getEthereumProvider();
-  const txHash = await provider.request({
-    method: "eth_sendTransaction",
-    params: [{
-      from: args.txRequest.from,
-      to: args.txRequest.to,
-      data: args.txRequest.data,
-      value: args.txRequest.value ?? "0x0",
-    }],
-  });
+  const txHash = await retryOnUnknownBlock(() =>
+    provider.request({
+      method: "eth_sendTransaction",
+      params: [{
+        from: args.txRequest.from,
+        to: args.txRequest.to,
+        data: args.txRequest.data,
+        value: args.txRequest.value ?? "0x0",
+        gas: args.txRequest.gas,
+        gasPrice: args.txRequest.gasPrice,
+        maxFeePerGas: args.txRequest.maxFeePerGas,
+        maxPriorityFeePerGas: args.txRequest.maxPriorityFeePerGas,
+      }],
+    })
+  );
 
   await waitForTransactionReceipt(provider, String(txHash));
   return String(txHash);
