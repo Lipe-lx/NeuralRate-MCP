@@ -90,6 +90,7 @@ type PreparedRuntimePlan = {
 };
 
 const DEFAULT_AUTOMATION_DOMAINS = ["state", "config", "benchmark", "execution"] as const;
+const AUTOMATION_RECOVERY_REFRESH_DELAYS_MS = [0, 800, 1800, 3200] as const;
 
 const isUnknownBlockError = (error: unknown) => {
   if (!error || typeof error !== "object") {
@@ -115,6 +116,8 @@ const isUnknownBlockError = (error: unknown) => {
 
   return /unknown block/i.test(parts);
 };
+
+const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 export const useNeuralRateUser = ({
   ownerEoa,
@@ -526,7 +529,17 @@ export const useNeuralRateUser = ({
       await refresh(ownerEoa);
       setNotice(`Automation grant issued. ${moduleMessage}`);
     } catch (err) {
-      const recoveredState = await refresh(ownerEoa).catch(() => null);
+      let recoveredState: AutomationState | null = null;
+      for (const delayMs of AUTOMATION_RECOVERY_REFRESH_DELAYS_MS) {
+        if (delayMs > 0) {
+          await wait(delayMs);
+        }
+        recoveredState = await refresh(ownerEoa).catch(() => null);
+        if (recoveredState?.activeGrant?.status === "active") {
+          break;
+        }
+      }
+
       if (recoveredState?.activeGrant?.status === "active") {
         setError(null);
         if (isUnknownBlockError(err)) {

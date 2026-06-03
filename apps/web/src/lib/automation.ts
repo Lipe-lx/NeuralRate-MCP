@@ -245,8 +245,8 @@ const executeSafeTransactions = async (
   provider: EIP1193Provider,
   transactions: MetaTransactionData[]
 ) => {
-  const safeTx = await safe.createTransaction({ transactions });
-  const result = await safe.executeTransaction(safeTx);
+  const safeTx = await retryOnUnknownBlock(() => safe.createTransaction({ transactions }));
+  const result = await retryOnUnknownBlock(() => safe.executeTransaction(safeTx));
   await waitForTransactionReceipt(provider, result.hash);
   return result.hash;
 };
@@ -308,7 +308,7 @@ export async function resolveUserSafeVault(
     })
   );
 
-  const deployment = await safe.createSafeDeploymentTransaction();
+  const deployment = await retryOnUnknownBlock(() => safe.createSafeDeploymentTransaction());
   const safeAddress = (await safe.getAddress()).toLowerCase();
   const isDeployed = await retryOnUnknownBlock(() => safe.isSafeDeployed());
 
@@ -376,8 +376,8 @@ export async function ensureVaultModuleEnabled(
     };
   }
 
-  const enableModuleTx = await safe.createEnableModuleTx(moduleAddress);
-  const result = await safe.executeTransaction(enableModuleTx);
+  const enableModuleTx = await retryOnUnknownBlock(() => safe.createEnableModuleTx(moduleAddress));
+  const result = await retryOnUnknownBlock(() => safe.executeTransaction(enableModuleTx));
   await waitForTransactionReceipt(provider, result.hash);
 
   return {
@@ -412,8 +412,8 @@ export async function ensureAutonomousVaultRuntime(
   let moduleTxHash: string | null = null;
   const vaultModuleAlreadyEnabled = await retryOnUnknownBlock(() => safe.isModuleEnabled(moduleAddress));
   if (!vaultModuleAlreadyEnabled) {
-    const enableModuleTx = await safe.createEnableModuleTx(moduleAddress);
-    const result = await safe.executeTransaction(enableModuleTx);
+    const enableModuleTx = await retryOnUnknownBlock(() => safe.createEnableModuleTx(moduleAddress));
+    const result = await retryOnUnknownBlock(() => safe.executeTransaction(enableModuleTx));
     await waitForTransactionReceipt(provider, result.hash);
     moduleTxHash = result.hash;
   }
@@ -422,8 +422,10 @@ export async function ensureAutonomousVaultRuntime(
   if (NEURALRATE_EXECUTION_GUARD_CONTRACT) {
     const currentModuleGuard = (await retryOnUnknownBlock(() => safe.getModuleGuard())).toLowerCase();
     if (currentModuleGuard !== NEURALRATE_EXECUTION_GUARD_CONTRACT.toLowerCase()) {
-      const enableModuleGuardTx = await safe.createEnableModuleGuardTx(NEURALRATE_EXECUTION_GUARD_CONTRACT);
-      const result = await safe.executeTransaction(enableModuleGuardTx);
+      const enableModuleGuardTx = await retryOnUnknownBlock(() =>
+        safe.createEnableModuleGuardTx(NEURALRATE_EXECUTION_GUARD_CONTRACT)
+      );
+      const result = await retryOnUnknownBlock(() => safe.executeTransaction(enableModuleGuardTx));
       await waitForTransactionReceipt(provider, result.hash);
       moduleGuardTxHash = result.hash;
     }
@@ -499,8 +501,10 @@ export async function ensureAutonomousVaultRuntime(
   }
 
   if (fallbackHandler !== SAFE_7579_ADAPTER_ADDRESS.toLowerCase()) {
-    const enableFallbackTx = await safe.createEnableFallbackHandlerTx(SAFE_7579_ADAPTER_ADDRESS);
-    const result = await safe.executeTransaction(enableFallbackTx);
+    const enableFallbackTx = await retryOnUnknownBlock(() =>
+      safe.createEnableFallbackHandlerTx(SAFE_7579_ADAPTER_ADDRESS)
+    );
+    const result = await retryOnUnknownBlock(() => safe.executeTransaction(enableFallbackTx));
     await waitForTransactionReceipt(provider, result.hash);
     fallbackTxHash = result.hash;
   }
@@ -534,8 +538,8 @@ export async function disableVaultModule(
     return null;
   }
 
-  const disableModuleTx = await safe.createDisableModuleTx(moduleAddress);
-  const result = await safe.executeTransaction(disableModuleTx);
+  const disableModuleTx = await retryOnUnknownBlock(() => safe.createDisableModuleTx(moduleAddress));
+  const result = await retryOnUnknownBlock(() => safe.executeTransaction(disableModuleTx));
   await waitForTransactionReceipt(provider, result.hash);
   return result.hash;
 }
