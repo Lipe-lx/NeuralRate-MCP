@@ -80,6 +80,8 @@ type AutonomousRuntimeResult = VaultModuleResult & {
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 const MODULE_TYPE_VALIDATOR = 1n;
+const UNKNOWN_BLOCK_RETRY_DELAYS_MS = [800, 1500, 2500, 4000] as const;
+const POST_RECEIPT_PROPAGATION_DELAY_MS = 900;
 const safe7579LaunchpadAbi = [{
   type: 'function',
   name: 'addSafe7579',
@@ -155,6 +157,50 @@ const normalizeValue = (value: unknown) => {
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
+const isUnknownBlockError = (error: unknown) => {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const record = error as {
+    message?: unknown;
+    details?: unknown;
+    shortMessage?: unknown;
+    cause?: { message?: unknown; details?: unknown } | null;
+  };
+
+  const description = [
+    record.message,
+    record.details,
+    record.shortMessage,
+    record.cause?.message,
+    record.cause?.details,
+  ]
+    .filter((value) => typeof value === 'string')
+    .join(' ');
+
+  return /unknown block/i.test(description);
+};
+
+const retryOnUnknownBlock = async <T>(action: () => Promise<T>) => {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= UNKNOWN_BLOCK_RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      return await action();
+    } catch (error) {
+      lastError = error;
+      if (!isUnknownBlockError(error) || attempt === UNKNOWN_BLOCK_RETRY_DELAYS_MS.length) {
+        throw error;
+      }
+
+      await wait(UNKNOWN_BLOCK_RETRY_DELAYS_MS[attempt]);
+    }
+  }
+
+  throw lastError;
+};
+
 const waitForTransactionReceipt = async (
   provider: EIP1193Provider,
   txHash: string,
@@ -162,12 +208,20 @@ const waitForTransactionReceipt = async (
   delayMs = 1500
 ) => {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const receipt = await provider.request({
-      method: 'eth_getTransactionReceipt',
-      params: [txHash],
-    });
+    let receipt = null;
+    try {
+      receipt = await provider.request({
+        method: 'eth_getTransactionReceipt',
+        params: [txHash],
+      });
+    } catch (error) {
+      if (!isUnknownBlockError(error)) {
+        throw error;
+      }
+    }
 
     if (receipt) {
+      await wait(POST_RECEIPT_PROPAGATION_DELAY_MS);
       return receipt;
     }
 
@@ -178,11 +232,13 @@ const waitForTransactionReceipt = async (
 };
 
 const openSafeByAddress = async (ownerAddress: string, provider: EIP1193Provider, safeAddress: string) =>
-  Safe.init({
-    provider: provider as any,
-    signer: ownerAddress,
-    safeAddress,
-  });
+  retryOnUnknownBlock(() =>
+    Safe.init({
+      provider: provider as any,
+      signer: ownerAddress,
+      safeAddress,
+    })
+  );
 
 const executeSafeTransactions = async (
   safe: Awaited<ReturnType<typeof openSafeByAddress>>,
@@ -199,10 +255,12 @@ const readContractViaProvider = async (
   provider: EIP1193Provider,
   call: { to: string; data: string }
 ) =>
-  provider.request({
-    method: 'eth_call',
-    params: [call, 'latest'],
-  }) as Promise<string>;
+  retryOnUnknownBlock(() =>
+    provider.request({
+      method: 'eth_call',
+      params: [call, 'latest'],
+    }) as Promise<string>
+  );
 
 const buildDelegateValidatorInitData = (delegateAddress: string, vaultModuleAddress: string) =>
   encodeAbiParameters(
@@ -242,15 +300,17 @@ export async function resolveUserSafeVault(
   saltNonce?: string
 ) {
   const provider = await wallet.getEthereumProvider();
-  const safe = await buildPredictedSafe({
-    ownerAddress,
-    provider,
-    saltNonce,
-  });
+  const safe = await retryOnUnknownBlock(() =>
+    buildPredictedSafe({
+      ownerAddress,
+      provider,
+      saltNonce,
+    })
+  );
 
   const deployment = await safe.createSafeDeploymentTransaction();
   const safeAddress = (await safe.getAddress()).toLowerCase();
-  const isDeployed = await safe.isSafeDeployed();
+  const isDeployed = await retryOnUnknownBlock(() => safe.isSafeDeployed());
 
   return {
     safeAddress,
@@ -306,7 +366,7 @@ export async function ensureVaultModuleEnabled(
   }
 
   const safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
-  const alreadyEnabled = await safe.isModuleEnabled(moduleAddress);
+  const alreadyEnabled = await retryOnUnknownBlock(() => safe.isModuleEnabled(moduleAddress));
   if (alreadyEnabled) {
     return {
       safeAddress: deployment.safeAddress,
@@ -350,7 +410,7 @@ export async function ensureAutonomousVaultRuntime(
 
   let safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
   let moduleTxHash: string | null = null;
-  const vaultModuleAlreadyEnabled = await safe.isModuleEnabled(moduleAddress);
+  const vaultModuleAlreadyEnabled = await retryOnUnknownBlock(() => safe.isModuleEnabled(moduleAddress));
   if (!vaultModuleAlreadyEnabled) {
     const enableModuleTx = await safe.createEnableModuleTx(moduleAddress);
     const result = await safe.executeTransaction(enableModuleTx);
@@ -360,7 +420,7 @@ export async function ensureAutonomousVaultRuntime(
 
   let moduleGuardTxHash: string | null = null;
   if (NEURALRATE_EXECUTION_GUARD_CONTRACT) {
-    const currentModuleGuard = (await safe.getModuleGuard()).toLowerCase();
+    const currentModuleGuard = (await retryOnUnknownBlock(() => safe.getModuleGuard())).toLowerCase();
     if (currentModuleGuard !== NEURALRATE_EXECUTION_GUARD_CONTRACT.toLowerCase()) {
       const enableModuleGuardTx = await safe.createEnableModuleGuardTx(NEURALRATE_EXECUTION_GUARD_CONTRACT);
       const result = await safe.executeTransaction(enableModuleGuardTx);
@@ -374,8 +434,8 @@ export async function ensureAutonomousVaultRuntime(
   let validatorRotateTxHash: string | null = null;
   let fallbackTxHash: string | null = null;
 
-  const safe7579Enabled = await safe.isModuleEnabled(SAFE_7579_ADAPTER_ADDRESS);
-  const fallbackHandler = (await safe.getFallbackHandler()).toLowerCase();
+  const safe7579Enabled = await retryOnUnknownBlock(() => safe.isModuleEnabled(SAFE_7579_ADAPTER_ADDRESS));
+  const fallbackHandler = (await retryOnUnknownBlock(() => safe.getFallbackHandler())).toLowerCase();
   const delegateValidatorInitData = buildDelegateValidatorInitData(
     NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS,
     moduleAddress
@@ -405,7 +465,9 @@ export async function ensureAutonomousVaultRuntime(
     safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
   }
 
-  const installedDelegate = await getInstalledDelegate(provider, deployment.safeAddress, DELEGATE_VALIDATOR_ADDRESS);
+  const installedDelegate = await retryOnUnknownBlock(() =>
+    getInstalledDelegate(provider, deployment.safeAddress, DELEGATE_VALIDATOR_ADDRESS)
+  );
   if (installedDelegate === ZERO_ADDRESS) {
     validatorInstallTxHash = await executeSafeTransactions(safe, provider, [
       {
@@ -467,7 +529,7 @@ export async function disableVaultModule(
 ) {
   const provider = await wallet.getEthereumProvider();
   const safe = await openSafeByAddress(ownerAddress, provider, safeAddress);
-  const enabled = await safe.isModuleEnabled(moduleAddress);
+  const enabled = await retryOnUnknownBlock(() => safe.isModuleEnabled(moduleAddress));
   if (!enabled) {
     return null;
   }

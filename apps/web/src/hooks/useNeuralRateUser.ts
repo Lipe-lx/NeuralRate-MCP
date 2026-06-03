@@ -91,6 +91,31 @@ type PreparedRuntimePlan = {
 
 const DEFAULT_AUTOMATION_DOMAINS = ["state", "config", "benchmark", "execution"] as const;
 
+const isUnknownBlockError = (error: unknown) => {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const record = error as {
+    message?: unknown;
+    details?: unknown;
+    shortMessage?: unknown;
+    cause?: { message?: unknown; details?: unknown } | null;
+  };
+
+  const parts = [
+    record.message,
+    record.details,
+    record.shortMessage,
+    record.cause?.message,
+    record.cause?.details,
+  ]
+    .filter((value) => typeof value === "string")
+    .join(" ");
+
+  return /unknown block/i.test(parts);
+};
+
 export const useNeuralRateUser = ({
   ownerEoa,
   externalWalletAddress,
@@ -501,6 +526,17 @@ export const useNeuralRateUser = ({
       await refresh(ownerEoa);
       setNotice(`Automation grant issued. ${moduleMessage}`);
     } catch (err) {
+      const recoveredState = await refresh(ownerEoa).catch(() => null);
+      if (recoveredState?.activeGrant?.status === "active") {
+        setError(null);
+        if (isUnknownBlockError(err)) {
+          setNotice("Automation grant issued. Runtime verification hit a transient Mantle RPC sync delay, so the app refreshed your state and kept automation enabled.");
+          return;
+        }
+        setNotice("Automation grant issued and state recovered after refresh.");
+        return;
+      }
+
       const message = err instanceof Error ? err.message : "Failed to enable automation.";
       setError(message);
       throw err;
