@@ -4,14 +4,17 @@ type RequestOptions = {
   headers?: Record<string, string>;
 };
 
+type DataApiFetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+
 export class DataApiClient {
   constructor(
     private baseUrl: string,
     private internalToken: string | null = null,
+    private fetcher: DataApiFetcher = fetch,
   ) {}
 
   private async request<T>(path: string, options: RequestOptions = {}) {
-    const response = await fetch(`${this.baseUrl}${path}`, {
+    const response = await this.fetcher(`${this.baseUrl}${path}`, {
       method: options.method ?? "GET",
       headers: {
         "Content-Type": "application/json",

@@ -36,3 +36,7 @@ NEURALRATE_VAULT_PROVIDER_STRATEGY = "safe"
 NEURALRATE_ONBOARDING_PROVIDER = "privy"
 NEURALRATE_MANAGED_SIGNER_PROVIDER = "turnkey"
 TURNKEY_API_BASE_URL = "https://api.turnkey.com"
+
+[[services]]
+binding = "DATA_API"
+service = "neuralrate-worker"

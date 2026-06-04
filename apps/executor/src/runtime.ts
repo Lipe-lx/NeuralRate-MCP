@@ -9,12 +9,20 @@ import {
   type ManagedSigner,
 } from "./managedSigner.js";
 
+type ServiceBinding = {
+  fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
+};
+
 export type ExecutorRuntime = {
   config: ExecutorConfig;
   chain: ReturnType<typeof defineChain>;
   dataApi: DataApiClient;
   publicClient: ReturnType<typeof createPublicClient>;
   managedSigner: ManagedSigner;
+};
+
+type ExecutorRuntimeEnv = ExecutorEnvBindings & {
+  DATA_API?: ServiceBinding;
 };
 
 let activeRuntime: ExecutorRuntime | null = null;
@@ -40,7 +48,7 @@ const buildManagedSigner = (config: ExecutorConfig): ManagedSigner =>
           })
         : new AddressOnlyManagedSigner(config.agentSessionSignerAddress);
 
-const buildRuntime = (config: ExecutorConfig): ExecutorRuntime => {
+const buildRuntime = (config: ExecutorConfig, env?: ExecutorRuntimeEnv): ExecutorRuntime => {
   const chain = defineChain({
     id: config.chainId,
     name: config.chainName,
@@ -53,7 +61,11 @@ const buildRuntime = (config: ExecutorConfig): ExecutorRuntime => {
   return {
     config,
     chain,
-    dataApi: new DataApiClient(config.dataApiBaseUrl.replace(/\/+$/, ""), config.internalApiToken),
+    dataApi: new DataApiClient(
+      (env?.DATA_API ? "https://data-api.internal/api" : config.dataApiBaseUrl).replace(/\/+$/, ""),
+      config.internalApiToken,
+      env?.DATA_API ? env.DATA_API.fetch.bind(env.DATA_API) : fetch
+    ),
     publicClient: createPublicClient({
       chain,
       transport: http(config.mantleSepoliaRpcUrl),
@@ -64,14 +76,14 @@ const buildRuntime = (config: ExecutorConfig): ExecutorRuntime => {
 
 const isNodeRuntime = () => typeof process !== "undefined" && process.release?.name === "node";
 
-export const initializeExecutorRuntime = (env: ExecutorEnvBindings) => {
+export const initializeExecutorRuntime = (env: ExecutorRuntimeEnv) => {
   const config = createExecutorConfig(env);
   const fingerprint = JSON.stringify(config);
   if (activeRuntime && activeRuntimeFingerprint === fingerprint) {
     return activeRuntime;
   }
 
-  activeRuntime = buildRuntime(config);
+  activeRuntime = buildRuntime(config, env);
   activeRuntimeFingerprint = fingerprint;
   return activeRuntime;
 };
@@ -81,7 +93,7 @@ export const initializeLocalExecutorRuntime = () => {
     throw new Error("Local executor runtime initialization is only available in a Node process.");
   }
   loadExecutorEnv();
-  return initializeExecutorRuntime(process.env as Record<string, string | undefined>);
+  return initializeExecutorRuntime(process.env as ExecutorRuntimeEnv);
 };
 
 export const getExecutorRuntime = () => {
