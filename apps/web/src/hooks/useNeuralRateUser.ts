@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
-import type { EIP1193Provider } from "viem";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPublicClient, defineChain, formatUnits, http, type Address, type EIP1193Provider } from "viem";
 import {
   API_BASE_URL,
   DELEGATE_VALIDATOR_ADDRESS,
   ERC8004_AGENT_ID,
   DEMO_STRATEGY_KEY,
   DEMO_TARGET_ASSET,
+  MANTLE_CHAIN_NAME,
   MANTLE_CHAIN_ID,
+  MANTLE_RPC_URL,
   SAFE_7579_ADAPTER_ADDRESS,
   SAFE_7579_LAUNCHPAD_ADDRESS,
   SESSION_POLICY_VERSION,
@@ -92,6 +94,17 @@ type PreparedRuntimePlan = {
 const DEFAULT_AUTOMATION_DOMAINS = ["state", "config", "benchmark", "execution"] as const;
 const AUTOMATION_RECOVERY_REFRESH_DELAYS_MS = [0, 800, 1800, 3200] as const;
 const POLICY_PUBLISH_RECOVERY_DELAYS_MS = [0, 1200, 2500, 4500] as const;
+const DEPOSIT_POLL_VISIBLE_MS = 30000;
+
+const vaultTelemetryClient = createPublicClient({
+  chain: defineChain({
+    id: MANTLE_CHAIN_ID,
+    name: MANTLE_CHAIN_NAME,
+    nativeCurrency: { name: "Mantle", symbol: DEMO_TARGET_ASSET, decimals: 18 },
+    rpcUrls: { default: { http: [MANTLE_RPC_URL] } },
+  }),
+  transport: http(MANTLE_RPC_URL),
+});
 
 const isUnknownBlockError = (error: unknown) => {
   if (!error || typeof error !== "object") {
@@ -156,6 +169,7 @@ export const useNeuralRateUser = ({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const liveFundingDetectedRef = useRef(false);
 
   const refresh = useCallback(async (targetOwner = ownerEoa) => {
     if (!targetOwner) {
@@ -183,6 +197,8 @@ export const useNeuralRateUser = ({
 
   useEffect(() => {
     if (!ownerEoa) {
+      setState(null);
+      liveFundingDetectedRef.current = false;
       return;
     }
 
@@ -192,6 +208,118 @@ export const useNeuralRateUser = ({
 
     return () => window.clearTimeout(timeoutId);
   }, [ownerEoa, refresh]);
+
+  useEffect(() => {
+    const vaultAddress = state?.vault?.vault_address;
+    const awaitingDeposit =
+      state?.vault?.funding_status === "awaiting_deposit" || Boolean(state?.vault?.last_funding_intent);
+    const hasNativeBalance =
+      Boolean(state?.runtimeState?.hasNativeBalance) ||
+      Number.parseFloat(state?.runtimeState?.nativeBalanceFormatted ?? "0") > 0;
+
+    if (!vaultAddress) {
+      liveFundingDetectedRef.current = false;
+      return;
+    }
+    if (!awaitingDeposit || hasNativeBalance) {
+      liveFundingDetectedRef.current = hasNativeBalance;
+      return;
+    }
+
+    let cancelled = false;
+    let timeoutId: number | null = null;
+
+    const clearScheduledPoll = () => {
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    };
+
+    const scheduleNextPoll = () => {
+      clearScheduledPoll();
+      if (cancelled || document.hidden) {
+        return;
+      }
+
+      timeoutId = window.setTimeout(() => {
+        void pollVaultBalance();
+      }, DEPOSIT_POLL_VISIBLE_MS);
+    };
+
+    const pollVaultBalance = async () => {
+      try {
+        const balanceWei = await vaultTelemetryClient.getBalance({ address: vaultAddress as Address });
+        if (cancelled) {
+          return;
+        }
+
+        const balanceFormatted = formatUnits(balanceWei, 18);
+        const hasNativeBalance = balanceWei > 0n;
+
+        setState((current) => {
+          if (!current || current.vault?.vault_address !== vaultAddress) {
+            return current;
+          }
+
+          return {
+            ...current,
+            runtimeState: {
+              ...(current.runtimeState ?? {}),
+              nativeBalanceWei: balanceWei.toString(),
+              nativeBalanceFormatted: balanceFormatted,
+              nativeAssetSymbol: DEMO_TARGET_ASSET,
+              hasNativeBalance,
+              lastCheckedAt: new Date().toISOString(),
+            },
+          };
+        });
+
+        if (hasNativeBalance && !liveFundingDetectedRef.current) {
+          setNotice(
+            `Deposit detected onchain. NeuralRate confirmed ${DEMO_TARGET_ASSET} funds in the vault and updated Vault Telemetry.`,
+          );
+        }
+        liveFundingDetectedRef.current = hasNativeBalance;
+        if (!hasNativeBalance) {
+          scheduleNextPoll();
+        }
+      } catch {
+        // best-effort onchain telemetry only
+        scheduleNextPoll();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (cancelled) {
+        return;
+      }
+
+      if (document.hidden) {
+        clearScheduledPoll();
+        return;
+      }
+
+      void pollVaultBalance();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    if (!document.hidden) {
+      void pollVaultBalance();
+    }
+
+    return () => {
+      cancelled = true;
+      clearScheduledPoll();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [
+    state?.vault?.vault_address,
+    state?.vault?.funding_status,
+    state?.vault?.last_funding_intent,
+    state?.runtimeState?.hasNativeBalance,
+    state?.runtimeState?.nativeBalanceFormatted,
+  ]);
 
   const bootstrap = async () => {
     if (!ownerEoa) {

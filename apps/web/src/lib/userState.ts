@@ -221,13 +221,19 @@ export interface AutomationState {
   } | null;
   policySyncStatus?: "not_published" | "in_sync" | "drifted" | "pending_publish" | "pending_revoke" | null;
   runtimeState?: {
-    safeDeployed: boolean;
-    vaultModuleEnabled: boolean;
-    safe7579Enabled: boolean;
-    fallbackReady: boolean;
-    moduleGuardReady: boolean;
-    delegateReady: boolean;
-    installedDelegate: string | null;
+    safeDeployed?: boolean;
+    vaultModuleEnabled?: boolean;
+    safe7579Enabled?: boolean;
+    fallbackReady?: boolean;
+    fallbackHandlerReady?: boolean;
+    moduleGuardReady?: boolean;
+    delegateReady?: boolean;
+    installedDelegate?: string | null;
+    nativeBalanceWei?: string | null;
+    nativeBalanceFormatted?: string | null;
+    nativeAssetSymbol?: string | null;
+    hasNativeBalance?: boolean;
+    lastCheckedAt?: string | null;
   } | null;
   onchainPolicy?: {
     policyId: string;

@@ -34,6 +34,11 @@ const formatUsd = (value: number) =>
   }).format(value);
 
 const formatCount = (value: number) => new Intl.NumberFormat("en-US").format(value);
+const formatTokenBalance = (value: number) =>
+  new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: value > 0 && value < 1 ? 4 : 2,
+    maximumFractionDigits: value >= 100 ? 2 : 4,
+  }).format(value);
 
 const formatDateTime = (value: string | null | undefined) => {
   if (!value) {
@@ -191,6 +196,9 @@ const VaultPanel: React.FC<Props> = ({
   const ownershipAcknowledged = Boolean(vault?.ownership_acknowledged_at);
   const isActionGated = Boolean(vault) && !ownershipAcknowledged;
   const managedValueUsd = parseNumeric(vault?.balance_usd);
+  const liveNativeBalance = parseNumeric(state?.runtimeState?.nativeBalanceFormatted);
+  const nativeAssetSymbol = state?.runtimeState?.nativeAssetSymbol ?? DEMO_TARGET_ASSET;
+  const hasOnchainDeposit = Boolean(state?.runtimeState?.hasNativeBalance) || liveNativeBalance > 0;
   const fundingIntentUsd = getRecordNumber(vault?.last_funding_intent, "amountUsd");
   const fundingIntentSource = humanize(getRecordString(vault?.last_funding_intent, "source"));
   const allowedAssets = activePermission?.allowed_assets?.length
@@ -224,7 +232,7 @@ const VaultPanel: React.FC<Props> = ({
     vault?.automation_status ??
     "inactive"
   );
-  const fundingStatus = humanize(vault?.funding_status ?? "not-created");
+  const fundingStatus = hasOnchainDeposit ? "Deposit detected" : humanize(vault?.funding_status ?? "not-created");
   const policyPreset = humanize(config?.restriction_preset ?? "not-set");
   const riskProfile = humanize(config?.risk_profile ?? "medium");
   const consentRecordedAt = activeGrant?.issued_at ?? session?.consent_verified_at ?? null;
@@ -237,6 +245,23 @@ const VaultPanel: React.FC<Props> = ({
   const hasFundingIntent = fundingIntentUsd > 0;
   const hasAutomation = Boolean(activeGrant && activeGrant.status === "active");
   const hasDemoQueued = automationJobs.length > 0;
+  const managedCapitalValue = managedValueUsd > 0
+    ? formatUsd(managedValueUsd)
+    : hasOnchainDeposit
+      ? `${formatTokenBalance(liveNativeBalance)} ${nativeAssetSymbol}`
+      : formatUsd(0);
+  const managedCapitalNote = managedValueUsd > 0
+    ? "Current balance administered inside this dedicated Safe vault."
+    : hasOnchainDeposit
+      ? `On-chain ${nativeAssetSymbol} balance detected inside this dedicated Safe vault.`
+      : "Current balance administered inside this dedicated Safe vault.";
+  const budgetCaption = automationBudgetUsd > 0
+    ? managedValueUsd > 0
+      ? `Policy ceiling ${formatUsd(automationBudgetUsd)} • ${Math.round(budgetCoverage)}% currently represented`
+      : hasOnchainDeposit
+        ? `Policy ceiling ${formatUsd(automationBudgetUsd)} • on-chain ${nativeAssetSymbol} detected, USD normalization pending`
+        : `Policy ceiling ${formatUsd(automationBudgetUsd)}`
+    : `Policy ceiling ${formatUsd(automationBudgetUsd)}`;
   const onboardingSteps = [
     {
       key: "connect",
@@ -523,8 +548,8 @@ const VaultPanel: React.FC<Props> = ({
           <div className="vault-swiss-kicker">Vault Telemetry</div>
           <div className="vault-hero-card">
             <div className="vault-metric-eyebrow">Managed Capital</div>
-            <div className="vault-hero-value">{formatUsd(managedValueUsd)}</div>
-            <div className="vault-hero-note">Current balance administered inside this dedicated Safe vault.</div>
+            <div className="vault-hero-value">{managedCapitalValue}</div>
+            <div className="vault-hero-note">{managedCapitalNote}</div>
             <div className="vault-status-strip">
               <span>{fundingStatus}</span>
               <span>{automationStatus}</span>
@@ -532,9 +557,7 @@ const VaultPanel: React.FC<Props> = ({
             <div className="vault-budget-rail">
               <div className="vault-budget-rail-fill" style={{ width: `${budgetCoverage}%` }} />
             </div>
-            <div className="vault-budget-caption">
-              Policy ceiling {formatUsd(automationBudgetUsd)} {automationBudgetUsd > 0 ? `• ${Math.round(budgetCoverage)}% currently represented` : ""}
-            </div>
+            <div className="vault-budget-caption">{budgetCaption}</div>
           </div>
 
           <div className="vault-metric-grid">
@@ -593,6 +616,10 @@ const VaultPanel: React.FC<Props> = ({
                 <strong>{fundingIntentUsd > 0 ? formatUsd(fundingIntentUsd) : "None"}</strong>
               </div>
               <div className="vault-info-row">
+                <span>Live vault balance</span>
+                <strong>{hasOnchainDeposit ? `${formatTokenBalance(liveNativeBalance)} ${nativeAssetSymbol}` : "Awaiting on-chain funds"}</strong>
+              </div>
+              <div className="vault-info-row">
                 <span>Signed consent</span>
                 <strong>{consentRecordedAt ? formatDateTime(consentRecordedAt) : "Pending"}</strong>
               </div>
@@ -601,7 +628,9 @@ const VaultPanel: React.FC<Props> = ({
                 <strong>{onchainGrantStatus}</strong>
               </div>
               <div className="vault-info-caption">
-                {consentDigest
+                {hasOnchainDeposit
+                  ? `NeuralRate detected funds at the vault address.${fundingIntentUsd > 0 ? ` Funding intent target: ${formatUsd(fundingIntentUsd)}.` : ""}`
+                  : consentDigest
                   ? `Consent digest ${truncate(consentDigest)}${fundingIntentUsd > 0 ? ` • last funding source: ${fundingIntentSource}` : ""}`
                   : fundingIntentUsd > 0
                     ? `Last funding source: ${fundingIntentSource}`
