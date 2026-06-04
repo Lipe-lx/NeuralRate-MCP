@@ -6,6 +6,7 @@ import { executeBenchmarkJob } from "./benchmarkExecutor.js";
 import { getApprovedStrategySurface, resolveExecutionPlan } from "./executionPlanner.js";
 import type { StrategyIntent } from "./executionRegistry.js";
 import { canUseAARuntime, getAARuntimeStatus, sendAAVaultUserOperation } from "./aaRuntime.js";
+import { safeJsonStringify } from "./json.js";
 import { buildAnchorSnapshotCalldata, ensureAnchoredSnapshot, getActivePolicy } from "./onchainPolicy.js";
 import { getExecutorRuntime, initializeExecutorRuntime, initializeLocalExecutorRuntime } from "./runtime.js";
 
@@ -20,7 +21,7 @@ const sendJson = (response: ServerResponse, status: number, payload: unknown) =>
     ...corsHeaders,
     "Content-Type": "application/json",
   });
-  response.end(JSON.stringify(payload));
+  response.end(safeJsonStringify(payload));
 };
 
 const readJson = async <T>(request: IncomingMessage) => {

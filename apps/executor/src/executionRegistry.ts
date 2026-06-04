@@ -1,4 +1,5 @@
 import { encodeFunctionData, isAddress, keccak256, parseUnits, stringToHex, toFunctionSelector, type Address, type Hex } from "viem";
+import { safeJsonStringify } from "./json.js";
 import { usdyStrategyDeployment } from "./generated/usdyStrategyDeployment.js";
 import { vaultModuleDeployment } from "./generated/vaultModuleDeployment.js";
 
@@ -328,7 +329,7 @@ export const getApprovedExecutionPolicySurface = () => {
 };
 
 export const makeIntentHash = (payload: Record<string, unknown>) => {
-  const serialized = JSON.stringify(payload);
+  const serialized = safeJsonStringify(payload);
   return keccak256(stringToHex(serialized));
 };
 

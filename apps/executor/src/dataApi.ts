@@ -1,3 +1,5 @@
+import { safeJsonStringify } from "./json.js";
+
 type RequestOptions = {
   method?: "GET" | "POST" | "PATCH";
   body?: unknown;
@@ -21,7 +23,7 @@ export class DataApiClient {
         ...(this.internalToken ? { "X-NeuralRate-Internal-Token": this.internalToken } : {}),
         ...(options.headers ?? {}),
       },
-      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      body: options.body !== undefined ? safeJsonStringify(options.body) : undefined,
     });
 
     if (!response.ok) {
