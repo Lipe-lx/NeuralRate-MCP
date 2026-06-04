@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import McpConnectModal from './McpConnectModal';
 import { useWalletContext } from '../context/WalletContext';
 
-type VaultHeaderTab = 'vault' | 'settings' | 'history';
+type VaultHeaderTab = 'vault' | 'telemetry' | 'settings' | 'history';
 
 type HeaderProps = {
   vaultTabsVisible?: boolean;
@@ -113,6 +113,9 @@ const Header: React.FC<HeaderProps> = ({ vaultTabsVisible = false, activeVaultTa
         <div className="vault-subnav vault-subnav-header">
           <button className={`vault-subnav-item ${activeVaultTab === 'vault' ? 'active' : ''}`} onClick={() => onVaultTabChange('vault')}>
             Vault
+          </button>
+          <button className={`vault-subnav-item ${activeVaultTab === 'telemetry' ? 'active' : ''}`} onClick={() => onVaultTabChange('telemetry')}>
+            Telemetry
           </button>
           <button className={`vault-subnav-item ${activeVaultTab === 'settings' ? 'active' : ''}`} onClick={() => onVaultTabChange('settings')}>
             Agent Settings

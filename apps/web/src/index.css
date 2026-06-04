@@ -722,6 +722,20 @@ input[type="checkbox"] {
   min-width: 0;
 }
 
+.vault-telemetry-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.vault-telemetry-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
+  gap: 0.7rem;
+  align-items: stretch;
+}
+
 .vault-detail-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -788,7 +802,7 @@ input[type="checkbox"] {
 
 .vault-hero-note {
   margin-top: 0.4rem;
-  max-width: 24ch;
+  max-width: 28ch;
 }
 
 .vault-status-strip {
@@ -834,9 +848,18 @@ input[type="checkbox"] {
   gap: 0.55rem;
 }
 
+.vault-metric-grid-wide {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.vault-metric-grid-top {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: stretch;
+}
+
 .vault-metric-card {
-  padding: 0.75rem;
-  min-height: 118px;
+  padding: 0.72rem;
+  min-height: 104px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -855,9 +878,9 @@ input[type="checkbox"] {
 }
 
 .vault-metric-value {
-  font-size: 1.4rem;
+  font-size: 1.22rem;
   line-height: 1;
-  margin: 0.45rem 0 0.35rem;
+  margin: 0.38rem 0 0.28rem;
   color: var(--text-primary);
 }
 
@@ -865,6 +888,14 @@ input[type="checkbox"] {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.55rem;
+}
+
+.vault-info-grid-wide {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.vault-info-card-span-2 {
+  grid-column: span 2;
 }
 
 .vault-info-card {
@@ -1089,6 +1120,10 @@ input[type="checkbox"] {
     height: auto;
   }
 
+  .vault-telemetry-top {
+    grid-template-columns: 1fr;
+  }
+
   .vault-panel-aside {
     border-left: none;
     padding-left: 0;
@@ -1102,6 +1137,16 @@ input[type="checkbox"] {
 
   .vault-info-grid {
     grid-template-columns: 1fr;
+  }
+
+  .vault-metric-grid-wide,
+  .vault-metric-grid-top,
+  .vault-info-grid-wide {
+    grid-template-columns: 1fr;
+  }
+
+  .vault-info-card-span-2 {
+    grid-column: auto;
   }
 
   .decision-ledger-layout,
@@ -2847,4 +2892,3 @@ main select option {
   text-transform: uppercase;
   padding: 0.5rem;
 }
-

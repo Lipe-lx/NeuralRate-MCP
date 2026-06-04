@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   DEMO_TARGET_ASSET,
   MANAGED_SIGNER_PROVIDER,
@@ -26,38 +26,6 @@ type Props = {
   controlWalletLabel: string;
 };
 
-const formatUsd = (value: number) =>
-  new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: value >= 100 ? 0 : 2,
-  }).format(value);
-
-const formatCount = (value: number) => new Intl.NumberFormat("en-US").format(value);
-const formatTokenBalance = (value: number) =>
-  new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: value > 0 && value < 1 ? 4 : 2,
-    maximumFractionDigits: value >= 100 ? 2 : 4,
-  }).format(value);
-
-const formatDateTime = (value: string | null | undefined) => {
-  if (!value) {
-    return "Not scheduled";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "Not scheduled";
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-};
-
 const parseNumeric = (value: string | number | null | undefined) => {
   if (typeof value === "number") {
     return Number.isFinite(value) ? value : 0;
@@ -71,16 +39,6 @@ const parseNumeric = (value: string | number | null | undefined) => {
   return 0;
 };
 
-const getRecordNumber = (record: Record<string, unknown> | null | undefined, key: string) => {
-  const value = record?.[key];
-  return typeof value === "number" || typeof value === "string" ? parseNumeric(value) : 0;
-};
-
-const getRecordString = (record: Record<string, unknown> | null | undefined, key: string) => {
-  const value = record?.[key];
-  return typeof value === "string" ? value : null;
-};
-
 const humanize = (value: string | null | undefined) =>
   value
     ? value
@@ -89,6 +47,9 @@ const humanize = (value: string | null | undefined) =>
         .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
         .join(" ")
     : "Not available";
+
+const truncate = (value: string | null | undefined) =>
+  value ? `${value.slice(0, 8)}...${value.slice(-6)}` : "n/a";
 
 const ActionButton: React.FC<{
   label: string;
@@ -141,35 +102,6 @@ const rowStyle: React.CSSProperties = {
   color: "var(--text-secondary)",
 };
 
-const truncate = (value: string | null | undefined) =>
-  value ? `${value.slice(0, 8)}...${value.slice(-6)}` : "n/a";
-
-const parsePayloadJson = (value: string | null | undefined) => {
-  if (!value) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(value) as Record<string, unknown>;
-    return parsed && typeof parsed === "object" ? parsed : null;
-  } catch {
-    return null;
-  }
-};
-
-const MetricCard: React.FC<{
-  eyebrow: string;
-  value: string;
-  note: string;
-  accent?: boolean;
-}> = ({ eyebrow, value, note, accent = false }) => (
-  <div className={`vault-metric-card${accent ? " accent" : ""}`}>
-    <div className="vault-metric-eyebrow">{eyebrow}</div>
-    <div className="vault-metric-value">{value}</div>
-    <div className="vault-metric-note">{note}</div>
-  </div>
-);
-
 const VaultPanel: React.FC<Props> = ({
   state,
   busy,
@@ -187,81 +119,31 @@ const VaultPanel: React.FC<Props> = ({
   onReviewOwnership,
   controlWalletLabel,
 }) => {
+  const [copiedField, setCopiedField] = useState<string | null>(null);
   const vault = state?.vault;
-  const config = state?.config;
   const session = state?.activeSession;
   const activeGrant = state?.activeGrant;
   const activeMcpSession = state?.activeMcpSession;
-  const activePermission = state?.activePermission;
   const ownershipAcknowledged = Boolean(vault?.ownership_acknowledged_at);
   const isActionGated = Boolean(vault) && !ownershipAcknowledged;
-  const managedValueUsd = parseNumeric(vault?.balance_usd);
-  const liveNativeBalance = parseNumeric(state?.runtimeState?.nativeBalanceFormatted);
-  const nativeAssetSymbol = state?.runtimeState?.nativeAssetSymbol ?? DEMO_TARGET_ASSET;
-  const hasOnchainDeposit = Boolean(state?.runtimeState?.hasNativeBalance) || liveNativeBalance > 0;
-  const fundingIntentUsd = getRecordNumber(vault?.last_funding_intent, "amountUsd");
-  const fundingIntentSource = humanize(getRecordString(vault?.last_funding_intent, "source"));
-  const allowedAssets = activePermission?.allowed_assets?.length
-    ? activePermission.allowed_assets
-    : (config?.allowed_assets ?? []);
-  const allowedProtocols = activePermission?.allowed_protocols?.length
-    ? activePermission.allowed_protocols
-    : (config?.allowed_protocols ?? []);
-  const tokensInScope = Array.from(
-    new Set([
-      ...allowedAssets,
-      ...(activePermission?.spend_token ? [activePermission.spend_token] : []),
-    ]),
-  );
-  const dailyLimitUsd = parseNumeric(activePermission?.spend_limit_daily ?? config?.max_daily_usd);
-  const perActionUsd = parseNumeric(activePermission?.spend_limit_per_use ?? config?.max_action_usd);
-  const automationBudgetUsd = parseNumeric(activePermission?.spend_limit_total ?? config?.max_automation_usd);
-  const manualApprovalUsd = parseNumeric(config?.require_manual_above_usd);
-  const sessionWindowEnd =
-    activeMcpSession?.expires_at ??
-    activeGrant?.expires_at ??
-    session?.valid_until ??
-    activePermission?.valid_until ??
-    null;
-  const usageLimit = activePermission?.usage_limit ?? null;
-  const budgetCoverage = automationBudgetUsd > 0 ? Math.min((managedValueUsd / automationBudgetUsd) * 100, 100) : 0;
+  const hasFundingIntent = parseNumeric(
+    typeof vault?.last_funding_intent?.amountUsd === "number" || typeof vault?.last_funding_intent?.amountUsd === "string"
+      ? vault.last_funding_intent.amountUsd
+      : 0,
+  ) > 0;
   const automationStatus = humanize(
     activeGrant?.status ??
     activeMcpSession?.status ??
     session?.session_status ??
     vault?.automation_status ??
-    "inactive"
+    "inactive",
   );
-  const fundingStatus = hasOnchainDeposit ? "Deposit detected" : humanize(vault?.funding_status ?? "not-created");
-  const policyPreset = humanize(config?.restriction_preset ?? "not-set");
-  const riskProfile = humanize(config?.risk_profile ?? "medium");
+  const fundingStatus = humanize(vault?.funding_status ?? "not-created");
   const consentRecordedAt = activeGrant?.issued_at ?? session?.consent_verified_at ?? null;
-  const consentDigest = activeGrant?.grant_id ?? session?.consent_digest ?? session?.permission_id ?? null;
-  const onchainGrantStatus = activeGrant?.status === "active" ? "Granted" : session?.grant_tx_hash ? "Executed" : "Not issued";
-  const automationJobs = state?.automationJobs ?? [];
-  const latestJobs = automationJobs.slice(0, 3);
   const onchainPolicy = state?.onchainPolicy ?? null;
   const aa = state?.aa ?? null;
-  const hasFundingIntent = fundingIntentUsd > 0;
   const hasAutomation = Boolean(activeGrant && activeGrant.status === "active");
-  const hasDemoQueued = automationJobs.length > 0;
-  const managedCapitalValue = managedValueUsd > 0
-    ? formatUsd(managedValueUsd)
-    : hasOnchainDeposit
-      ? `${formatTokenBalance(liveNativeBalance)} ${nativeAssetSymbol}`
-      : formatUsd(0);
-  const managedCapitalNote = managedValueUsd > 0
-    ? "Current balance administered inside this dedicated Safe vault."
-    : hasOnchainDeposit
-      ? `On-chain ${nativeAssetSymbol} balance detected inside this dedicated Safe vault.`
-      : "Current balance administered inside this dedicated Safe vault.";
-  const budgetCaption = automationBudgetUsd > 0
-    ? managedValueUsd > 0
-      ? `Policy ceiling ${formatUsd(automationBudgetUsd)} • ${Math.round(budgetCoverage)}% currently represented`
-      : hasOnchainDeposit
-        ? `Policy ceiling ${formatUsd(automationBudgetUsd)} • on-chain ${nativeAssetSymbol} detected, USD normalization pending`
-        : `Policy ceiling ${formatUsd(automationBudgetUsd)}`
-    : `Policy ceiling ${formatUsd(automationBudgetUsd)}`;
+  const hasDemoQueued = (state?.automationJobs ?? []).length > 0;
   const onboardingSteps = [
     {
       key: "connect",
@@ -303,10 +185,91 @@ const VaultPanel: React.FC<Props> = ({
   const completedSteps = onboardingSteps.filter((step) => step.done).length;
   const nextStep = onboardingSteps.find((step) => !step.done);
 
+  const handleCopy = async (value: string | null | undefined, field: string) => {
+    if (!value) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedField(field);
+      window.setTimeout(() => {
+        setCopiedField((current) => (current === field ? null : current));
+      }, 1500);
+    } catch {
+      // best-effort UX only
+    }
+  };
+
+  const renderCopyValue = (
+    field: string,
+    rawValue: string | null | undefined,
+    displayValue: React.ReactNode,
+    options?: {
+      href?: string | null;
+      accent?: boolean;
+    },
+  ) => {
+    const copyEnabled = Boolean(rawValue);
+    const copied = copiedField === field;
+    const color = copied
+      ? "var(--color-lime)"
+      : options?.accent
+        ? "var(--color-lime)"
+        : "var(--text-primary)";
+
+    return (
+      <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "flex-end", gap: "0.4rem", minWidth: 0 }}>
+        <button
+          type="button"
+          onClick={() => void handleCopy(rawValue, field)}
+          disabled={!copyEnabled}
+          title={!copyEnabled ? "No value available" : copied ? "Copied" : "Click to copy"}
+          style={{
+            appearance: "none",
+            border: "none",
+            background: "transparent",
+            padding: 0,
+            margin: 0,
+            color,
+            font: "inherit",
+            fontWeight: 700,
+            cursor: copyEnabled ? "copy" : "default",
+            textAlign: "right",
+            minWidth: 0,
+            textDecoration: copyEnabled ? "underline dotted transparent" : "none",
+            textUnderlineOffset: "0.18em",
+            transition: "color 0.2s ease, text-decoration-color 0.2s ease",
+          }}
+          onMouseEnter={(event) => {
+            if (copyEnabled) {
+              event.currentTarget.style.textDecorationColor = "rgba(223, 246, 81, 0.45)";
+            }
+          }}
+          onMouseLeave={(event) => {
+            event.currentTarget.style.textDecorationColor = "transparent";
+          }}
+        >
+          {copied ? "Copied" : displayValue}
+        </button>
+        {options?.href && (
+          <a
+            href={options.href}
+            target="_blank"
+            rel="noreferrer"
+            title="Open in explorer"
+            style={{ color: "var(--color-lime)", textDecoration: "none", fontSize: "0.82rem", lineHeight: 1, flexShrink: 0 }}
+          >
+            ↗
+          </a>
+        )}
+      </span>
+    );
+  };
+
   return (
     <section className="glass-panel animate-enter vault-panel">
-      <div className="vault-panel-layout">
-        <div className="vault-panel-main">
+      <div className="vault-panel-main">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
               <h2 style={{ margin: 0, fontSize: "1.1rem" }}>Vault</h2>
@@ -320,68 +283,69 @@ const VaultPanel: React.FC<Props> = ({
           <div className="vault-detail-grid">
             <div style={rowStyle}>
               <span>Onboarding</span>
-              <strong style={{ color: "var(--text-primary)" }}>{ONBOARDING_PROVIDER}</strong>
+              {renderCopyValue("onboarding", ONBOARDING_PROVIDER, ONBOARDING_PROVIDER)}
             </div>
             <div style={rowStyle}>
               <span>Vault Strategy</span>
-              <strong style={{ color: "var(--text-primary)" }}>{VAULT_PROVIDER_STRATEGY}</strong>
+              {renderCopyValue("vault_strategy", VAULT_PROVIDER_STRATEGY, VAULT_PROVIDER_STRATEGY)}
             </div>
             <div style={rowStyle}>
               <span>Managed Signer</span>
-              <strong style={{ color: "var(--text-primary)" }}>{MANAGED_SIGNER_PROVIDER}</strong>
+              {renderCopyValue("managed_signer", MANAGED_SIGNER_PROVIDER, MANAGED_SIGNER_PROVIDER)}
             </div>
             <div style={rowStyle}>
               <span>Vault ID</span>
-              <strong style={{ color: "var(--text-primary)" }}>{truncate(vault?.vault_id)}</strong>
+              {renderCopyValue("vault_id", vault?.vault_id, truncate(vault?.vault_id))}
             </div>
             <div style={rowStyle}>
               <span>Vault Address</span>
-              <strong style={{ color: "var(--text-primary)" }}>
-                {vault?.vault_address ? (
-                  <a
-                    href={`${MANTLE_EXPLORER_BASE_URL}/address/${vault.vault_address}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ color: "var(--color-lime)", textDecoration: "none" }}
-                  >
-                    {truncate(vault.vault_address)}
-                  </a>
-                ) : (
-                  "Pending bootstrap"
-                )}
-              </strong>
+              {renderCopyValue(
+                "vault_address",
+                vault?.vault_address,
+                vault?.vault_address ? truncate(vault.vault_address) : "Pending bootstrap",
+                {
+                  href: vault?.vault_address ? `${MANTLE_EXPLORER_BASE_URL}/address/${vault.vault_address}` : null,
+                  accent: Boolean(vault?.vault_address),
+                },
+              )}
             </div>
             <div style={rowStyle}>
               <span>Funding Status</span>
-              <strong style={{ color: "var(--text-primary)" }}>{fundingStatus}</strong>
+              {renderCopyValue("funding_status", fundingStatus, fundingStatus)}
             </div>
             <div style={rowStyle}>
               <span>Automation</span>
-              <strong style={{ color: "var(--text-primary)" }}>{automationStatus}</strong>
+              {renderCopyValue("automation_status", automationStatus, automationStatus)}
             </div>
             <div style={rowStyle}>
               <span>Signed Consent</span>
-              <strong style={{ color: consentRecordedAt ? "var(--color-lime)" : "var(--text-primary)" }}>
-                {consentRecordedAt ? "Recorded" : "Pending"}
-              </strong>
+              {renderCopyValue("signed_consent", consentRecordedAt ? "Recorded" : "Pending", consentRecordedAt ? "Recorded" : "Pending", {
+                accent: Boolean(consentRecordedAt),
+              })}
             </div>
             <div style={rowStyle}>
               <span>Automation Ready</span>
-              <strong style={{ color: state?.automationReady ? "var(--color-lime)" : "var(--text-primary)" }}>
-                {state?.automationReady ? "Ready" : "Pending"}
-              </strong>
+              {renderCopyValue("automation_ready", state?.automationReady ? "Ready" : "Pending", state?.automationReady ? "Ready" : "Pending", {
+                accent: Boolean(state?.automationReady),
+              })}
             </div>
             <div style={rowStyle}>
               <span>Onchain Policy</span>
-              <strong style={{ color: onchainPolicy ? "var(--color-lime)" : "var(--text-primary)" }}>
-                {onchainPolicy ? truncate(onchainPolicy.policyId) : "Not published"}
-              </strong>
+              {renderCopyValue(
+                "onchain_policy",
+                onchainPolicy?.policyId,
+                onchainPolicy ? truncate(onchainPolicy.policyId) : "Not published",
+                { accent: Boolean(onchainPolicy) },
+              )}
             </div>
             <div style={rowStyle}>
               <span>AA Runtime</span>
-              <strong style={{ color: aa?.safe4337ModuleAddress ? "var(--color-lime)" : "var(--text-primary)" }}>
-                {aa?.safe4337ModuleAddress ? "Safe4337 + 7579" : "Safe module path"}
-              </strong>
+              {renderCopyValue(
+                "aa_runtime",
+                aa?.safe4337ModuleAddress ? "Safe4337 + 7579" : "Safe module path",
+                aa?.safe4337ModuleAddress ? "Safe4337 + 7579" : "Safe module path",
+                { accent: Boolean(aa?.safe4337ModuleAddress) },
+              )}
             </div>
           </div>
 
@@ -542,188 +506,6 @@ const VaultPanel: React.FC<Props> = ({
               {error && <div style={{ color: "var(--color-danger)" }}>{error}</div>}
             </div>
           )}
-        </div>
-
-        <aside className="vault-panel-aside organic-col-divider">
-          <div className="vault-swiss-kicker">Vault Telemetry</div>
-          <div className="vault-hero-card">
-            <div className="vault-metric-eyebrow">Managed Capital</div>
-            <div className="vault-hero-value">{managedCapitalValue}</div>
-            <div className="vault-hero-note">{managedCapitalNote}</div>
-            <div className="vault-status-strip">
-              <span>{fundingStatus}</span>
-              <span>{automationStatus}</span>
-            </div>
-            <div className="vault-budget-rail">
-              <div className="vault-budget-rail-fill" style={{ width: `${budgetCoverage}%` }} />
-            </div>
-            <div className="vault-budget-caption">{budgetCaption}</div>
-          </div>
-
-          <div className="vault-metric-grid">
-            <MetricCard
-              eyebrow="Tokens In Scope"
-              value={formatCount(tokensInScope.length)}
-              note={tokensInScope.length ? tokensInScope.slice(0, 3).join(" · ") : "No token policy set yet"}
-              accent
-            />
-            <MetricCard
-              eyebrow="Protocols Open"
-              value={formatCount(allowedProtocols.length)}
-              note={allowedProtocols.length ? allowedProtocols.slice(0, 2).join(" · ") : policyPreset}
-            />
-            <MetricCard
-              eyebrow="Daily Limit"
-              value={formatUsd(dailyLimitUsd)}
-              note="Agent throughput allowed per 24h"
-            />
-            <MetricCard
-              eyebrow="Per Action"
-              value={formatUsd(perActionUsd)}
-              note="Maximum amount per autonomous action"
-            />
-          </div>
-
-          <div className="vault-info-grid">
-            <div className="vault-info-card">
-              <div className="vault-swiss-kicker">Policy Envelope</div>
-              <div className="vault-info-row">
-                <span>Total automation budget</span>
-                <strong>{formatUsd(automationBudgetUsd)}</strong>
-              </div>
-              <div className="vault-info-row">
-                <span>Manual approval threshold</span>
-                <strong>{formatUsd(manualApprovalUsd)}</strong>
-              </div>
-              <div className="vault-info-row">
-                <span>Risk profile</span>
-                <strong>{riskProfile}</strong>
-              </div>
-            </div>
-
-            <div className="vault-info-card">
-              <div className="vault-swiss-kicker">Session Window</div>
-              <div className="vault-info-row">
-                <span>Valid until</span>
-                <strong>{formatDateTime(sessionWindowEnd)}</strong>
-              </div>
-              <div className="vault-info-row">
-                <span>Usage limit</span>
-                <strong>{usageLimit ? formatCount(usageLimit) : "Not issued"}</strong>
-              </div>
-              <div className="vault-info-row">
-                <span>Funding intent</span>
-                <strong>{fundingIntentUsd > 0 ? formatUsd(fundingIntentUsd) : "None"}</strong>
-              </div>
-              <div className="vault-info-row">
-                <span>Live vault balance</span>
-                <strong>{hasOnchainDeposit ? `${formatTokenBalance(liveNativeBalance)} ${nativeAssetSymbol}` : "Awaiting on-chain funds"}</strong>
-              </div>
-              <div className="vault-info-row">
-                <span>Signed consent</span>
-                <strong>{consentRecordedAt ? formatDateTime(consentRecordedAt) : "Pending"}</strong>
-              </div>
-              <div className="vault-info-row">
-                <span>On-chain grant</span>
-                <strong>{onchainGrantStatus}</strong>
-              </div>
-              <div className="vault-info-caption">
-                {hasOnchainDeposit
-                  ? `NeuralRate detected funds at the vault address.${fundingIntentUsd > 0 ? ` Funding intent target: ${formatUsd(fundingIntentUsd)}.` : ""}`
-                  : consentDigest
-                  ? `Consent digest ${truncate(consentDigest)}${fundingIntentUsd > 0 ? ` • last funding source: ${fundingIntentSource}` : ""}`
-                  : fundingIntentUsd > 0
-                    ? `Last funding source: ${fundingIntentSource}`
-                    : "Create a funding intent to stage the first deposit into the vault."}
-              </div>
-            </div>
-
-            <div className="vault-info-card">
-              <div className="vault-swiss-kicker">Execution Trail</div>
-              {latestJobs.length ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem" }}>
-                  {latestJobs.map((job) => {
-                    const payload = parsePayloadJson(job.payload_json);
-                    const targetAsset =
-                      typeof payload?.targetAsset === "string" ? payload.targetAsset : DEMO_TARGET_ASSET;
-                    const validationStatus =
-                      typeof payload?.validationStatus === "string" ? payload.validationStatus : null;
-                    const protocolId =
-                      typeof payload?.protocolId === "string" ? payload.protocolId : null;
-                    const resolvedContract =
-                      typeof payload?.resolvedContract === "string" ? payload.resolvedContract : null;
-                    const executionSummary =
-                      typeof payload?.executionSummary === "string" ? payload.executionSummary : null;
-
-                    return (
-                      <div
-                        key={job.job_id}
-                        style={{
-                          border: "1px solid var(--border-subtle)",
-                          borderRadius: "12px",
-                          padding: "0.8rem",
-                          background: "rgba(255,255,255,0.02)",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "0.35rem",
-                        }}
-                      >
-                        <div className="vault-info-row">
-                          <span>{humanize(job.job_type)}</span>
-                          <strong>{humanize(job.status)}</strong>
-                        </div>
-                        <div style={{ fontSize: "0.74rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
-                          {targetAsset} · {humanize(job.execution_domain)} · {protocolId ? humanize(protocolId) : "Registry-pinned strategy"}
-                        </div>
-                        {validationStatus && (
-                          <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)" }}>
-                            Validation {humanize(validationStatus)}
-                          </div>
-                        )}
-                        {executionSummary && (
-                          <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
-                            {executionSummary}
-                          </div>
-                        )}
-                        {resolvedContract && (
-                          <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)" }}>
-                            Contract {truncate(resolvedContract)}
-                          </div>
-                        )}
-                        <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)" }}>
-                          {job.confirmed_at
-                            ? `Confirmed ${formatDateTime(job.confirmed_at)}`
-                            : job.created_at
-                              ? `Created ${formatDateTime(job.created_at)}`
-                              : "Awaiting execution update"}
-                        </div>
-                        {job.tx_hash && (
-                          <a
-                            href={`${MANTLE_EXPLORER_BASE_URL}/tx/${job.tx_hash}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={{ color: "var(--color-lime)", textDecoration: "none", fontSize: "0.74rem" }}
-                          >
-                            View tx {truncate(job.tx_hash)}
-                          </a>
-                        )}
-                        {job.failure_reason && (
-                          <div style={{ fontSize: "0.72rem", color: "var(--color-warning)", lineHeight: 1.45 }}>
-                            {job.failure_reason}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="vault-info-caption">
-                  No execution jobs recorded yet. Queue the {DEMO_TARGET_ASSET} demo after enabling automation to populate the audit trail.
-                </div>
-              )}
-            </div>
-          </div>
-        </aside>
       </div>
     </section>
   );

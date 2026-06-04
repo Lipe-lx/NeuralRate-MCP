@@ -5,6 +5,7 @@ import RiskPanel from './components/RiskPanel';
 import NansenRadar from './components/NansenRadar';
 import DecisionLedger from './components/DecisionLedger';
 import VaultPanel from './components/VaultPanel';
+import VaultTelemetryPanel from './components/VaultTelemetryPanel';
 import AgentSettingsPanel from './components/AgentSettingsPanel';
 import WalletOwnershipModal from './components/WalletOwnershipModal';
 import VerifyPanel from './components/VerifyPanel';
@@ -70,7 +71,7 @@ function AppContent() {
   const [selectedPoolId, setSelectedPoolId] = useState<string | null>(null);
   const [route, setRoute] = useState<AppRoute>(() => resolveRoute(window.location.pathname));
   const [activeTab, setActiveTab] = useState<AppTab>(() => (window.location.pathname === '/verify' ? 'verify' : 'terminal'));
-  const [activeVaultTab, setActiveVaultTab] = useState<'vault' | 'settings' | 'history'>('vault');
+  const [activeVaultTab, setActiveVaultTab] = useState<'vault' | 'telemetry' | 'settings' | 'history'>('vault');
   const [isOwnershipModalOpen, setIsOwnershipModalOpen] = useState(false);
   const wallet = useWalletContext();
   const { address, isConnected, isCorrectChain, connect, switchToMantle } = wallet;
@@ -341,6 +342,11 @@ function AppContent() {
                       onReviewOwnership={() => setIsOwnershipModalOpen(true)}
                       controlWalletLabel={controlWalletLabel}
                     />
+                  </div>
+                )}
+                {activeVaultTab === 'telemetry' && (
+                  <div className="centered-page-container" style={{ maxWidth: '1240px', margin: '0.65rem auto 0', height: '100%' }}>
+                    <VaultTelemetryPanel state={neuralRateUser.state} />
                   </div>
                 )}
                 {activeVaultTab === 'settings' && (
