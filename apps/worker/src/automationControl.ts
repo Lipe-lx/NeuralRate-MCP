@@ -942,18 +942,18 @@ export async function prepareVaultRuntimeEnable(
           mode: "wallet_tx",
         }
       : null,
-    env.NEURALRATE_EXECUTION_GUARD_CONTRACT && !runtime?.moduleGuardReady
-      ? {
-          key: "enable_execution_guard",
-          label: "Enable execution guard",
-          required: true,
-          mode: "wallet_tx",
-        }
-      : null,
     needsSafe7579 && !runtime?.fallbackReady
       ? {
           key: "enable_fallback_handler",
           label: "Enable fallback handler",
+          required: true,
+          mode: "wallet_tx",
+        }
+      : null,
+    env.NEURALRATE_EXECUTION_GUARD_CONTRACT && !runtime?.moduleGuardReady
+      ? {
+          key: "enable_execution_guard",
+          label: "Enable execution guard",
           required: true,
           mode: "wallet_tx",
         }

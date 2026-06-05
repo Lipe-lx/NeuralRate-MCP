@@ -167,14 +167,14 @@ const VaultPanel: React.FC<Props> = ({
       done: Boolean(state?.runtimeState?.delegateReady),
     },
     {
-      key: "guard",
-      label: "Enable execution guard",
-      done: Boolean(state?.runtimeState?.moduleGuardReady),
-    },
-    {
       key: "fallback",
       label: "Enable fallback handler",
       done: Boolean(state?.runtimeState?.fallbackHandlerReady ?? state?.runtimeState?.fallbackReady),
+    },
+    {
+      key: "guard",
+      label: "Enable execution guard",
+      done: Boolean(state?.runtimeState?.moduleGuardReady),
     },
   ];
   const completedRuntimeSteps = runtimeChecklist.filter((item) => item.done).length;

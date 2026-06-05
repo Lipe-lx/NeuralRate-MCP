@@ -207,6 +207,30 @@ const isSafeAlreadyDeployedError = (error: unknown) => {
   return /safe already deployed/i.test(description);
 };
 
+const describeError = (error: unknown) => {
+  if (!error || typeof error !== 'object') {
+    return '';
+  }
+
+  const record = error as {
+    message?: unknown;
+    details?: unknown;
+    shortMessage?: unknown;
+    cause?: { message?: unknown; details?: unknown; shortMessage?: unknown } | null;
+  };
+
+  return [
+    record.message,
+    record.details,
+    record.shortMessage,
+    record.cause?.message,
+    record.cause?.details,
+    record.cause?.shortMessage,
+  ]
+    .filter((value) => typeof value === 'string')
+    .join(' ');
+};
+
 const retryOnUnknownBlock = async <T>(action: () => Promise<T>) => {
   let lastError: unknown;
 
@@ -464,21 +488,10 @@ export async function ensureAutonomousVaultRuntime(
     const result = await retryOnUnknownBlock(() => safe.executeTransaction(enableModuleTx));
     await waitForTransactionReceipt(provider, result.hash);
     moduleTxHash = result.hash;
+    safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
   }
 
   let moduleGuardTxHash: string | null = null;
-  if (NEURALRATE_EXECUTION_GUARD_CONTRACT) {
-    const currentModuleGuard = (await retryOnUnknownBlock(() => safe.getModuleGuard())).toLowerCase();
-    if (currentModuleGuard !== NEURALRATE_EXECUTION_GUARD_CONTRACT.toLowerCase()) {
-      const enableModuleGuardTx = await retryOnUnknownBlock(() =>
-        safe.createEnableModuleGuardTx(NEURALRATE_EXECUTION_GUARD_CONTRACT)
-      );
-      const result = await retryOnUnknownBlock(() => safe.executeTransaction(enableModuleGuardTx));
-      await waitForTransactionReceipt(provider, result.hash);
-      moduleGuardTxHash = result.hash;
-    }
-  }
-
   let safe7579InstallTxHash: string | null = null;
   let validatorInstallTxHash: string | null = null;
   let validatorRotateTxHash: string | null = null;
@@ -534,6 +547,7 @@ export async function ensureAutonomousVaultRuntime(
         }),
       },
     ]);
+    safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
   } else if (installedDelegate !== NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS.toLowerCase()) {
     validatorRotateTxHash = await executeSafeTransactions(safe, provider, [
       {
@@ -546,6 +560,7 @@ export async function ensureAutonomousVaultRuntime(
         }),
       },
     ]);
+    safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
   }
 
   if (fallbackHandler !== SAFE_7579_ADAPTER_ADDRESS.toLowerCase()) {
@@ -555,6 +570,28 @@ export async function ensureAutonomousVaultRuntime(
     const result = await retryOnUnknownBlock(() => safe.executeTransaction(enableFallbackTx));
     await waitForTransactionReceipt(provider, result.hash);
     fallbackTxHash = result.hash;
+    safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
+  }
+
+  if (NEURALRATE_EXECUTION_GUARD_CONTRACT) {
+    const currentModuleGuard = (await retryOnUnknownBlock(() => safe.getModuleGuard())).toLowerCase();
+    if (currentModuleGuard !== NEURALRATE_EXECUTION_GUARD_CONTRACT.toLowerCase()) {
+      try {
+        const enableModuleGuardTx = await retryOnUnknownBlock(() =>
+          safe.createEnableModuleGuardTx(NEURALRATE_EXECUTION_GUARD_CONTRACT)
+        );
+        const result = await retryOnUnknownBlock(() => safe.executeTransaction(enableModuleGuardTx));
+        await waitForTransactionReceipt(provider, result.hash);
+        moduleGuardTxHash = result.hash;
+      } catch (error) {
+        const detail = describeError(error);
+        throw new Error(
+          `Failed to enable execution guard after runtime prerequisites were installed.${
+            detail ? ` ${detail}` : ''
+          }`
+        );
+      }
+    }
   }
 
   return {
