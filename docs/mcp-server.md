@@ -2,7 +2,12 @@
 
 **Status:** Canonical doc
 
-The MCP server runs inside `apps/worker` and is split into one public read-only catalog plus three scoped mutation catalogs.
+The MCP server runs inside `apps/worker` and is split into one public read-only catalog plus four scoped catalogs:
+
+- `state` for read-only vault introspection bound to one scoped automation session
+- `config` for policy and runtime mutations
+- `benchmark` for benchmark anchoring flows
+- `execution` for strategy execution flows
 
 ## Endpoints
 
@@ -19,8 +24,9 @@ Preferred client behavior as of 2026-06-04:
 - prefer Streamable HTTP client configs (`type: "http"` in most clients)
 - treat `/sse` only as a compatibility fallback for older clients
 
-### Scoped Mutation Catalogs
+### Scoped Catalogs
 
+- `/mcp/scoped/state`
 - `/mcp/scoped/config`
 - `/mcp/scoped/benchmark`
 - `/mcp/scoped/execution`
@@ -43,30 +49,79 @@ The public read-only endpoint exposes:
 - `nansen_context`
 - `risk_assess`
 - `optimal_allocation`
-- `get_decisions`
-- `get_user_state`
-- `list_jobs`
 
-`get_user_state` and `list_jobs` now require a valid `sessionToken` and are not available by raw `ownerEoa` on the public catalog.
+The public catalog intentionally does not expose vault-bound state or execution surfaces.
+
+## Scoped State Tools
+
+`/mcp/scoped/state` exposes:
+
+- `get_user_state`
+- `get_vault_balances`
+- `get_open_positions`
+- `get_execution_readiness`
+- `get_policy_surface`
+- `get_activity_feed`
+- `list_jobs`
+- `get_decisions`
+- `get_benchmark_history`
+- `get_decision_lineage`
+- `get_audit_summary`
+
+These tools are session-bound and return only the vault attached to the scoped session.
 
 ## Scoped Mutation Tools
 
-All scoped catalogs include the same read-only tools above, plus one mutation tool:
+The mutation catalogs remain intentionally narrow and reuse the same scoped session model.
 
 ### `/mcp/scoped/config`
 
-- extra tool: `update_agent_policy`
+- tools:
+  - `update_agent_policy`
+  - `prepare_policy_publish`
+  - `submit_policy_publish`
+  - `prepare_policy_revoke`
+  - `submit_policy_revoke`
+  - `prepare_vault_runtime_enable`
+  - `submit_vault_runtime_enable`
+  - `prepare_vault_runtime_disable`
+  - `submit_vault_runtime_disable`
+  - `prepare_automation_grant`
+  - `submit_automation_grant`
+  - `revoke_automation_grant`
 - required session domain: `config`
 
 ### `/mcp/scoped/benchmark`
 
-- extra tool: `queue_benchmark`
+- tools:
+  - `queue_benchmark`
 - required session domain: `benchmark`
 
 ### `/mcp/scoped/execution`
 
-- extra tool: `execute_strategy`
+- tools:
+  - `execute_strategy`
 - required session domain: `execution`
+
+## Scoped Resources
+
+`/mcp/scoped/state` also exposes resource templates for heavier JSON snapshots:
+
+- `resource://vault/{vaultRef}/portfolio`
+- `resource://vault/{vaultRef}/policy`
+- `resource://vault/{vaultRef}/activity`
+
+`vaultRef` accepts `current` plus the vault identifiers advertised by the current scoped session.
+
+## Scoped Prompts
+
+`/mcp/scoped/state` exposes prompts for explicit review flows:
+
+- `review-portfolio`
+- `review-execution-readiness`
+- `explain-why-blocked`
+
+These prompts are built from the same underlying state snapshots as the tools and resources above.
 
 ## Route-Level Behavior
 

@@ -1,4 +1,4 @@
-import { createPublicClient, defineChain, getContract, http, type Address } from "viem";
+import { createPublicClient, defineChain, formatUnits, getContract, http, isAddress, type Address } from "viem";
 
 const policyRegistryAbi = [
   {
@@ -92,7 +92,7 @@ const delegateValidatorAbi = [
   },
 ] as const;
 
-type RuntimeEnv = {
+export type RuntimeEnv = {
   MANTLE_SEPOLIA_RPC_URL?: string;
   NEURALRATE_CHAIN_ID?: string;
   NEURALRATE_CHAIN_NAME?: string;
@@ -105,6 +105,7 @@ type RuntimeEnv = {
   NEURALRATE_4337_ENTRYPOINT_ADDRESS?: string;
   NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS?: string;
   NEURALRATE_VAULT_MODULE_ADDRESS?: string;
+  NEURALRATE_USDY_TOKEN_ADDRESS?: string;
 };
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -135,7 +136,49 @@ const sameStringSet = (left: string[], right: string[]) => {
   return a.length === b.length && a.every((value, index) => value === b[index]);
 };
 
-const buildPublicClient = (env: RuntimeEnv) => {
+const erc20BalanceAbi = [
+  {
+    type: "function",
+    name: "balanceOf",
+    stateMutability: "view",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "decimals",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint8" }],
+  },
+  {
+    type: "function",
+    name: "symbol",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "string" }],
+  },
+] as const;
+
+export type VaultBalanceSource = {
+  id: string;
+  status: "live" | "configured" | "unavailable";
+  detail: string;
+};
+
+export type VaultAssetBalance = {
+  asset: string;
+  kind: "native" | "erc20";
+  address: string | null;
+  decimals: number;
+  balanceRaw: string;
+  balanceFormatted: string;
+  hasBalance: boolean;
+  valuationUsd: number | null;
+  valuationSource: string | null;
+};
+
+export const buildPublicClient = (env: RuntimeEnv) => {
   const rpcUrl = env.MANTLE_SEPOLIA_RPC_URL?.trim() || "https://rpc.sepolia.mantle.xyz";
   const chainId = Number.parseInt(env.NEURALRATE_CHAIN_ID || "", 10);
   const runtimeChainId = Number.isFinite(chainId) ? chainId : 5003;
@@ -151,6 +194,117 @@ const buildPublicClient = (env: RuntimeEnv) => {
     transport: http(rpcUrl),
   });
 };
+
+const configuredTrackedAssets = (env: RuntimeEnv) => {
+  const tracked: Array<{ asset: string; address: Address; decimals: number; symbol: string }> = [];
+  const usdyAddress = env.NEURALRATE_USDY_TOKEN_ADDRESS?.trim();
+  if (usdyAddress && isAddress(usdyAddress)) {
+    tracked.push({
+      asset: "USDY",
+      symbol: "USDY",
+      address: usdyAddress,
+      decimals: 18,
+    });
+  }
+  return tracked;
+};
+
+export async function readVaultBalances(vaultAddress: string, env: RuntimeEnv) {
+  const publicClient = buildPublicClient(env);
+  const sources: VaultBalanceSource[] = [];
+
+  let nativeBalanceWei = 0n;
+  let nativeBalanceLive = true;
+  try {
+    nativeBalanceWei = await publicClient.getBalance({ address: vaultAddress as Address });
+  } catch {
+    nativeBalanceLive = false;
+  }
+  sources.push({
+    id: "native_rpc_balance",
+    status: nativeBalanceLive ? "live" : "unavailable",
+    detail: nativeBalanceLive
+      ? "Native vault balance read from the configured chain RPC."
+      : "Native vault balance could not be read from the configured chain RPC.",
+  });
+
+  const nativeBalance: VaultAssetBalance = {
+    asset: "MNT",
+    kind: "native",
+    address: null,
+    decimals: 18,
+    balanceRaw: nativeBalanceWei.toString(),
+    balanceFormatted: formatUnits(nativeBalanceWei, 18),
+    hasBalance: nativeBalanceWei > 0n,
+    valuationUsd: null,
+    valuationSource: null,
+  };
+
+  const tokenBalances = await Promise.all(
+    configuredTrackedAssets(env).map(async (token) => {
+      let readLive = true;
+      let balanceRaw = 0n;
+      let decimals = token.decimals;
+      let symbol = token.symbol;
+      try {
+        [balanceRaw, decimals, symbol] = await Promise.all([
+          publicClient.readContract({
+            address: token.address,
+            abi: erc20BalanceAbi,
+            functionName: "balanceOf",
+            args: [vaultAddress as Address],
+          }),
+          publicClient.readContract({
+            address: token.address,
+            abi: erc20BalanceAbi,
+            functionName: "decimals",
+          }),
+          publicClient.readContract({
+            address: token.address,
+            abi: erc20BalanceAbi,
+            functionName: "symbol",
+          }),
+        ]);
+      } catch {
+        readLive = false;
+      }
+
+      sources.push({
+        id: `erc20_rpc_balance:${token.asset.toLowerCase()}`,
+        status: readLive ? "live" : "unavailable",
+        detail: readLive
+          ? `${token.asset} vault balance read from the configured chain RPC.`
+          : `${token.asset} vault balance could not be read from the configured chain RPC.`,
+      });
+
+      return {
+        asset: String(symbol || token.asset).trim().toUpperCase() || token.asset,
+        kind: "erc20" as const,
+        address: token.address.toLowerCase(),
+        decimals: Number(decimals),
+        balanceRaw: balanceRaw.toString(),
+        balanceFormatted: formatUnits(balanceRaw, Number(decimals)),
+        hasBalance: balanceRaw > 0n,
+        valuationUsd: null,
+        valuationSource: null,
+      } satisfies VaultAssetBalance;
+    })
+  );
+
+  if (configuredTrackedAssets(env).length === 0) {
+    sources.push({
+      id: "tracked_erc20_assets",
+      status: "configured",
+      detail: "No tracked ERC20 assets are configured for worker-side vault balance reads.",
+    });
+  }
+
+  return {
+    nativeBalance,
+    tokenBalances,
+    sources,
+  };
+}
 
 export async function withOnchainPolicyState<T extends Record<string, unknown>>(state: T, env: RuntimeEnv) {
   const vaultAddress = asString((state.vault as Record<string, unknown> | null)?.vault_address);

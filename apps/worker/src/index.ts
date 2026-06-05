@@ -1,5 +1,5 @@
 import { McpAgent } from "agents/mcp";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { DefiLlamaService } from "./services/defillama";
 import { FredService } from "./services/fred";
 import { NansenService } from "./services/nansen";
@@ -34,9 +34,14 @@ import {
   McpToolHandlers,
   bootstrapUserVaultSchema,
   executeStrategySchema,
+  getActivityFeedSchema,
   getDecisionLineageSchema,
   getDecisionsSchema,
+  getExecutionReadinessSchema,
+  getOpenPositionsSchema,
+  getPolicySurfaceSchema,
   getUserStateSchema,
+  getVaultBalancesSchema,
   yieldScanSchema,
   issueAutomationGrantSchema,
   listJobsSchema,
@@ -61,6 +66,15 @@ import {
 } from "./mcp/tools";
 import { withOnchainPolicyState } from "./onchainState";
 import { getScopedCatalogRequest } from "./scopedMcp";
+import {
+  buildExecutionReadinessPrompt,
+  buildPortfolioReviewPrompt,
+  buildWhyBlockedPrompt,
+  isScopedVaultReference,
+  listScopedVaultReferences,
+  loadScopedStateCatalogSnapshot,
+  type StateCatalogSnapshot,
+} from "./stateCatalog";
 
 type ExecutorServiceBinding = {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
@@ -89,7 +103,9 @@ export interface Env {
   NEURALRATE_ERC7484_REGISTRY_ADDRESS?: string;
   MANTLE_SEPOLIA_RPC_URL?: string;
   NEURALRATE_CHAIN_ID?: string;
+  NEURALRATE_CHAIN_NAME?: string;
   NEURALRATE_ENV_PROFILE?: string;
+  NEURALRATE_USDY_TOKEN_ADDRESS?: string;
   NEURALRATE_INTERNAL_API_TOKEN?: string;
   INTERNAL_API_TOKEN?: string;
   EXECUTOR?: ExecutorServiceBinding;
@@ -113,6 +129,18 @@ const MCP_SCOPED_EXECUTION_ROUTE = "/mcp/scoped/execution";
 const MCP_SCOPED_EXECUTION_SSE_ALIAS_ROUTE = "/sse/scoped/execution";
 
 const readJsonBody = async <T>(request: Request) => (await request.json()) as T;
+const jsonText = (value: unknown) => JSON.stringify(value, null, 2);
+const buildJsonToolResult = (value: unknown) => ({
+  content: [{ type: "text" as const, text: jsonText(value) }],
+  structuredContent: value as Record<string, unknown>,
+});
+const buildJsonResourceResult = (uri: string, value: unknown) => ({
+  contents: [{
+    uri,
+    mimeType: "application/json",
+    text: jsonText(value),
+  }],
+});
 
 const getAuthEnvelope = (body: unknown) => {
   if (!body || typeof body !== "object") {
@@ -294,7 +322,12 @@ const buildAuditSummary = (state: Record<string, unknown>) => {
   });
   events.push({
     type: "session_created",
-    status: activeSession?.session_status ? String(activeSession.session_status) : "missing",
+    status:
+      activeSession?.session_status
+        ? String(activeSession.session_status)
+        : activeSession?.status
+          ? String(activeSession.status)
+          : "missing",
     at: typeof activeSession?.issued_at === "string" ? activeSession.issued_at : null,
     detail: activeSession ? String(activeSession.session_id ?? "session") : "No MCP mutation session found.",
   });
@@ -661,17 +694,124 @@ export class NeuralRateStateMcpAgent extends McpAgent<Env, Record<string, never>
   async init() {
     const { handlers, automation } = createServices(this.env);
     const getScoped = () => resolveScopedMcpSession(this.env, "state", this.getSessionId());
+    const getSnapshot = async () => {
+      const scoped = await getScoped();
+      return loadScopedStateCatalogSnapshot(automation, this.env, scoped.ownerEoa);
+    };
+    const registerScopedResource = (
+      name: string,
+      suffix: "portfolio" | "policy" | "activity",
+      title: string,
+      description: string,
+      select: (snapshot: StateCatalogSnapshot) => unknown
+    ) => {
+      const template = new ResourceTemplate(`resource://vault/{vaultRef}/${suffix}`, {
+        list: async () => {
+          const snapshot = await getSnapshot();
+          const refs = listScopedVaultReferences(snapshot);
+          return {
+            resources: refs.map((vaultRef) => ({
+              uri: `resource://vault/${vaultRef}/${suffix}`,
+              name: `${name}-${vaultRef}`,
+              title,
+              mimeType: "application/json",
+            })),
+          };
+        },
+        complete: {
+          vaultRef: async () => {
+            const snapshot = await getSnapshot();
+            return listScopedVaultReferences(snapshot);
+          },
+        },
+      });
+
+      this.server.registerResource(
+        name,
+        template,
+        {
+          title,
+          description,
+          mimeType: "application/json",
+        },
+        async (uri, variables) => {
+          const snapshot = await getSnapshot();
+          const vaultRef = String(variables.vaultRef ?? "");
+          if (!isScopedVaultReference(snapshot, vaultRef)) {
+            throw new Error(`Vault resource ${vaultRef} is not available in this scoped session.`);
+          }
+          return buildJsonResourceResult(uri.toString(), select(snapshot));
+        }
+      );
+    };
 
     this.server.tool(
       "get_user_state",
       "Fetches the scoped user, vault, grant, session and job state",
       getUserStateSchema,
       async () => {
-        const scoped = await getScoped();
-        const state = await withOnchainPolicyState(await automation.getAutomationState(scoped.ownerEoa), this.env);
+        const snapshot = await getSnapshot();
+        return buildJsonToolResult(snapshot.state);
+      }
+    );
+
+    this.server.tool(
+      "get_vault_balances",
+      "Returns the scoped vault balance surface with native gas, tracked token balances, spendable USD, and data sources",
+      getVaultBalancesSchema,
+      async () => {
+        const snapshot = await getSnapshot();
+        return buildJsonToolResult(snapshot.balances);
+      }
+    );
+
+    this.server.tool(
+      "get_open_positions",
+      "Returns normalized open positions derived from the scoped vault balance surface",
+      getOpenPositionsSchema,
+      async () => {
+        const snapshot = await getSnapshot();
+        const structured = { positions: snapshot.positions };
         return {
-          content: [{ type: "text", text: JSON.stringify(state, null, 2) }],
-          structuredContent: state,
+          content: [{ type: "text", text: jsonText(structured) }],
+          structuredContent: structured,
+        };
+      }
+    );
+
+    this.server.tool(
+      "get_execution_readiness",
+      "Consolidates balance, policy, runtime, grant, and session readiness for scoped execution",
+      getExecutionReadinessSchema,
+      async () => {
+        const snapshot = await getSnapshot();
+        return buildJsonToolResult(snapshot.readiness);
+      }
+    );
+
+    this.server.tool(
+      "get_policy_surface",
+      "Exposes the effective execution policy surface, allowlists, validity, and remaining policy headroom",
+      getPolicySurfaceSchema,
+      async () => {
+        const snapshot = await getSnapshot();
+        return buildJsonToolResult(snapshot.policySurface);
+      }
+    );
+
+    this.server.tool(
+      "get_activity_feed",
+      "Returns a money-and-control oriented activity feed with attempts, blocks, executions, and benchmark-linked actions",
+      getActivityFeedSchema,
+      async ({ limit }) => {
+        const snapshot = await getSnapshot();
+        const structured = {
+          ...snapshot.activityFeed,
+          items: snapshot.activityFeed.items.slice(0, limit ?? 50),
+        };
+        return {
+          content: [{ type: "text", text: jsonText(structured) }],
+          structuredContent: structured,
         };
       }
     );
@@ -750,14 +890,68 @@ export class NeuralRateStateMcpAgent extends McpAgent<Env, Record<string, never>
       "Returns a compact audit summary for the bound owner",
       {},
       async () => {
-        const scoped = await getScoped();
-        const state = await withOnchainPolicyState(await automation.getAutomationState(scoped.ownerEoa), this.env);
-        const summary = buildAuditSummary(state as unknown as Record<string, unknown>);
-        return {
-          content: [{ type: "text", text: JSON.stringify(summary, null, 2) }],
-          structuredContent: summary,
-        };
+        const snapshot = await getSnapshot();
+        const summary = buildAuditSummary(snapshot.state as unknown as Record<string, unknown>);
+        return buildJsonToolResult(summary);
       }
+    );
+
+    registerScopedResource(
+      "vault-portfolio",
+      "portfolio",
+      "Vault Portfolio Snapshot",
+      "Snapshot of balances, normalized open positions, and execution readiness for the scoped vault.",
+      (snapshot) => ({
+        balances: snapshot.balances,
+        positions: snapshot.positions,
+        readiness: snapshot.readiness,
+      })
+    );
+
+    registerScopedResource(
+      "vault-policy",
+      "policy",
+      "Vault Policy Snapshot",
+      "Snapshot of the effective execution policy, limits, allowlists, and remaining headroom for the scoped vault.",
+      (snapshot) => ({
+        policySurface: snapshot.policySurface,
+        readiness: snapshot.readiness,
+      })
+    );
+
+    registerScopedResource(
+      "vault-activity",
+      "activity",
+      "Vault Activity Snapshot",
+      "Snapshot of execution attempts, benchmark-linked actions, failures, and recent vault activity.",
+      (snapshot) => snapshot.activityFeed
+    );
+
+    this.server.registerPrompt(
+      "review-portfolio",
+      {
+        title: "Review Portfolio",
+        description: "Review the scoped vault portfolio and identify safe next actions within the current policy.",
+      },
+      async () => buildPortfolioReviewPrompt(await getSnapshot())
+    );
+
+    this.server.registerPrompt(
+      "review-execution-readiness",
+      {
+        title: "Review Execution Readiness",
+        description: "Explain whether the scoped vault is ready for autonomous execution and what remains blocked.",
+      },
+      async () => buildExecutionReadinessPrompt(await getSnapshot())
+    );
+
+    this.server.registerPrompt(
+      "explain-why-blocked",
+      {
+        title: "Explain Why Blocked",
+        description: "Explain the current execution blockers for the scoped vault and the safest remediation order.",
+      },
+      async () => buildWhyBlockedPrompt(await getSnapshot())
     );
   }
 }

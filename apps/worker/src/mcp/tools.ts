@@ -91,6 +91,13 @@ export const getDecisionsSchema = {
 };
 
 export const getUserStateSchema = {};
+export const getVaultBalancesSchema = {};
+export const getOpenPositionsSchema = {};
+export const getExecutionReadinessSchema = {};
+export const getPolicySurfaceSchema = {};
+export const getActivityFeedSchema = {
+  limit: z.number().optional().default(50),
+};
 
 export const bootstrapUserVaultSchema = {
   ownerEoa: z.string().describe("Owner EOA for the dedicated vault"),
