@@ -499,9 +499,9 @@ export async function ensureAutonomousVaultRuntime(
   let validatorInstallTxHash: string | null = null;
   let validatorRotateTxHash: string | null = null;
   let fallbackTxHash: string | null = null;
+  let safe7579InitError: string | null = null;
 
   const safe7579Enabled = await retryOnUnknownBlock(() => safe.isModuleEnabled(SAFE_7579_ADAPTER_ADDRESS));
-  const fallbackHandler = (await retryOnUnknownBlock(() => safe.getFallbackHandler())).toLowerCase();
   const delegateValidatorInitData = buildDelegateValidatorInitData(
     NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS,
     moduleAddress
@@ -514,6 +514,20 @@ export async function ensureAutonomousVaultRuntime(
     safe7579InstallTxHash = enableSafe7579ModuleResult.hash;
     safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
 
+  }
+
+  const fallbackHandler = (await retryOnUnknownBlock(() => safe.getFallbackHandler())).toLowerCase();
+  if (fallbackHandler !== SAFE_7579_ADAPTER_ADDRESS.toLowerCase()) {
+    const enableFallbackTx = await retryOnUnknownBlock(() =>
+      safe.createEnableFallbackHandlerTx(SAFE_7579_ADAPTER_ADDRESS)
+    );
+    const result = await retryOnUnknownBlock(() => safe.executeTransaction(enableFallbackTx));
+    await waitForTransactionReceipt(provider, result.hash);
+    fallbackTxHash = result.hash;
+    safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
+  }
+
+  try {
     await executeSafeTransactions(safe, provider, [
       {
         to: SAFE_7579_ADAPTER_ADDRESS,
@@ -522,11 +536,7 @@ export async function ensureAutonomousVaultRuntime(
           abi: safe7579AdapterAbi,
           functionName: 'initializeAccount',
           args: [
-            [{
-              module: DELEGATE_VALIDATOR_ADDRESS as `0x${string}`,
-              initData: delegateValidatorInitData,
-              moduleType: MODULE_TYPE_VALIDATOR,
-            }],
+            [],
             {
               registry: ZERO_ADDRESS as `0x${string}`,
               attesters: [] as `0x${string}`[],
@@ -537,6 +547,8 @@ export async function ensureAutonomousVaultRuntime(
       },
     ]);
     safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
+  } catch (error) {
+    safe7579InitError = describeError(error) || 'Safe7579 initializeAccount reverted.';
   }
 
   const installedDelegate = await retryOnUnknownBlock(() =>
@@ -574,14 +586,8 @@ export async function ensureAutonomousVaultRuntime(
     safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
   }
 
-  if (fallbackHandler !== SAFE_7579_ADAPTER_ADDRESS.toLowerCase()) {
-    const enableFallbackTx = await retryOnUnknownBlock(() =>
-      safe.createEnableFallbackHandlerTx(SAFE_7579_ADAPTER_ADDRESS)
-    );
-    const result = await retryOnUnknownBlock(() => safe.executeTransaction(enableFallbackTx));
-    await waitForTransactionReceipt(provider, result.hash);
-    fallbackTxHash = result.hash;
-    safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
+  if (safe7579InitError && !validatorInstallTxHash && installedDelegate === ZERO_ADDRESS) {
+    throw new Error(`Failed to initialize Safe7579 adapter for the existing Safe. ${safe7579InitError}`);
   }
 
   if (NEURALRATE_EXECUTION_GUARD_CONTRACT) {
