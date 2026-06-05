@@ -77,6 +77,22 @@ import {
 import { withOnchainPolicyState } from "./onchainState";
 import { getScopedCatalogRequest } from "./scopedMcp";
 import {
+  MCP_SCOPED_BENCHMARK_ROUTE,
+  MCP_SCOPED_BENCHMARK_SSE_ALIAS_ROUTE,
+  MCP_SCOPED_CONFIG_ROUTE,
+  MCP_SCOPED_CONFIG_SSE_ALIAS_ROUTE,
+  MCP_SCOPED_EXECUTION_ROUTE,
+  MCP_SCOPED_EXECUTION_SSE_ALIAS_ROUTE,
+  MCP_SCOPED_ROUTE,
+  MCP_SCOPED_SSE_ALIAS_ROUTE,
+  MCP_SCOPED_STATE_ROUTE,
+  MCP_SCOPED_STATE_SSE_ALIAS_ROUTE,
+  resolveScopedCatalogBinding,
+  resolveScopedCatalogRoute,
+  type ScopedCatalogDomain,
+  type ScopedMutationDomain,
+} from "./scopedCatalog";
+import {
   buildExecutionReadinessPrompt,
   buildPortfolioReviewPrompt,
   buildWhyBlockedPrompt,
@@ -95,6 +111,7 @@ export interface Env {
   CACHE_KV: KVNamespace;
   DECISIONS_DB: D1Database;
   MCP_OBJECT: DurableObjectNamespace;
+  MCP_STATE_OBJECT: DurableObjectNamespace;
   MCP_READONLY_OBJECT: DurableObjectNamespace;
   MCP_CONFIG_OBJECT: DurableObjectNamespace;
   MCP_BENCHMARK_OBJECT: DurableObjectNamespace;
@@ -128,16 +145,6 @@ const getInternalApiToken = (env: Env) =>
 
 const MCP_CANONICAL_ROUTE = "/mcp";
 const MCP_SSE_ALIAS_ROUTE = "/sse";
-const MCP_SCOPED_ROUTE = "/mcp/scoped";
-const MCP_SCOPED_SSE_ALIAS_ROUTE = "/sse/scoped";
-const MCP_SCOPED_STATE_ROUTE = "/mcp/scoped/state";
-const MCP_SCOPED_STATE_SSE_ALIAS_ROUTE = "/sse/scoped/state";
-const MCP_SCOPED_CONFIG_ROUTE = "/mcp/scoped/config";
-const MCP_SCOPED_CONFIG_SSE_ALIAS_ROUTE = "/sse/scoped/config";
-const MCP_SCOPED_BENCHMARK_ROUTE = "/mcp/scoped/benchmark";
-const MCP_SCOPED_BENCHMARK_SSE_ALIAS_ROUTE = "/sse/scoped/benchmark";
-const MCP_SCOPED_EXECUTION_ROUTE = "/mcp/scoped/execution";
-const MCP_SCOPED_EXECUTION_SSE_ALIAS_ROUTE = "/sse/scoped/execution";
 
 const readJsonBody = async <T>(request: Request) => (await request.json()) as T;
 const jsonText = (value: unknown) => JSON.stringify(value, null, 2);
@@ -369,8 +376,6 @@ const buildAuditSummary = (state: Record<string, unknown>) => {
   return { events };
 };
 
-type ScopedMutationDomain = "config" | "benchmark" | "execution";
-type ScopedCatalogDomain = "state" | ScopedMutationDomain;
 type ScopedCatalogBinding = {
   ownerEoa: string;
   userId: string;
@@ -536,54 +541,6 @@ const requireScopedCatalogAccess = async (
 
   const automation = new AutomationStore(env.DECISIONS_DB);
   return resolveAutomationAccessFromSessionToken(automation, sessionToken, requiredDomain);
-};
-
-const resolveScopedCatalogRoute = (url: URL): { route: string; domain: ScopedCatalogDomain } | null => {
-  if (
-    url.pathname.startsWith(MCP_SCOPED_STATE_ROUTE) ||
-    url.pathname.startsWith(MCP_SCOPED_STATE_SSE_ALIAS_ROUTE)
-  ) {
-    return { route: MCP_SCOPED_STATE_ROUTE, domain: "state" };
-  }
-
-  if (
-    url.pathname.startsWith(MCP_SCOPED_CONFIG_ROUTE) ||
-    url.pathname.startsWith(MCP_SCOPED_CONFIG_SSE_ALIAS_ROUTE)
-  ) {
-    return { route: MCP_SCOPED_CONFIG_ROUTE, domain: "config" };
-  }
-
-  if (
-    url.pathname.startsWith(MCP_SCOPED_BENCHMARK_ROUTE) ||
-    url.pathname.startsWith(MCP_SCOPED_BENCHMARK_SSE_ALIAS_ROUTE)
-  ) {
-    return { route: MCP_SCOPED_BENCHMARK_ROUTE, domain: "benchmark" };
-  }
-
-  if (
-    url.pathname.startsWith(MCP_SCOPED_EXECUTION_ROUTE) ||
-    url.pathname.startsWith(MCP_SCOPED_EXECUTION_SSE_ALIAS_ROUTE)
-  ) {
-    return { route: MCP_SCOPED_EXECUTION_ROUTE, domain: "execution" };
-  }
-
-  if (url.pathname.startsWith(MCP_SCOPED_ROUTE) || url.pathname.startsWith(MCP_SCOPED_SSE_ALIAS_ROUTE)) {
-    const domain = url.searchParams.get("domain")?.trim() ?? null;
-    if (domain === "state") {
-      return { route: MCP_SCOPED_STATE_ROUTE, domain };
-    }
-    if (domain === "config") {
-      return { route: MCP_SCOPED_CONFIG_ROUTE, domain };
-    }
-    if (domain === "benchmark") {
-      return { route: MCP_SCOPED_BENCHMARK_ROUTE, domain };
-    }
-    if (domain === "execution") {
-      return { route: MCP_SCOPED_EXECUTION_ROUTE, domain };
-    }
-  }
-
-  return null;
 };
 
 const buildCatalogDescriptor = (
@@ -2436,14 +2393,7 @@ export default {
             ? NeuralRateBenchmarkMcpAgent
             : NeuralRateExecutionMcpAgent;
 
-      const scopedBinding =
-        scopedCatalog.domain === "state"
-          ? "MCP_OBJECT"
-          : scopedCatalog.domain === "config"
-          ? "MCP_CONFIG_OBJECT"
-          : scopedCatalog.domain === "benchmark"
-            ? "MCP_BENCHMARK_OBJECT"
-            : "MCP_EXECUTION_OBJECT";
+      const scopedBinding = resolveScopedCatalogBinding(scopedCatalog.domain);
 
       const mcpResponse = await (scopedAgent as any).serve(scopedCatalog.route, { binding: scopedBinding }).fetch(mcpRequest, env, ctx);
       const newHeaders = new Headers(mcpResponse.headers);

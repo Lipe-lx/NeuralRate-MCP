@@ -43,6 +43,10 @@ name = "MCP_OBJECT"
 class_name = "NeuralRateMcpAgent"
 
 [[durable_objects.bindings]]
+name = "MCP_STATE_OBJECT"
+class_name = "NeuralRateStateMcpAgent"
+
+[[durable_objects.bindings]]
 name = "MCP_READONLY_OBJECT"
 class_name = "NeuralRateReadonlyMcpAgent"
 
@@ -74,3 +78,7 @@ new_sqlite_classes = [
   "NeuralRateBenchmarkMcpAgent",
   "NeuralRateExecutionMcpAgent",
 ]
+
+[[migrations]]
+tag = "v4"
+new_sqlite_classes = ["NeuralRateStateMcpAgent"]
