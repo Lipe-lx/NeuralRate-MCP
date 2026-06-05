@@ -797,6 +797,17 @@ export const useNeuralRateUser = ({
     setError(null);
     let issuedBundle: McpAccessBundle | null = null;
     try {
+      if (current.activeGrant?.status === "active" && !current.automationReady) {
+        await enableRuntimeFromPlan();
+        const recovered = await refresh(ownerEoa);
+        if (recovered?.automationReady) {
+          setNotice("Automation runtime verified on-chain. Agent execution is ready.");
+        } else {
+          setNotice("Automation grant is active, but runtime setup is still pending. Finish the runtime checklist before asking the agent to operate.");
+        }
+        return;
+      }
+
       if (!current.vault.ownership_acknowledged_at) {
         throw new Error("Acknowledge vault ownership before issuing an automation grant.");
       }
@@ -820,16 +831,17 @@ export const useNeuralRateUser = ({
       setMcpAccessBundle(issuedBundle);
       storeMcpAccessBundle(issuedBundle);
 
-      let moduleMessage = "Grant recorded and policy synchronized.";
       if (VAULT_MODULE_ENABLED) {
         await enableRuntimeFromPlan();
-        moduleMessage = "Grant recorded, policy synchronized and runtime verified on-chain.";
       }
 
-      await refresh(ownerEoa);
-      const finalNotice = issuedBundle
-        ? `Automation grant issued. ${moduleMessage} MCP execution access is ready through ${issuedBundle.recommendedTransport.url}.`
-        : `Automation grant issued. ${moduleMessage}`;
+      const refreshed = await refresh(ownerEoa);
+      const runtimeReady = Boolean(refreshed?.automationReady);
+      const finalNotice = runtimeReady
+        ? issuedBundle
+          ? `Automation is fully enabled. MCP execution access is ready through ${issuedBundle.recommendedTransport.url}.`
+          : "Automation is fully enabled and runtime verified on-chain."
+        : "Automation grant is active, but runtime setup is still pending. Finish the runtime checklist before asking the agent to operate.";
       setNotice(finalNotice);
     } catch (err) {
       let recoveredState: AutomationState | null = null;
@@ -849,6 +861,10 @@ export const useNeuralRateUser = ({
           storeMcpAccessBundle(issuedBundle);
         }
         setError(null);
+        if (!recoveredState.automationReady) {
+          setNotice("Automation grant is active, but runtime setup is still pending. Finish the runtime checklist before asking the agent to operate.");
+          return;
+        }
         if (isUnknownBlockError(err)) {
           setNotice("Automation grant issued. Runtime verification hit a transient Mantle RPC sync delay, so the app refreshed your state and kept automation enabled.");
           return;
@@ -858,6 +874,30 @@ export const useNeuralRateUser = ({
       }
 
       const message = err instanceof Error ? err.message : "Failed to enable automation.";
+      setError(message);
+      throw err;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const completeRuntimeSetup = async () => {
+    if (!ownerEoa) {
+      throw new Error("Connect a wallet before completing the runtime setup.");
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      await enableRuntimeFromPlan();
+      const refreshed = await refresh(ownerEoa);
+      if (refreshed?.automationReady) {
+        setNotice("Automation runtime verified on-chain. Agent execution is ready.");
+      } else {
+        setNotice("Runtime setup is still pending on-chain. Review the checklist and retry after the wallet confirmations settle.");
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to complete the runtime setup.";
       setError(message);
       throw err;
     } finally {
@@ -1004,6 +1044,7 @@ export const useNeuralRateUser = ({
     acknowledgeOwnership,
     issueMcpAccessBundle,
     enableAutomation,
+    completeRuntimeSetup,
     revokeAutomation,
     queueDemoStrategy,
   };

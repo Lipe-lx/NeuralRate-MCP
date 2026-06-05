@@ -94,6 +94,7 @@ const delegateValidatorAbi = [
 
 export type RuntimeEnv = {
   MANTLE_SEPOLIA_RPC_URL?: string;
+  MANTLE_SEPOLIA_RPC_FALLBACK_URL?: string;
   NEURALRATE_CHAIN_ID?: string;
   NEURALRATE_CHAIN_NAME?: string;
   NEURALRATE_POLICY_REGISTRY_CONTRACT?: string;
@@ -176,10 +177,67 @@ export type VaultAssetBalance = {
   hasBalance: boolean;
   valuationUsd: number | null;
   valuationSource: string | null;
+  readStatus: "live" | "cached" | "unavailable";
+  asOf: string | null;
 };
 
-export const buildPublicClient = (env: RuntimeEnv) => {
-  const rpcUrl = env.MANTLE_SEPOLIA_RPC_URL?.trim() || "https://rpc.sepolia.mantle.xyz";
+type BalanceReadClient = {
+  getBalance(args: { address: Address }): Promise<bigint>;
+  readContract(args: {
+    address: Address;
+    abi: typeof erc20BalanceAbi;
+    functionName: "balanceOf" | "decimals" | "symbol";
+    args?: [Address];
+  }): Promise<unknown>;
+};
+
+type VaultBalanceCacheEntry = {
+  cachedAt: string;
+  expiresAtMs: number;
+  nativeBalance: VaultAssetBalance;
+  tokenBalances: VaultAssetBalance[];
+};
+
+type VaultBalanceReadOptions = {
+  cacheTtlMs?: number;
+  maxAttemptsPerRpc?: number;
+  retryDelayMs?: number;
+  nowMs?: number;
+  createClient?: (rpcUrl: string) => BalanceReadClient;
+};
+
+const DEFAULT_RPC_URL = "https://rpc.sepolia.mantle.xyz";
+const DEFAULT_VAULT_BALANCE_CACHE_TTL_MS = 30_000;
+const DEFAULT_RPC_ATTEMPTS = 2;
+const DEFAULT_RPC_RETRY_DELAY_MS = 150;
+const vaultBalanceCache = new Map<string, VaultBalanceCacheEntry>();
+
+const sleep = async (ms: number) => {
+  if (ms <= 0) {
+    return;
+  }
+  await new Promise((resolve) => setTimeout(resolve, ms));
+};
+
+const cloneBalance = (
+  balance: VaultAssetBalance,
+  overrides: Partial<Pick<VaultAssetBalance, "readStatus" | "asOf">> = {}
+): VaultAssetBalance => ({
+  ...balance,
+  readStatus: overrides.readStatus ?? balance.readStatus,
+  asOf: overrides.asOf ?? balance.asOf,
+});
+
+const resolveRpcUrls = (env: RuntimeEnv) => {
+  const urls = [
+    env.MANTLE_SEPOLIA_RPC_URL?.trim() || DEFAULT_RPC_URL,
+    env.MANTLE_SEPOLIA_RPC_FALLBACK_URL?.trim() || "",
+  ].filter(Boolean);
+  return [...new Set(urls)];
+};
+
+export const buildPublicClient = (env: RuntimeEnv, rpcUrl?: string) => {
+  const resolvedRpcUrl = rpcUrl?.trim() || resolveRpcUrls(env)[0] || DEFAULT_RPC_URL;
   const chainId = Number.parseInt(env.NEURALRATE_CHAIN_ID || "", 10);
   const runtimeChainId = Number.isFinite(chainId) ? chainId : 5003;
   const runtimeChainName = env.NEURALRATE_CHAIN_NAME?.trim() || "Mantle Sepolia";
@@ -189,9 +247,9 @@ export const buildPublicClient = (env: RuntimeEnv) => {
       id: runtimeChainId,
       name: runtimeChainName,
       nativeCurrency: { name: "MNT", symbol: "MNT", decimals: 18 },
-      rpcUrls: { default: { http: [rpcUrl] } },
+      rpcUrls: { default: { http: [resolvedRpcUrl] } },
     }),
-    transport: http(rpcUrl),
+    transport: http(resolvedRpcUrl),
   });
 };
 
@@ -209,84 +267,218 @@ const configuredTrackedAssets = (env: RuntimeEnv) => {
   return tracked;
 };
 
-export async function readVaultBalances(vaultAddress: string, env: RuntimeEnv) {
-  const publicClient = buildPublicClient(env);
-  const sources: VaultBalanceSource[] = [];
+const resolveVaultBalanceCacheKey = (vaultAddress: string, env: RuntimeEnv) =>
+  `${(env.NEURALRATE_CHAIN_ID || "5003").trim()}:${vaultAddress.toLowerCase()}`;
 
-  let nativeBalanceWei = 0n;
-  let nativeBalanceLive = true;
-  try {
-    nativeBalanceWei = await publicClient.getBalance({ address: vaultAddress as Address });
-  } catch {
-    nativeBalanceLive = false;
+const getCachedVaultBalances = (vaultAddress: string, env: RuntimeEnv, nowMs: number) => {
+  const cacheKey = resolveVaultBalanceCacheKey(vaultAddress, env);
+  const cached = vaultBalanceCache.get(cacheKey);
+  if (!cached) {
+    return null;
   }
+  if (cached.expiresAtMs <= nowMs) {
+    vaultBalanceCache.delete(cacheKey);
+    return null;
+  }
+  return cached;
+};
+
+const setCachedVaultBalances = (
+  vaultAddress: string,
+  env: RuntimeEnv,
+  nowMs: number,
+  cacheTtlMs: number,
+  nativeBalance: VaultAssetBalance,
+  tokenBalances: VaultAssetBalance[]
+) => {
+  const cacheKey = resolveVaultBalanceCacheKey(vaultAddress, env);
+  vaultBalanceCache.set(cacheKey, {
+    cachedAt: new Date(nowMs).toISOString(),
+    expiresAtMs: nowMs + cacheTtlMs,
+    nativeBalance: cloneBalance(nativeBalance),
+    tokenBalances: tokenBalances.map((balance) => cloneBalance(balance)),
+  });
+};
+
+const findCachedTokenBalance = (cached: VaultBalanceCacheEntry | null, token: { asset: string; address: Address }) =>
+  cached?.tokenBalances.find((entry) =>
+    entry.asset.toUpperCase() === token.asset.toUpperCase() ||
+    entry.address?.toLowerCase() === token.address.toLowerCase()
+  ) ?? null;
+
+const readWithRetry = async <T>(
+  rpcUrls: string[],
+  createClient: (rpcUrl: string) => BalanceReadClient,
+  maxAttemptsPerRpc: number,
+  retryDelayMs: number,
+  load: (client: BalanceReadClient) => Promise<T>
+) => {
+  let lastError: unknown = null;
+
+  for (let rpcIndex = 0; rpcIndex < rpcUrls.length; rpcIndex += 1) {
+    const rpcUrl = rpcUrls[rpcIndex]!;
+    const client = createClient(rpcUrl);
+    for (let attempt = 1; attempt <= maxAttemptsPerRpc; attempt += 1) {
+      try {
+        const value = await load(client);
+        return { ok: true as const, value, rpcIndex, rpcUrl, attempt };
+      } catch (error) {
+        lastError = error;
+        if (attempt < maxAttemptsPerRpc) {
+          await sleep(retryDelayMs * attempt);
+        }
+      }
+    }
+  }
+
+  return { ok: false as const, error: lastError };
+};
+
+export const resetVaultBalanceCacheForTests = () => {
+  vaultBalanceCache.clear();
+};
+
+export async function readVaultBalances(vaultAddress: string, env: RuntimeEnv, options: VaultBalanceReadOptions = {}) {
+  const nowMs = options.nowMs ?? Date.now();
+  const asOf = new Date(nowMs).toISOString();
+  const cacheTtlMs = options.cacheTtlMs ?? DEFAULT_VAULT_BALANCE_CACHE_TTL_MS;
+  const maxAttemptsPerRpc = Math.max(1, options.maxAttemptsPerRpc ?? DEFAULT_RPC_ATTEMPTS);
+  const retryDelayMs = Math.max(0, options.retryDelayMs ?? DEFAULT_RPC_RETRY_DELAY_MS);
+  const rpcUrls = resolveRpcUrls(env);
+  const createClient = options.createClient ?? ((rpcUrl: string) => buildPublicClient(env, rpcUrl) as BalanceReadClient);
+  const sources: VaultBalanceSource[] = [];
+  const cached = getCachedVaultBalances(vaultAddress, env, nowMs);
+
+  const nativeRead = await readWithRetry(
+    rpcUrls,
+    createClient,
+    maxAttemptsPerRpc,
+    retryDelayMs,
+    async (client) => client.getBalance({ address: vaultAddress as Address })
+  );
+
+  const nativeBalance = nativeRead.ok
+    ? {
+        asset: "MNT",
+        kind: "native" as const,
+        address: null,
+        decimals: 18,
+        balanceRaw: nativeRead.value.toString(),
+        balanceFormatted: formatUnits(nativeRead.value, 18),
+        hasBalance: nativeRead.value > 0n,
+        valuationUsd: null,
+        valuationSource: null,
+        readStatus: "live" as const,
+        asOf,
+      }
+    : cached?.nativeBalance
+      ? cloneBalance(cached.nativeBalance, { readStatus: "cached", asOf: cached.cachedAt })
+      : {
+          asset: "MNT",
+          kind: "native" as const,
+          address: null,
+          decimals: 18,
+          balanceRaw: "0",
+          balanceFormatted: "0",
+          hasBalance: false,
+          valuationUsd: null,
+          valuationSource: null,
+          readStatus: "unavailable" as const,
+          asOf: null,
+        };
+
   sources.push({
     id: "native_rpc_balance",
-    status: nativeBalanceLive ? "live" : "unavailable",
-    detail: nativeBalanceLive
-      ? "Native vault balance read from the configured chain RPC."
-      : "Native vault balance could not be read from the configured chain RPC.",
+    status: nativeRead.ok ? "live" : cached?.nativeBalance ? "configured" : "unavailable",
+    detail: nativeRead.ok
+      ? nativeRead.rpcIndex === 0
+        ? "Native vault balance read from the configured chain RPC."
+        : "Native vault balance read from the fallback chain RPC after primary retries failed."
+      : cached?.nativeBalance
+        ? "Native vault balance could not be read from the configured chain RPCs. Returned the last successful worker-cached balance instead of reporting zero."
+        : "Native vault balance could not be read from the configured chain RPCs after retries, so the live native balance is currently unknown.",
   });
-
-  const nativeBalance: VaultAssetBalance = {
-    asset: "MNT",
-    kind: "native",
-    address: null,
-    decimals: 18,
-    balanceRaw: nativeBalanceWei.toString(),
-    balanceFormatted: formatUnits(nativeBalanceWei, 18),
-    hasBalance: nativeBalanceWei > 0n,
-    valuationUsd: null,
-    valuationSource: null,
-  };
 
   const tokenBalances = await Promise.all(
     configuredTrackedAssets(env).map(async (token) => {
-      let readLive = true;
-      let balanceRaw = 0n;
-      let decimals = token.decimals;
-      let symbol = token.symbol;
-      try {
-        [balanceRaw, decimals, symbol] = await Promise.all([
-          publicClient.readContract({
-            address: token.address,
-            abi: erc20BalanceAbi,
-            functionName: "balanceOf",
-            args: [vaultAddress as Address],
-          }),
-          publicClient.readContract({
-            address: token.address,
-            abi: erc20BalanceAbi,
-            functionName: "decimals",
-          }),
-          publicClient.readContract({
-            address: token.address,
-            abi: erc20BalanceAbi,
-            functionName: "symbol",
-          }),
-        ]);
-      } catch {
-        readLive = false;
-      }
+      const tokenRead = await readWithRetry(
+        rpcUrls,
+        createClient,
+        maxAttemptsPerRpc,
+        retryDelayMs,
+        async (client) => {
+          const [balanceRaw, decimals, symbol] = await Promise.all([
+            client.readContract({
+              address: token.address,
+              abi: erc20BalanceAbi,
+              functionName: "balanceOf",
+              args: [vaultAddress as Address],
+            }),
+            client.readContract({
+              address: token.address,
+              abi: erc20BalanceAbi,
+              functionName: "decimals",
+            }),
+            client.readContract({
+              address: token.address,
+              abi: erc20BalanceAbi,
+              functionName: "symbol",
+            }),
+          ]);
+          return {
+            balanceRaw: balanceRaw as bigint,
+            decimals: Number(decimals),
+            symbol: String(symbol),
+          };
+        }
+      );
+
+      const cachedToken = findCachedTokenBalance(cached, token);
 
       sources.push({
         id: `erc20_rpc_balance:${token.asset.toLowerCase()}`,
-        status: readLive ? "live" : "unavailable",
-        detail: readLive
-          ? `${token.asset} vault balance read from the configured chain RPC.`
-          : `${token.asset} vault balance could not be read from the configured chain RPC.`,
+        status: tokenRead.ok ? "live" : cachedToken ? "configured" : "unavailable",
+        detail: tokenRead.ok
+          ? tokenRead.rpcIndex === 0
+            ? `${token.asset} vault balance read from the configured chain RPC.`
+            : `${token.asset} vault balance read from the fallback chain RPC after primary retries failed.`
+          : cachedToken
+            ? `${token.asset} vault balance could not be read from the configured chain RPCs. Returned the last successful worker-cached balance instead of reporting zero.`
+            : `${token.asset} vault balance could not be read from the configured chain RPCs after retries, so the live token balance is currently unknown.`,
       });
 
+      if (tokenRead.ok) {
+        return {
+          asset: String(tokenRead.value.symbol || token.asset).trim().toUpperCase() || token.asset,
+          kind: "erc20" as const,
+          address: token.address.toLowerCase(),
+          decimals: Number(tokenRead.value.decimals),
+          balanceRaw: tokenRead.value.balanceRaw.toString(),
+          balanceFormatted: formatUnits(tokenRead.value.balanceRaw, Number(tokenRead.value.decimals)),
+          hasBalance: tokenRead.value.balanceRaw > 0n,
+          valuationUsd: null,
+          valuationSource: null,
+          readStatus: "live" as const,
+          asOf,
+        } satisfies VaultAssetBalance;
+      }
+
+      if (cachedToken) {
+        return cloneBalance(cachedToken, { readStatus: "cached", asOf: cached?.cachedAt ?? cachedToken.asOf });
+      }
+
       return {
-        asset: String(symbol || token.asset).trim().toUpperCase() || token.asset,
+        asset: token.asset,
         kind: "erc20" as const,
         address: token.address.toLowerCase(),
-        decimals: Number(decimals),
-        balanceRaw: balanceRaw.toString(),
-        balanceFormatted: formatUnits(balanceRaw, Number(decimals)),
-        hasBalance: balanceRaw > 0n,
+        decimals: token.decimals,
+        balanceRaw: "0",
+        balanceFormatted: "0",
+        hasBalance: false,
         valuationUsd: null,
         valuationSource: null,
+        readStatus: "unavailable" as const,
+        asOf: null,
       } satisfies VaultAssetBalance;
     })
   );
@@ -297,6 +489,19 @@ export async function readVaultBalances(vaultAddress: string, env: RuntimeEnv) {
       status: "configured",
       detail: "No tracked ERC20 assets are configured for worker-side vault balance reads.",
     });
+  }
+
+  if (nativeBalance.readStatus === "cached" || tokenBalances.some((balance) => balance.readStatus === "cached")) {
+    sources.push({
+      id: "vault_balance_cache",
+      status: "configured",
+      detail: "At least one asset balance was served from the worker's short-lived last-good cache because the live RPC read was unavailable.",
+    });
+  }
+
+  const allBalancesLive = nativeBalance.readStatus === "live" && tokenBalances.every((balance) => balance.readStatus === "live");
+  if (allBalancesLive) {
+    setCachedVaultBalances(vaultAddress, env, nowMs, cacheTtlMs, nativeBalance, tokenBalances);
   }
 
   return {

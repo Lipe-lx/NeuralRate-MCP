@@ -21,6 +21,7 @@ type Props = {
   onBootstrap: () => Promise<unknown>;
   onFundingIntent: (amountUsd: number) => Promise<void>;
   onEnableAutomation: () => Promise<void>;
+  onCompleteRuntimeSetup: () => Promise<void>;
   onRevokeAutomation: () => Promise<void>;
   onQueueDemoStrategy: () => Promise<void>;
   mcpAccessBundle: McpAccessBundle | null;
@@ -117,6 +118,7 @@ const VaultPanel: React.FC<Props> = ({
   onBootstrap,
   onFundingIntent,
   onEnableAutomation,
+  onCompleteRuntimeSetup,
   onRevokeAutomation,
   onQueueDemoStrategy,
   mcpAccessBundle,
@@ -148,6 +150,34 @@ const VaultPanel: React.FC<Props> = ({
   const onchainPolicy = state?.onchainPolicy ?? null;
   const aa = state?.aa ?? null;
   const hasAutomation = Boolean(activeGrant && activeGrant.status === "active");
+  const runtimePending = hasAutomation && !state?.automationReady;
+  const runtimeChecklist = [
+    {
+      key: "vault_module",
+      label: "Enable vault module",
+      done: Boolean(state?.runtimeState?.vaultModuleEnabled),
+    },
+    {
+      key: "safe7579",
+      label: "Install Safe7579",
+      done: Boolean(state?.runtimeState?.safe7579Enabled),
+    },
+    {
+      key: "delegate",
+      label: "Install delegate validator",
+      done: Boolean(state?.runtimeState?.delegateReady),
+    },
+    {
+      key: "guard",
+      label: "Enable execution guard",
+      done: Boolean(state?.runtimeState?.moduleGuardReady),
+    },
+    {
+      key: "fallback",
+      label: "Enable fallback handler",
+      done: Boolean(state?.runtimeState?.fallbackHandlerReady ?? state?.runtimeState?.fallbackReady),
+    },
+  ];
   const hasDemoQueued = (state?.automationJobs ?? []).length > 0;
   const mcpExecutionCatalog = mcpAccessBundle?.catalogs.execution ?? null;
   const mcpConfigCatalog = mcpAccessBundle?.catalogs.config ?? null;
@@ -193,10 +223,16 @@ const VaultPanel: React.FC<Props> = ({
       blockedBy: vault && !ownershipAcknowledged ? "Review wallet ownership before grants and execution." : null,
     },
     {
-      key: "automation",
-      label: "Enable automation",
+      key: "grant",
+      label: "Issue grant",
       done: hasAutomation,
       blockedBy: ownershipAcknowledged && !hasAutomation ? "Issue a scoped automation grant from your control wallet." : null,
+    },
+    {
+      key: "runtime",
+      label: "Activate runtime",
+      done: Boolean(state?.automationReady),
+      blockedBy: hasAutomation && !state?.automationReady ? "Finish the Safe runtime checklist so the agent can actually execute." : null,
     },
     {
       key: "strategy",
@@ -378,6 +414,51 @@ const VaultPanel: React.FC<Props> = ({
           <div style={{ fontSize: "0.74rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
             Signature trail: mutation auth signs API writes, grant signature opens scoped MCP domains, policy publish writes on-chain limits, and Safe/module transactions activate or revoke execution runtime.
           </div>
+          {runtimePending && (
+            <div
+              style={{
+                border: "1px solid rgba(255, 184, 77, 0.22)",
+                background: "rgba(255, 184, 77, 0.08)",
+                borderRadius: "12px",
+                padding: "0.9rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.7rem",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+                <div>
+                  <div style={{ fontSize: "0.82rem", color: "var(--text-primary)", fontWeight: 700 }}>Runtime Setup Pending</div>
+                  <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)", marginTop: "0.18rem", lineHeight: 1.45 }}>
+                    The grant is active, but the vault still cannot execute. Finish these on-chain Safe actions to make the agent operational.
+                  </div>
+                </div>
+                <ActionButton
+                  label={busy ? "Finishing..." : "Finish Runtime Setup"}
+                  tone="primary"
+                  onClick={onCompleteRuntimeSetup}
+                  disabled={busy}
+                />
+              </div>
+              <div style={{ display: "grid", gap: "0.45rem" }}>
+                {runtimeChecklist.map((step) => (
+                  <div
+                    key={step.key}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: "0.75rem",
+                      fontSize: "0.76rem",
+                      color: step.done ? "var(--color-lime)" : "var(--text-secondary)",
+                    }}
+                  >
+                    <span>{step.label}</span>
+                    <span style={{ fontWeight: 700 }}>{step.done ? "Done" : "Pending"}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {state?.automationReady && (
             <div
               style={{
@@ -592,6 +673,21 @@ const VaultPanel: React.FC<Props> = ({
                     onClick={onEnableAutomation}
                     disabled={busy || !vault.vault_address || isActionGated}
                   />
+                ) : runtimePending ? (
+                  <>
+                    <ActionButton
+                      label={busy ? "Finishing..." : "Finish Runtime Setup"}
+                      tone="primary"
+                      onClick={onCompleteRuntimeSetup}
+                      disabled={busy}
+                    />
+                    <ActionButton
+                      label={busy ? "Revoking..." : "Revoke Automation"}
+                      tone="warning"
+                      onClick={onRevokeAutomation}
+                      disabled={busy}
+                    />
+                  </>
                 ) : (
                   <ActionButton
                     label={busy ? "Revoking..." : "Revoke Automation"}
@@ -623,6 +719,11 @@ const VaultPanel: React.FC<Props> = ({
           {!activeGrant && vault && ownershipAcknowledged && (
             <div style={{ fontSize: "0.76rem", color: "var(--color-warning)", lineHeight: 1.5 }}>
               Automation remains manual-only until this wallet issues a vault-scoped MCP grant.
+            </div>
+          )}
+          {runtimePending && (
+            <div style={{ fontSize: "0.76rem", color: "var(--color-warning)", lineHeight: 1.5 }}>
+              The grant is live, but the vault runtime is still pending. The agent should not be told to operate until the runtime checklist turns green.
             </div>
           )}
 

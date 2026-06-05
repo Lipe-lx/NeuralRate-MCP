@@ -4,10 +4,16 @@ import {
   buildActivityFeedSnapshot,
   buildExecutionReadinessSnapshot,
   buildPolicySurfaceSnapshot,
+  loadScopedStateCatalogSnapshot,
+  resetStateCatalogCachesForTests,
   type VaultBalancesSnapshot,
 } from "./stateCatalog";
 
 const iso = (ms: number) => new Date(ms).toISOString();
+
+test.afterEach(() => {
+  resetStateCatalogCachesForTests();
+});
 
 test("policy surface calculates remaining daily and total budget from executed jobs", () => {
   const now = Date.parse("2026-06-05T12:00:00.000Z");
@@ -117,6 +123,8 @@ test("execution readiness blocks when execution policy, grant domain, session do
       hasBalance: false,
       valuationUsd: null,
       valuationSource: null,
+      readStatus: "live",
+      asOf: "2026-06-05T12:00:00.000Z",
     },
     tokenBalances: [],
     spendableUsd: null,
@@ -162,4 +170,28 @@ test("activity feed sorts newest events first and preserves benchmark linkage", 
   assert.equal(feed.items[0]?.benchmarkDecisionId, "42");
   assert.equal(feed.summary.executed, 2);
   assert.equal(feed.summary.benchmarkLinked, 1);
+});
+
+test("scoped state snapshots are reused briefly to avoid cross-tool drift", async () => {
+  let reads = 0;
+  const automation = {
+    async getAutomationState(ownerEoa: string) {
+      reads += 1;
+      return {
+        ownerEoa,
+        vault: null,
+        automationJobs: [],
+        benchmarkJobs: [],
+      };
+    },
+  } as any;
+
+  const env = {} as any;
+  const owner = "0xabc";
+
+  const first = await loadScopedStateCatalogSnapshot(automation, env, owner);
+  const second = await loadScopedStateCatalogSnapshot(automation, env, owner);
+
+  assert.equal(reads, 1);
+  assert.strictEqual(second, first);
 });

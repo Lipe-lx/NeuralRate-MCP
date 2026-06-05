@@ -34,6 +34,8 @@ const makeSnapshot = (): StateCatalogSnapshot => ({
       hasBalance: true,
       valuationUsd: null,
       valuationSource: null,
+      readStatus: "live",
+      asOf: "2026-06-05T12:00:00.000Z",
     },
     tokenBalances: [],
     spendableUsd: 1000,

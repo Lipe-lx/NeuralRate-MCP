@@ -337,6 +337,7 @@ function AppContent() {
                       onBootstrap={handleBootstrap}
                       onFundingIntent={neuralRateUser.createFundingIntent}
                       onEnableAutomation={neuralRateUser.enableAutomation}
+                      onCompleteRuntimeSetup={neuralRateUser.completeRuntimeSetup}
                       onRevokeAutomation={neuralRateUser.revokeAutomation}
                       onQueueDemoStrategy={neuralRateUser.queueDemoStrategy}
                       mcpAccessBundle={neuralRateUser.mcpAccessBundle}

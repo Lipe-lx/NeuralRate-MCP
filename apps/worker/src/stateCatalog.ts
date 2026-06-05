@@ -1,6 +1,7 @@
 import { AutomationStore } from "./automation";
 import {
   readVaultBalances,
+  resetVaultBalanceCacheForTests,
   type RuntimeEnv,
   type VaultAssetBalance,
 } from "./onchainState";
@@ -166,6 +167,11 @@ export type StateCatalogSnapshot = {
   activityFeed: ActivityFeedSnapshot;
 };
 
+type SnapshotCacheEntry = {
+  expiresAtMs: number;
+  snapshot: StateCatalogSnapshot;
+};
+
 const asRecord = (value: unknown): JsonMap | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as JsonMap) : null;
 
@@ -298,6 +304,8 @@ const normalizeAddressAllowlist = (value: unknown) =>
   asStringArray(value).map((entry) => entry.toLowerCase());
 
 const uniqueText = (values: string[]) => [...new Set(values)];
+const STATE_SNAPSHOT_CACHE_TTL_MS = 4_000;
+const stateSnapshotCache = new Map<string, SnapshotCacheEntry>();
 
 const resolveVaultAddress = (state: Record<string, unknown>) =>
   asString(asRecord(state.vault)?.vault_address);
@@ -697,6 +705,13 @@ export async function loadScopedStateCatalogSnapshot(
   env: RuntimeEnv,
   ownerEoa: string
 ): Promise<StateCatalogSnapshot> {
+  const cacheKey = ownerEoa.trim().toLowerCase();
+  const nowMs = Date.now();
+  const cached = stateSnapshotCache.get(cacheKey);
+  if (cached && cached.expiresAtMs > nowMs) {
+    return cached.snapshot;
+  }
+
   const state = await withOnchainPolicyState(await automation.getAutomationState(ownerEoa), env);
   const balances = await buildVaultBalancesSnapshot(state, env);
   const positions = buildOpenPositionsSnapshot(state, balances);
@@ -704,7 +719,7 @@ export async function loadScopedStateCatalogSnapshot(
   const readiness = buildExecutionReadinessSnapshot(state, balances, policySurface);
   const activityFeed = buildActivityFeedSnapshot(state);
 
-  return {
+  const snapshot = {
     state,
     balances,
     positions,
@@ -712,7 +727,18 @@ export async function loadScopedStateCatalogSnapshot(
     readiness,
     activityFeed,
   };
+  stateSnapshotCache.set(cacheKey, {
+    expiresAtMs: nowMs + STATE_SNAPSHOT_CACHE_TTL_MS,
+    snapshot,
+  });
+
+  return snapshot;
 }
+
+export const resetStateCatalogCachesForTests = () => {
+  stateSnapshotCache.clear();
+  resetVaultBalanceCacheForTests();
+};
 
 export function isScopedVaultReference(
   snapshot: StateCatalogSnapshot,
