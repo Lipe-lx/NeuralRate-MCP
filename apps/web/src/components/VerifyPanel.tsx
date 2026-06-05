@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { API_BASE_URL, MCP_HTTP_URL, MANTLE_CHAIN_ID, MANTLE_EXPLORER_BASE_URL } from "../config";
+import { API_BASE_URL, MCP_HTTP_URL, MANTLE_CHAIN_ID, MANTLE_EXPLORER_BASE_URL, SSE_URL } from "../config";
 
 type DeploymentRecord = {
   network?: string;
@@ -111,21 +111,38 @@ const VerifyPanel: React.FC = () => {
 
   const service = agentCard?.services?.[0] ?? null;
   const registration = agentCard?.registrations?.[0] ?? null;
+  const canonicalEndpoint = service?.endpoint || MCP_HTTP_URL;
   const mcpConfig = useMemo(
     () =>
       JSON.stringify(
         {
           mcpServers: {
             neuralrate: {
-              command: "npx",
-              args: ["-y", "@modelcontextprotocol/client-cli", service?.endpoint || MCP_HTTP_URL],
+              type: "http",
+              url: canonicalEndpoint,
             },
           },
         },
         null,
         2
       ),
-    [service?.endpoint]
+    [canonicalEndpoint]
+  );
+  const legacySseConfig = useMemo(
+    () =>
+      JSON.stringify(
+        {
+          mcpServers: {
+            neuralrate: {
+              type: "sse",
+              url: SSE_URL,
+            },
+          },
+        },
+        null,
+        2
+      ),
+    []
   );
   const policySummary = useMemo(
     () =>
@@ -174,7 +191,7 @@ const VerifyPanel: React.FC = () => {
         <div className="decision-ledger-summary-card">
           <div className="vault-swiss-kicker">MCP Endpoint</div>
           <div className="decision-ledger-summary-value" style={{ fontSize: "0.95rem" }}>
-            {truncate(service?.endpoint || MCP_HTTP_URL)}
+            {truncate(canonicalEndpoint)}
           </div>
           <div className="decision-ledger-summary-note">Worker public surface</div>
         </div>
@@ -234,6 +251,9 @@ const VerifyPanel: React.FC = () => {
         <a href={`${API_BASE_URL.replace(/\/api$/, "")}/mcp`} target="_blank" rel="noreferrer" style={{ color: "var(--color-lime)", fontSize: "0.78rem" }}>
           Open MCP endpoint
         </a>
+        <a href={`${API_BASE_URL.replace(/\/api$/, "")}/sse`} target="_blank" rel="noreferrer" style={{ color: "var(--text-secondary)", fontSize: "0.78rem" }}>
+          Open legacy SSE endpoint
+        </a>
         <button
           onClick={() => {
             void copyText("mcp", mcpConfig);
@@ -241,6 +261,14 @@ const VerifyPanel: React.FC = () => {
           style={{ border: "1px solid var(--border-subtle)", background: "transparent", color: "var(--text-primary)", borderRadius: "8px", padding: "0.35rem 0.6rem", fontSize: "0.74rem", cursor: "pointer" }}
         >
           {copiedKey === "mcp" ? "Copied MCP config" : "Copy MCP config"}
+        </button>
+        <button
+          onClick={() => {
+            void copyText("mcp-sse", legacySseConfig);
+          }}
+          style={{ border: "1px solid var(--border-subtle)", background: "transparent", color: "var(--text-primary)", borderRadius: "8px", padding: "0.35rem 0.6rem", fontSize: "0.74rem", cursor: "pointer" }}
+        >
+          {copiedKey === "mcp-sse" ? "Copied SSE config" : "Copy legacy SSE config"}
         </button>
         <button
           onClick={() => {

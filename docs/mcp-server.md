@@ -13,6 +13,12 @@ The MCP server runs inside `apps/worker` and is split into one public read-only 
 
 This is the endpoint advertised in [agent-card.json](../agent-card.json).
 
+Preferred client behavior as of 2026-06-04:
+
+- use `/mcp` as the canonical remote MCP endpoint
+- prefer Streamable HTTP client configs (`type: "http"` in most clients)
+- treat `/sse` only as a compatibility fallback for older clients
+
 ### Scoped Mutation Catalogs
 
 - `/mcp/scoped/config`

@@ -85,7 +85,6 @@ export const SCOPED_SSE_URL = isLocal
   ? `${defaultLocalOrigin}/sse/scoped/execution`
   : trimTrailingSlash(publicScopedMcpSseUrl || `${workerOrigin}/sse/scoped/execution`);
 
-export const MCP_PROTOCOL_URL = MCP_HTTP_URL.replace(/^http/, 'mcp+sse');
 export const MANTLE_RPC_URL = trimTrailingSlash(publicRpcUrl || defaultPublicRpcUrl);
 export const MANTLE_EXPLORER_BASE_URL = trimTrailingSlash(publicExplorerBaseUrl || defaultExplorerBaseUrl);
 export const MANTLE_CHAIN_ID = Number.isFinite(publicMantleChainId) ? publicMantleChainId : defaultMantleChainId;
