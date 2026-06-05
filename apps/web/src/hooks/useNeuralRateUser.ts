@@ -22,7 +22,13 @@ import {
   ensureVaultModuleEnabled,
   resolveUserSafeVault,
 } from "../lib/automation";
-import { signedGetJsonFetch, signedJsonFetch } from "../lib/auth";
+import {
+  clearStoredMcpAccessBundle,
+  loadStoredMcpAccessBundle,
+  storeMcpAccessBundle,
+  type McpAccessBundle,
+} from "../lib/mcpAccess";
+import { authorizedGetJsonFetch, signedGetJsonFetch, signedJsonFetch } from "../lib/auth";
 import { buildLocalSnapshotHash, sendPreparedTransaction, type PreparedTxRequest } from "../lib/policyRegistry";
 import type { AutomationState } from "../lib/userState";
 
@@ -169,6 +175,7 @@ export const useNeuralRateUser = ({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mcpAccessBundle, setMcpAccessBundle] = useState<McpAccessBundle | null>(null);
   const liveFundingDetectedRef = useRef(false);
 
   const refresh = useCallback(async (targetOwner = ownerEoa) => {
@@ -179,11 +186,28 @@ export const useNeuralRateUser = ({
     setLoading(true);
     setError(null);
     try {
-      const json = await signedGetJsonFetch<AutomationState>({
-        ownerEoa: targetOwner,
-        signMessage,
-        url: `${API_BASE_URL}/automation/state?ownerEoa=${encodeURIComponent(targetOwner)}`,
-      });
+      const storedBundle = loadStoredMcpAccessBundle(targetOwner);
+      let json: AutomationState;
+      try {
+        json = await authorizedGetJsonFetch<AutomationState>({
+          ownerEoa: targetOwner,
+          signMessage,
+          url: `${API_BASE_URL}/automation/state?ownerEoa=${encodeURIComponent(targetOwner)}`,
+          sessionToken: storedBundle?.sessionToken ?? mcpAccessBundle?.sessionToken ?? null,
+        });
+      } catch (sessionError) {
+        if (!storedBundle && !mcpAccessBundle?.sessionToken) {
+          throw sessionError;
+        }
+
+        clearStoredMcpAccessBundle(targetOwner);
+        setMcpAccessBundle(null);
+        json = await signedGetJsonFetch<AutomationState>({
+          ownerEoa: targetOwner,
+          signMessage,
+          url: `${API_BASE_URL}/automation/state?ownerEoa=${encodeURIComponent(targetOwner)}`,
+        });
+      }
       setState(json);
       return json;
     } catch (err) {
@@ -193,11 +217,21 @@ export const useNeuralRateUser = ({
     } finally {
       setLoading(false);
     }
-  }, [ownerEoa, signMessage]);
+  }, [mcpAccessBundle?.sessionToken, ownerEoa, signMessage]);
+
+  useEffect(() => {
+    if (!ownerEoa) {
+      return;
+    }
+
+    setMcpAccessBundle(loadStoredMcpAccessBundle(ownerEoa));
+  }, [ownerEoa]);
 
   useEffect(() => {
     if (!ownerEoa) {
       setState(null);
+      setMcpAccessBundle(null);
+      clearStoredMcpAccessBundle(ownerEoa);
       liveFundingDetectedRef.current = false;
       return;
     }
@@ -208,6 +242,19 @@ export const useNeuralRateUser = ({
 
     return () => window.clearTimeout(timeoutId);
   }, [ownerEoa, refresh]);
+
+  useEffect(() => {
+    if (!ownerEoa || !state) {
+      return;
+    }
+
+    if (state.activeGrant?.status === "active" && state.automationReady) {
+      return;
+    }
+
+    setMcpAccessBundle(null);
+    clearStoredMcpAccessBundle(ownerEoa);
+  }, [ownerEoa, state]);
 
   useEffect(() => {
     const vaultAddress = state?.vault?.vault_address;
@@ -576,6 +623,49 @@ export const useNeuralRateUser = ({
     }
   };
 
+  const issueMcpAccessBundle = async (
+    targetOwner = ownerEoa,
+    options?: { silent?: boolean }
+  ) => {
+    if (!targetOwner) {
+      throw new Error("Connect a wallet before requesting MCP access.");
+    }
+
+    if (!options?.silent) {
+      setBusy(true);
+      setError(null);
+    }
+
+    try {
+      const bundle = await signedJsonFetch<McpAccessBundle>({
+        ownerEoa: targetOwner,
+        signMessage,
+        url: `${API_BASE_URL}/automation/mcp/access`,
+        method: "POST",
+        body: {
+          ownerEoa: targetOwner,
+        },
+      });
+
+      setMcpAccessBundle(bundle);
+      storeMcpAccessBundle(bundle);
+      if (!options?.silent) {
+        setNotice(`MCP access refreshed. Use ${bundle.recommendedTransport.url} with ${bundle.headerName}.`);
+      }
+      return bundle;
+    } catch (err) {
+      if (!options?.silent) {
+        const message = err instanceof Error ? err.message : "Failed to issue MCP access.";
+        setError(message);
+      }
+      throw err;
+    } finally {
+      if (!options?.silent) {
+        setBusy(false);
+      }
+    }
+  };
+
   const enableRuntimeFromPlan = async () => {
     if (!ownerEoa) {
       throw new Error("Connect a wallet before enabling the runtime.");
@@ -704,7 +794,16 @@ export const useNeuralRateUser = ({
       }
 
       await refresh(ownerEoa);
-      setNotice(`Automation grant issued. ${moduleMessage}`);
+      let finalNotice = `Automation grant issued. ${moduleMessage}`;
+      try {
+        const bundle = await issueMcpAccessBundle(ownerEoa, { silent: true });
+        finalNotice = `Automation grant issued. ${moduleMessage} MCP execution access is ready through ${bundle.recommendedTransport.url}.`;
+      } catch (bundleError) {
+        const bundleMessage = bundleError instanceof Error ? bundleError.message : "Failed to prepare MCP access.";
+        finalNotice = `Automation grant issued. ${moduleMessage} Generate MCP access again from Vault if you need to reconnect the agent. (${bundleMessage})`;
+      }
+
+      setNotice(finalNotice);
     } catch (err) {
       let recoveredState: AutomationState | null = null;
       for (const delayMs of AUTOMATION_RECOVERY_REFRESH_DELAYS_MS) {
@@ -759,6 +858,8 @@ export const useNeuralRateUser = ({
           grantId: state.activeGrant.grant_id,
         },
       });
+      setMcpAccessBundle(null);
+      clearStoredMcpAccessBundle(ownerEoa);
       const preparedRevoke = await signedJsonFetch<{ txRequest: PreparedTxRequest }>({
         ownerEoa,
         signMessage,
@@ -862,6 +963,7 @@ export const useNeuralRateUser = ({
     busy,
     notice,
     error,
+    mcpAccessBundle,
     setNotice,
     setError,
     refresh,
@@ -869,6 +971,7 @@ export const useNeuralRateUser = ({
     saveConfig,
     createFundingIntent,
     acknowledgeOwnership,
+    issueMcpAccessBundle,
     enableAutomation,
     revokeAutomation,
     queueDemoStrategy,

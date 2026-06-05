@@ -6,6 +6,7 @@ import {
   ONBOARDING_PROVIDER,
   VAULT_PROVIDER_STRATEGY,
 } from "../config";
+import type { McpAccessBundle } from "../lib/mcpAccess";
 import type { AutomationState } from "../lib/userState";
 
 type Props = {
@@ -22,6 +23,8 @@ type Props = {
   onEnableAutomation: () => Promise<void>;
   onRevokeAutomation: () => Promise<void>;
   onQueueDemoStrategy: () => Promise<void>;
+  mcpAccessBundle: McpAccessBundle | null;
+  onIssueMcpAccess: () => Promise<McpAccessBundle>;
   onReviewOwnership: () => void;
   controlWalletLabel: string;
 };
@@ -116,6 +119,8 @@ const VaultPanel: React.FC<Props> = ({
   onEnableAutomation,
   onRevokeAutomation,
   onQueueDemoStrategy,
+  mcpAccessBundle,
+  onIssueMcpAccess,
   onReviewOwnership,
   controlWalletLabel,
 }) => {
@@ -144,6 +149,24 @@ const VaultPanel: React.FC<Props> = ({
   const aa = state?.aa ?? null;
   const hasAutomation = Boolean(activeGrant && activeGrant.status === "active");
   const hasDemoQueued = (state?.automationJobs ?? []).length > 0;
+  const mcpExecutionCatalog = mcpAccessBundle?.catalogs.execution ?? null;
+  const mcpConfigCatalog = mcpAccessBundle?.catalogs.config ?? null;
+  const mcpBundlePayload = mcpAccessBundle
+    ? JSON.stringify(
+        {
+          type: mcpAccessBundle.recommendedTransport.type,
+          url: mcpAccessBundle.recommendedTransport.url,
+          queryUrl: mcpAccessBundle.recommendedTransport.queryUrl,
+          headers: mcpAccessBundle.recommendedTransport.headers,
+          ownerEoa: mcpAccessBundle.ownerEoa,
+          vaultAddress: mcpAccessBundle.vaultAddress,
+          allowedDomains: mcpAccessBundle.allowedDomains,
+          expiresAt: mcpAccessBundle.expiresAt,
+        },
+        null,
+        2,
+      )
+    : null;
   const onboardingSteps = [
     {
       key: "connect",
@@ -355,6 +378,109 @@ const VaultPanel: React.FC<Props> = ({
           <div style={{ fontSize: "0.74rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
             Signature trail: mutation auth signs API writes, grant signature opens scoped MCP domains, policy publish writes on-chain limits, and Safe/module transactions activate or revoke execution runtime.
           </div>
+          {state?.automationReady && (
+            <div
+              style={{
+                border: "1px solid rgba(223, 246, 81, 0.18)",
+                borderRadius: "12px",
+                background: "rgba(223, 246, 81, 0.04)",
+                padding: "0.9rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.7rem",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+                <div>
+                  <div style={{ fontSize: "0.82rem", color: "var(--text-primary)", fontWeight: 700 }}>MCP Access</div>
+                  <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)", marginTop: "0.18rem", lineHeight: 1.45 }}>
+                    Generate a scoped credential bundle for your external agent. Each new bundle rotates the current MCP token.
+                  </div>
+                </div>
+                <ActionButton
+                  label={mcpAccessBundle ? "Refresh MCP Access" : "Generate MCP Access"}
+                  onClick={onIssueMcpAccess}
+                  disabled={busy || !hasAutomation}
+                />
+              </div>
+              {mcpAccessBundle ? (
+                <>
+                  <div className="vault-detail-grid">
+                    <div style={rowStyle}>
+                      <span>Execution MCP</span>
+                      {renderCopyValue(
+                        "mcp_execution_http",
+                        mcpExecutionCatalog?.httpUrl,
+                        mcpExecutionCatalog?.httpUrl ? truncate(mcpExecutionCatalog.httpUrl) : "Unavailable",
+                        { accent: Boolean(mcpExecutionCatalog?.allowed) },
+                      )}
+                    </div>
+                    <div style={rowStyle}>
+                      <span>Execution Query</span>
+                      {renderCopyValue(
+                        "mcp_execution_query",
+                        mcpExecutionCatalog?.queryHttpUrl,
+                        mcpExecutionCatalog?.queryHttpUrl ? truncate(mcpExecutionCatalog.queryHttpUrl) : "Unavailable",
+                        { accent: Boolean(mcpExecutionCatalog?.allowed) },
+                      )}
+                    </div>
+                    <div style={rowStyle}>
+                      <span>Config MCP</span>
+                      {renderCopyValue(
+                        "mcp_config_http",
+                        mcpConfigCatalog?.httpUrl,
+                        mcpConfigCatalog?.httpUrl ? truncate(mcpConfigCatalog.httpUrl) : "Unavailable",
+                        { accent: Boolean(mcpConfigCatalog?.allowed) },
+                      )}
+                    </div>
+                    <div style={rowStyle}>
+                      <span>Token Expires</span>
+                      {renderCopyValue(
+                        "mcp_expires_at",
+                        mcpAccessBundle.expiresAt,
+                        new Date(mcpAccessBundle.expiresAt).toLocaleString(),
+                        { accent: true },
+                      )}
+                    </div>
+                    <div style={rowStyle}>
+                      <span>Session Token</span>
+                      {renderCopyValue("mcp_session_token", mcpAccessBundle.sessionToken, truncate(mcpAccessBundle.sessionToken), {
+                        accent: true,
+                      })}
+                    </div>
+                    <div style={rowStyle}>
+                      <span>Header</span>
+                      {renderCopyValue(
+                        "mcp_header",
+                        `${mcpAccessBundle.headerName}: ${mcpAccessBundle.sessionToken}`,
+                        mcpAccessBundle.headerName,
+                        { accent: true },
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.65rem" }}>
+                    <ActionButton
+                      label={copiedField === "mcp_agent_payload" ? "Copied Agent Payload" : "Copy Agent Payload"}
+                      onClick={() => handleCopy(mcpBundlePayload, "mcp_agent_payload")}
+                      disabled={!mcpBundlePayload}
+                    />
+                    <ActionButton
+                      label={copiedField === "mcp_execution_query_direct" ? "Copied Query URL" : "Copy Execution Query URL"}
+                      onClick={() => handleCopy(mcpExecutionCatalog?.queryHttpUrl, "mcp_execution_query_direct")}
+                      disabled={!mcpExecutionCatalog?.queryHttpUrl}
+                    />
+                  </div>
+                  <div style={{ fontSize: "0.74rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                    To let the agent operate, send the `Execution MCP` endpoint plus the `x-neuralrate-session-token` header, or use the query URL if your client cannot set headers.
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: "0.74rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                  After automation is active, generate a bundle here and pass it to the agent as a scoped MCP connection. The execution route grants read tools plus `execute_strategy`; use the config route only if the agent also needs to change policy.
+                </div>
+              )}
+            </div>
+          )}
           <div
             style={{
               border: "1px solid var(--border-subtle)",

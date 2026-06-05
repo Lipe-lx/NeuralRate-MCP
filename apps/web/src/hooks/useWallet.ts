@@ -50,11 +50,36 @@ export function useInjectedWallet(): InjectedWalletState {
     const eth = (window as any).ethereum;
     if (!eth) return;
 
+    let cancelled = false;
+
+    const syncExistingConnection = async () => {
+      try {
+        const [accounts, chain] = await Promise.all([
+          eth.request({ method: 'eth_accounts' }) as Promise<string[]>,
+          eth.request({ method: 'eth_chainId' }) as Promise<string>,
+        ]);
+
+        if (cancelled) {
+          return;
+        }
+
+        setAddress(accounts.length > 0 ? String(accounts[0]).toLowerCase() : null);
+        setChainId(chain ? parseInt(chain, 16) : null);
+      } catch {
+        if (!cancelled) {
+          setAddress(null);
+          setChainId(null);
+        }
+      }
+    };
+
+    void syncExistingConnection();
+
     const handleAccountsChanged = (accounts: string[]) => {
       if (accounts.length === 0) {
         setAddress(null);
       } else {
-        setAddress(accounts[0]);
+        setAddress(String(accounts[0]).toLowerCase());
       }
     };
 
@@ -66,6 +91,7 @@ export function useInjectedWallet(): InjectedWalletState {
     eth.on('chainChanged', handleChainChanged);
 
     return () => {
+      cancelled = true;
       eth.removeListener('accountsChanged', handleAccountsChanged);
       eth.removeListener('chainChanged', handleChainChanged);
     };
@@ -83,7 +109,7 @@ export function useInjectedWallet(): InjectedWalletState {
 
     try {
       const accounts = await eth.request({ method: 'eth_requestAccounts' });
-      setAddress(accounts[0]);
+      setAddress(accounts[0] ? String(accounts[0]).toLowerCase() : null);
 
       const chain = await eth.request({ method: 'eth_chainId' });
       const currentChainId = parseInt(chain, 16);

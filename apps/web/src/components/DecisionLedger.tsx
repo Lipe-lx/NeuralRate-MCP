@@ -7,7 +7,8 @@ import {
   NEURALRATE_AGENT_SMART_WALLET,
   NEURALRATE_BENCHMARK_CONTRACT,
 } from "../config";
-import { signedGetJsonFetch, signedJsonFetch } from "../lib/auth";
+import { clearStoredMcpAccessBundle, loadStoredMcpAccessBundle } from "../lib/mcpAccess";
+import { authorizedGetJsonFetch, signedGetJsonFetch, signedJsonFetch } from "../lib/auth";
 import { buildLocalSnapshotHash } from "../lib/policyRegistry";
 import type { AutomationState, DecisionRecord } from "../lib/userState";
 import { useWalletContext } from "../context/WalletContext";
@@ -109,11 +110,27 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
     setLoading(true);
     setError(null);
     try {
-      const json = await signedGetJsonFetch<{ success: boolean; decisions: DecisionRecord[] }>({
-        ownerEoa,
-        signMessage: wallet.signMessage,
-        url: `${API_BASE_URL}/benchmark/history?ownerEoa=${encodeURIComponent(ownerEoa)}&limit=25`,
-      });
+      const storedBundle = loadStoredMcpAccessBundle(ownerEoa);
+      let json: { success: boolean; decisions: DecisionRecord[] };
+      try {
+        json = await authorizedGetJsonFetch<{ success: boolean; decisions: DecisionRecord[] }>({
+          ownerEoa,
+          signMessage: wallet.signMessage,
+          url: `${API_BASE_URL}/benchmark/history?ownerEoa=${encodeURIComponent(ownerEoa)}&limit=25`,
+          sessionToken: storedBundle?.sessionToken ?? null,
+        });
+      } catch (sessionError) {
+        if (!storedBundle?.sessionToken) {
+          throw sessionError;
+        }
+
+        clearStoredMcpAccessBundle(ownerEoa);
+        json = await signedGetJsonFetch<{ success: boolean; decisions: DecisionRecord[] }>({
+          ownerEoa,
+          signMessage: wallet.signMessage,
+          url: `${API_BASE_URL}/benchmark/history?ownerEoa=${encodeURIComponent(ownerEoa)}&limit=25`,
+        });
+      }
       setDecisions(json.decisions);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to load benchmark history.";

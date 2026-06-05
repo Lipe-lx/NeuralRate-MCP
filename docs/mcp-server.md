@@ -88,6 +88,12 @@ The worker still supports two auth paths:
 2. **scoped MCP session**
    A canonical automation grant signed by the owner, then converted into a short-lived `sessionToken`.
 
+After automation is enabled, the web app can mint or rotate a fresh scoped MCP credential bundle through:
+
+- `POST /api/automation/mcp/access`
+
+That endpoint requires the same signed owner mutation envelope and returns the scoped routes plus the new `x-neuralrate-session-token` value to hand to an external agent or MCP client.
+
 The `sessionToken` is now primarily used for MCP scoping and discovery. Real strategy execution is additionally checked against on-chain policy and guard state by the executor and contracts.
 
 ## Snapshot-Aware Strategy Inputs

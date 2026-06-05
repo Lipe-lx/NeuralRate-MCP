@@ -339,6 +339,8 @@ function AppContent() {
                       onEnableAutomation={neuralRateUser.enableAutomation}
                       onRevokeAutomation={neuralRateUser.revokeAutomation}
                       onQueueDemoStrategy={neuralRateUser.queueDemoStrategy}
+                      mcpAccessBundle={neuralRateUser.mcpAccessBundle}
+                      onIssueMcpAccess={neuralRateUser.issueMcpAccessBundle}
                       onReviewOwnership={() => setIsOwnershipModalOpen(true)}
                       controlWalletLabel={controlWalletLabel}
                     />

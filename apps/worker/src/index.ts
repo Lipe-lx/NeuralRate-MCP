@@ -24,6 +24,7 @@ import {
   submitVaultRuntimeDisable,
   queueBenchmarkThroughExecutor,
   queueStrategyThroughExecutor,
+  rotateActiveMcpSessionToken,
   resolveAutomationAccessFromOwner,
   resolveAutomationAccessFromSessionToken,
   revokeAutomationGrant,
@@ -197,6 +198,16 @@ const assertReadAuthorized = async (
     return { mode: "internal" as const, ownerEoa: expectedOwner.toLowerCase() };
   }
 
+  const sessionToken = request.headers.get("x-neuralrate-session-token")?.trim();
+  if (sessionToken) {
+    const automation = new AutomationStore(env.DECISIONS_DB);
+    const access = await resolveAutomationAccessFromSessionToken(automation, sessionToken, "state");
+    if (access.ownerEoa !== expectedOwner.toLowerCase()) {
+      throw new Error("Scoped session owner does not match the requested owner.");
+    }
+    return { mode: "session" as const, ownerEoa: access.ownerEoa };
+  }
+
   const auth = getHeaderAuthEnvelope(request);
   if (!auth) {
     throw new Error("Missing signed read auth headers.");
@@ -263,7 +274,8 @@ const buildAuditSummary = (state: Record<string, unknown>) => {
   const events: Array<{ type: string; status: string; at: string | null; detail: string }> = [];
   const onchainPolicy = (state.onchainPolicy ?? null) as Record<string, unknown> | null;
   const activeGrant = (state.activeGrant ?? null) as Record<string, unknown> | null;
-  const activeSession = (state.activeSession ?? null) as Record<string, unknown> | null;
+  const activeSession =
+    ((state.activeMcpSession ?? state.activeSession) ?? null) as Record<string, unknown> | null;
   const benchmarkJobs = Array.isArray(state.benchmarkJobs) ? (state.benchmarkJobs as Array<Record<string, unknown>>) : [];
   const automationJobs = Array.isArray(state.automationJobs) ? (state.automationJobs as Array<Record<string, unknown>>) : [];
 
@@ -328,6 +340,39 @@ type ScopedCatalogBinding = {
   authMode: "session" | "signed";
 };
 
+type McpAccessCatalogDescriptor = {
+  domain: ScopedCatalogDomain;
+  allowed: boolean;
+  httpUrl: string;
+  sseUrl: string;
+  queryHttpUrl: string;
+  querySseUrl: string;
+};
+
+type McpAccessBundle = {
+  success: true;
+  ownerEoa: string;
+  userId: string;
+  vaultId: string;
+  vaultAddress: string;
+  agentSubject: string;
+  policyVersion: string;
+  sessionId: string;
+  grantId: string;
+  allowedDomains: string[];
+  expiresAt: string;
+  sessionToken: string;
+  headerName: "x-neuralrate-session-token";
+  queryParam: "sessionToken";
+  catalogs: Record<ScopedCatalogDomain, McpAccessCatalogDescriptor>;
+  recommendedTransport: {
+    type: "http";
+    url: string;
+    queryUrl: string;
+    headers: Record<string, string>;
+  };
+};
+
 const scopedMcpSessionKey = (domain: ScopedCatalogDomain, mcpSessionId: string) =>
   `mcp-scoped-session:${domain}:${mcpSessionId}`;
 
@@ -357,6 +402,17 @@ const resolveScopedMcpSession = async (
   }
 
   const parsed = JSON.parse(raw) as ScopedCatalogBinding;
+  const automation = new AutomationStore(env.DECISIONS_DB);
+  const activeSession = await automation.getMcpMutationSession(parsed.sessionId);
+  if (!activeSession || activeSession.status !== "active" || activeSession.revoked_at) {
+    throw new Error("Scoped MCP session is no longer active. Re-initialize the catalog with a fresh token.");
+  }
+  if (Date.parse(String(activeSession.expires_at ?? "")) < Date.now()) {
+    throw new Error("Scoped MCP session has expired.");
+  }
+  if (!Array.isArray(activeSession.allowed_domains) || !activeSession.allowed_domains.includes(domain)) {
+    throw new Error(`Scoped MCP session is not authorized for the ${domain} domain.`);
+  }
   if (Date.parse(parsed.grantExpiresAt) < Date.now()) {
     throw new Error("Scoped MCP session has expired.");
   }
@@ -490,6 +546,92 @@ const resolveScopedCatalogRoute = (url: URL): { route: string; domain: ScopedCat
   }
 
   return null;
+};
+
+const buildCatalogDescriptor = (
+  origin: string,
+  domain: ScopedCatalogDomain,
+  httpPath: string,
+  ssePath: string,
+  sessionToken: string,
+  allowedDomains: string[]
+): McpAccessCatalogDescriptor => {
+  const encodedToken = encodeURIComponent(sessionToken);
+  return {
+    domain,
+    allowed: allowedDomains.includes(domain),
+    httpUrl: `${origin}${httpPath}`,
+    sseUrl: `${origin}${ssePath}`,
+    queryHttpUrl: `${origin}${httpPath}?sessionToken=${encodedToken}`,
+    querySseUrl: `${origin}${ssePath}?sessionToken=${encodedToken}`,
+  };
+};
+
+const buildMcpAccessBundle = (
+  request: Request,
+  access: Awaited<ReturnType<typeof rotateActiveMcpSessionToken>>
+): McpAccessBundle => {
+  const origin = new URL(request.url).origin;
+  const catalogs = {
+    state: buildCatalogDescriptor(
+      origin,
+      "state",
+      MCP_SCOPED_STATE_ROUTE,
+      MCP_SCOPED_STATE_SSE_ALIAS_ROUTE,
+      access.sessionToken,
+      access.allowedDomains
+    ),
+    config: buildCatalogDescriptor(
+      origin,
+      "config",
+      MCP_SCOPED_CONFIG_ROUTE,
+      MCP_SCOPED_CONFIG_SSE_ALIAS_ROUTE,
+      access.sessionToken,
+      access.allowedDomains
+    ),
+    benchmark: buildCatalogDescriptor(
+      origin,
+      "benchmark",
+      MCP_SCOPED_BENCHMARK_ROUTE,
+      MCP_SCOPED_BENCHMARK_SSE_ALIAS_ROUTE,
+      access.sessionToken,
+      access.allowedDomains
+    ),
+    execution: buildCatalogDescriptor(
+      origin,
+      "execution",
+      MCP_SCOPED_EXECUTION_ROUTE,
+      MCP_SCOPED_EXECUTION_SSE_ALIAS_ROUTE,
+      access.sessionToken,
+      access.allowedDomains
+    ),
+  } satisfies Record<ScopedCatalogDomain, McpAccessCatalogDescriptor>;
+
+  return {
+    success: true,
+    ownerEoa: access.ownerEoa,
+    userId: access.userId,
+    vaultId: access.vaultId,
+    vaultAddress: access.vaultAddress,
+    agentSubject: access.agentSubject,
+    policyVersion: access.policyVersion,
+    sessionId: access.sessionId,
+    grantId: access.grantId,
+    allowedDomains: access.allowedDomains,
+    expiresAt: access.grantExpiresAt,
+    sessionToken: access.sessionToken,
+    headerName: "x-neuralrate-session-token",
+    queryParam: "sessionToken",
+    catalogs,
+    recommendedTransport: {
+      type: "http",
+      url: catalogs.execution.httpUrl,
+      queryUrl: catalogs.execution.queryHttpUrl,
+      headers: {
+        "x-neuralrate-session-token": access.sessionToken,
+      },
+    },
+  };
 };
 
 export class NeuralRateMcpAgent extends McpAgent<Env, Record<string, never>> {
@@ -1323,6 +1465,19 @@ export default {
 
           const state = await withOnchainPolicyState(await automation.getAutomationState(ownerEoa), env);
           return new Response(JSON.stringify(state), { headers: corsHeaders });
+        }
+
+        if (url.pathname === "/api/automation/mcp/access" && request.method === "POST") {
+          const body = await readJsonBody<Record<string, unknown>>(request);
+          const ownerEoa = resolveMutationOwner(body);
+          if (!ownerEoa) {
+            return new Response(JSON.stringify({ error: "ownerEoa is required" }), { status: 400, headers: corsHeaders });
+          }
+          await assertMutationAuthorized(request, env, body, ownerEoa);
+
+          const access = await rotateActiveMcpSessionToken(automation, ownerEoa);
+          const bundle = buildMcpAccessBundle(request, access);
+          return new Response(JSON.stringify(bundle), { headers: corsHeaders });
         }
 
         if (url.pathname === "/api/audit/summary" && request.method === "GET") {

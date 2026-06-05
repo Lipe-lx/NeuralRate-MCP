@@ -89,3 +89,21 @@ export async function signedGetJsonFetch<T>(args: {
     },
   });
 }
+
+export async function authorizedGetJsonFetch<T>(args: {
+  ownerEoa: string;
+  signMessage: SignMessage;
+  url: string;
+  sessionToken?: string | null;
+}) {
+  if (args.sessionToken) {
+    return fetchJson<T>(args.url, {
+      method: "GET",
+      headers: {
+        "x-neuralrate-session-token": args.sessionToken,
+      },
+    });
+  }
+
+  return signedGetJsonFetch<T>(args);
+}

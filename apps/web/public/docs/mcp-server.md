@@ -13,6 +13,12 @@ The MCP server runs inside `apps/worker` and is split into one public read-only 
 
 This is the endpoint advertised in [agent-card.json](../agent-card.json).
 
+Preferred client behavior as of 2026-06-04:
+
+- use `/mcp` as the canonical remote MCP endpoint
+- prefer Streamable HTTP client configs (`type: "http"` in most clients)
+- treat `/sse` only as a compatibility fallback for older clients
+
 ### Scoped Mutation Catalogs
 
 - `/mcp/scoped/config`
@@ -81,6 +87,12 @@ The worker still supports two auth paths:
    A short-lived nonce envelope signed by the owner wallet.
 2. **scoped MCP session**
    A canonical automation grant signed by the owner, then converted into a short-lived `sessionToken`.
+
+After automation is enabled, the web app can mint or rotate a fresh scoped MCP credential bundle through:
+
+- `POST /api/automation/mcp/access`
+
+That endpoint requires the same signed owner mutation envelope and returns the scoped routes plus the new `x-neuralrate-session-token` value to hand to an external agent or MCP client.
 
 The `sessionToken` is now primarily used for MCP scoping and discovery. Real strategy execution is additionally checked against on-chain policy and guard state by the executor and contracts.
 

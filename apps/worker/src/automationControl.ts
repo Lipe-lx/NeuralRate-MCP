@@ -48,6 +48,10 @@ export type ScopedAutomationAccess = {
   authMode: "session" | "signed";
 };
 
+export type RotatedMcpSessionAccess = ScopedAutomationAccess & {
+  sessionToken: string;
+};
+
 type PreparedTxRequest = {
   from: string;
   to: string;
@@ -608,6 +612,92 @@ export async function resolveAutomationAccessFromOwner(
     allowedDomains: Array.isArray(grant.allowed_domains) ? grant.allowed_domains.map(String) : [],
     grantExpiresAt: String(grant.expires_at),
     authMode: "signed",
+  };
+}
+
+export async function rotateActiveMcpSessionToken(
+  store: AutomationStore,
+  ownerEoa: string
+): Promise<RotatedMcpSessionAccess> {
+  const grant = await store.getActiveAutomationGrant(ownerEoa);
+  const session = await store.getActiveMcpMutationSession(ownerEoa);
+  if (!grant || !session) {
+    throw new Error("Enable automation and issue an active grant before requesting MCP access.");
+  }
+  if (String(grant.grant_id) !== String(session.grant_id)) {
+    throw new Error("Active MCP mutation session is no longer aligned with the current automation grant.");
+  }
+
+  const allowedDomains = Array.isArray(session.allowed_domains)
+    ? normalizeDomainList(session.allowed_domains.map(String))
+    : Array.isArray(grant.allowed_domains)
+      ? normalizeDomainList(grant.allowed_domains.map(String))
+      : [];
+  if (allowedDomains.length === 0) {
+    throw new Error("Active automation grant does not expose any MCP domains.");
+  }
+
+  const rotatedSessionId = makeId("mcp_session");
+  const rotatedAt = new Date().toISOString();
+  const sessionToken = createSessionToken();
+  const sessionTokenHash = await hashSessionToken(sessionToken);
+
+  await store.revokeMcpMutationSession(String(session.session_id), rotatedAt);
+  await store.upsertMcpMutationSession({
+    sessionId: rotatedSessionId,
+    grantId: String(session.grant_id),
+    ownerEoa: String(session.owner_eoa),
+    userId: String(session.user_id),
+    vaultId: String(session.vault_id),
+    vaultAddress: String(session.vault_address),
+    agentSubject: String(session.agent_subject),
+    policyVersion: String(session.policy_version),
+    allowedDomains,
+    sessionTokenHash,
+    issuedVia: typeof session.issued_via === "string" ? session.issued_via : "web",
+    status: "active",
+    issuedAt: rotatedAt,
+    expiresAt:
+      typeof session.expires_at === "string"
+        ? session.expires_at
+        : String(grant.expires_at),
+    lastUsedAt: null,
+    revokedAt: null,
+  });
+
+  await store.upsertAutomationGrant({
+    grantId: String(grant.grant_id),
+    ownerEoa: String(grant.owner_eoa),
+    userId: String(grant.user_id),
+    vaultId: String(grant.vault_id),
+    vaultAddress: String(grant.vault_address),
+    agentSubject: String(grant.agent_subject),
+    policyVersion: String(grant.policy_version),
+    allowedDomains,
+    nonce: String(grant.nonce),
+    signature: String(grant.signature),
+    grantMessage: String(grant.grant_message),
+    issuedVia: typeof grant.issued_via === "string" ? grant.issued_via : "web",
+    status: "active",
+    issuedAt: String(grant.issued_at),
+    expiresAt: String(grant.expires_at),
+    revokedAt: null,
+    sessionId: rotatedSessionId,
+  });
+
+  return {
+    ownerEoa: String(grant.owner_eoa),
+    userId: String(grant.user_id),
+    vaultId: String(grant.vault_id),
+    vaultAddress: String(grant.vault_address),
+    agentSubject: String(grant.agent_subject),
+    policyVersion: String(grant.policy_version),
+    sessionId: rotatedSessionId,
+    grantId: String(grant.grant_id),
+    allowedDomains,
+    grantExpiresAt: String(session.expires_at ?? grant.expires_at),
+    authMode: "session",
+    sessionToken,
   };
 }
 
