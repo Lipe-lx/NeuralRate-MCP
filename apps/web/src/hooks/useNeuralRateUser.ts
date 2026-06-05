@@ -23,6 +23,7 @@ import {
   resolveUserSafeVault,
 } from "../lib/automation";
 import {
+  buildMcpAccessBundle,
   clearStoredMcpAccessBundle,
   loadStoredMcpAccessBundle,
   storeMcpAccessBundle,
@@ -97,10 +98,27 @@ type PreparedRuntimePlan = {
   }>;
 };
 
+type FinalizedAutomationGrant = {
+  success: boolean;
+  requiresSignature: boolean;
+  grantId: string;
+  sessionId: string;
+  sessionToken: string;
+  ownerEoa: string;
+  userId: string;
+  vaultId: string;
+  vaultAddress: string;
+  agentSubject: string;
+  policyVersion: string;
+  allowedDomains: string[];
+  grantExpiresAt: string;
+};
+
 const DEFAULT_AUTOMATION_DOMAINS = ["state", "config", "benchmark", "execution"] as const;
 const AUTOMATION_RECOVERY_REFRESH_DELAYS_MS = [0, 800, 1800, 3200] as const;
 const POLICY_PUBLISH_RECOVERY_DELAYS_MS = [0, 1200, 2500, 4500] as const;
 const DEPOSIT_POLL_VISIBLE_MS = 30000;
+const WORKER_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "");
 
 const vaultTelemetryClient = createPublicClient({
   chain: defineChain({
@@ -598,11 +616,7 @@ export const useNeuralRateUser = ({
     });
 
     const grantSignature = await signMessage(challengeResponse.challenge.message);
-    const result = await fetchJson<{
-      success: boolean;
-      requiresSignature: boolean;
-      grantId?: string;
-    }>(`${API_BASE_URL}/automation/grants/submit`, {
+    const result = await fetchJson<FinalizedAutomationGrant>(`${API_BASE_URL}/automation/grants/submit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -621,6 +635,8 @@ export const useNeuralRateUser = ({
     if (result.requiresSignature) {
       throw new Error("Automation grant was not finalized after signing.");
     }
+
+    return result;
   };
 
   const issueMcpAccessBundle = async (
@@ -779,13 +795,30 @@ export const useNeuralRateUser = ({
 
     setBusy(true);
     setError(null);
+    let issuedBundle: McpAccessBundle | null = null;
     try {
       if (!current.vault.ownership_acknowledged_at) {
         throw new Error("Acknowledge vault ownership before issuing an automation grant.");
       }
 
       await publishDraftPolicy();
-      await finalizeAutomationGrant(current);
+      const finalizedGrant = await finalizeAutomationGrant(current);
+      issuedBundle = buildMcpAccessBundle({
+        workerOrigin: WORKER_ORIGIN,
+        ownerEoa: finalizedGrant.ownerEoa,
+        userId: finalizedGrant.userId,
+        vaultId: finalizedGrant.vaultId,
+        vaultAddress: finalizedGrant.vaultAddress,
+        agentSubject: finalizedGrant.agentSubject,
+        policyVersion: finalizedGrant.policyVersion,
+        sessionId: finalizedGrant.sessionId,
+        grantId: finalizedGrant.grantId,
+        allowedDomains: finalizedGrant.allowedDomains,
+        expiresAt: finalizedGrant.grantExpiresAt,
+        sessionToken: finalizedGrant.sessionToken,
+      });
+      setMcpAccessBundle(issuedBundle);
+      storeMcpAccessBundle(issuedBundle);
 
       let moduleMessage = "Grant recorded and policy synchronized.";
       if (VAULT_MODULE_ENABLED) {
@@ -794,15 +827,9 @@ export const useNeuralRateUser = ({
       }
 
       await refresh(ownerEoa);
-      let finalNotice = `Automation grant issued. ${moduleMessage}`;
-      try {
-        const bundle = await issueMcpAccessBundle(ownerEoa, { silent: true });
-        finalNotice = `Automation grant issued. ${moduleMessage} MCP execution access is ready through ${bundle.recommendedTransport.url}.`;
-      } catch (bundleError) {
-        const bundleMessage = bundleError instanceof Error ? bundleError.message : "Failed to prepare MCP access.";
-        finalNotice = `Automation grant issued. ${moduleMessage} Generate MCP access again from Vault if you need to reconnect the agent. (${bundleMessage})`;
-      }
-
+      const finalNotice = issuedBundle
+        ? `Automation grant issued. ${moduleMessage} MCP execution access is ready through ${issuedBundle.recommendedTransport.url}.`
+        : `Automation grant issued. ${moduleMessage}`;
       setNotice(finalNotice);
     } catch (err) {
       let recoveredState: AutomationState | null = null;
@@ -817,6 +844,10 @@ export const useNeuralRateUser = ({
       }
 
       if (recoveredState?.activeGrant?.status === "active") {
+        if (issuedBundle) {
+          setMcpAccessBundle(issuedBundle);
+          storeMcpAccessBundle(issuedBundle);
+        }
         setError(null);
         if (isUnknownBlockError(err)) {
           setNotice("Automation grant issued. Runtime verification hit a transient Mantle RPC sync delay, so the app refreshed your state and kept automation enabled.");

@@ -33,6 +33,24 @@ export interface McpAccessBundle {
   };
 }
 
+type BuildMcpAccessBundleArgs = {
+  workerOrigin: string;
+  ownerEoa: string;
+  userId: string;
+  vaultId: string;
+  vaultAddress: string;
+  agentSubject: string;
+  policyVersion: string;
+  sessionId: string;
+  grantId: string;
+  allowedDomains: string[];
+  expiresAt: string;
+  sessionToken: string;
+};
+
+const scopedCatalogPath = (domain: McpAccessDomain) => `/mcp/scoped/${domain}`;
+const scopedSsePath = (domain: McpAccessDomain) => `/sse/scoped/${domain}`;
+
 const storageKey = (ownerEoa: string) => `neuralrate:mcp-access:${ownerEoa.trim().toLowerCase()}`;
 
 const isExpired = (expiresAt: string) => {
@@ -78,4 +96,50 @@ export const clearStoredMcpAccessBundle = (ownerEoa: string | null | undefined) 
   }
 
   window.sessionStorage.removeItem(storageKey(ownerEoa));
+};
+
+export const buildMcpAccessBundle = (args: BuildMcpAccessBundleArgs): McpAccessBundle => {
+  const encodedToken = encodeURIComponent(args.sessionToken);
+  const catalogs = (["state", "config", "benchmark", "execution"] as const).reduce(
+    (acc, domain) => {
+      const httpUrl = `${args.workerOrigin}${scopedCatalogPath(domain)}`;
+      const sseUrl = `${args.workerOrigin}${scopedSsePath(domain)}`;
+      acc[domain] = {
+        domain,
+        allowed: args.allowedDomains.includes(domain),
+        httpUrl,
+        sseUrl,
+        queryHttpUrl: `${httpUrl}?sessionToken=${encodedToken}`,
+        querySseUrl: `${sseUrl}?sessionToken=${encodedToken}`,
+      };
+      return acc;
+    },
+    {} as Record<McpAccessDomain, McpAccessCatalogDescriptor>,
+  );
+
+  return {
+    success: true,
+    ownerEoa: args.ownerEoa,
+    userId: args.userId,
+    vaultId: args.vaultId,
+    vaultAddress: args.vaultAddress,
+    agentSubject: args.agentSubject,
+    policyVersion: args.policyVersion,
+    sessionId: args.sessionId,
+    grantId: args.grantId,
+    allowedDomains: args.allowedDomains,
+    expiresAt: args.expiresAt,
+    sessionToken: args.sessionToken,
+    headerName: "x-neuralrate-session-token",
+    queryParam: "sessionToken",
+    catalogs,
+    recommendedTransport: {
+      type: "http",
+      url: catalogs.execution.httpUrl,
+      queryUrl: catalogs.execution.queryHttpUrl,
+      headers: {
+        "x-neuralrate-session-token": args.sessionToken,
+      },
+    },
+  };
 };

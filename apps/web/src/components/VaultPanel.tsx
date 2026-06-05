@@ -394,11 +394,11 @@ const VaultPanel: React.FC<Props> = ({
                 <div>
                   <div style={{ fontSize: "0.82rem", color: "var(--text-primary)", fontWeight: 700 }}>MCP Access</div>
                   <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)", marginTop: "0.18rem", lineHeight: 1.45 }}>
-                    Generate a scoped credential bundle for your external agent. Each new bundle rotates the current MCP token.
+                    Created automatically when automation is enabled. Rotate only if you need to reconnect an external agent or recover access on this browser.
                   </div>
                 </div>
                 <ActionButton
-                  label={mcpAccessBundle ? "Refresh MCP Access" : "Generate MCP Access"}
+                  label={mcpAccessBundle ? "Rotate MCP Token" : "Recover MCP Access"}
                   onClick={onIssueMcpAccess}
                   disabled={busy || !hasAutomation}
                 />
@@ -476,7 +476,7 @@ const VaultPanel: React.FC<Props> = ({
                 </>
               ) : (
                 <div style={{ fontSize: "0.74rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
-                  After automation is active, generate a bundle here and pass it to the agent as a scoped MCP connection. The execution route grants read tools plus `execute_strategy`; use the config route only if the agent also needs to change policy.
+                  Automation normally creates this bundle for you. If this browser lost the session, recover it here and pass the execution route to the agent as the scoped MCP connection. Use the config route only when the agent also needs to change policy.
                 </div>
               )}
             </div>
