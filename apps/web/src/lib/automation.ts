@@ -14,7 +14,6 @@ import {
   NEURALRATE_POLICY_REGISTRY_CONTRACT,
   NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS,
   SAFE_7579_ADAPTER_ADDRESS,
-  SAFE_7579_LAUNCHPAD_ADDRESS,
   SAFE_SALT_NONCE,
 } from '../config';
 
@@ -82,12 +81,11 @@ const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 const MODULE_TYPE_VALIDATOR = 1n;
 const UNKNOWN_BLOCK_RETRY_DELAYS_MS = [800, 1500, 2500, 4000] as const;
 const POST_RECEIPT_PROPAGATION_DELAY_MS = 900;
-const safe7579LaunchpadAbi = [{
+const safe7579AdapterAbi = [{
   type: 'function',
-  name: 'addSafe7579',
+  name: 'initializeAccount',
   stateMutability: 'nonpayable',
   inputs: [
-    { name: 'safe7579', type: 'address' },
     {
       name: 'modules',
       type: 'tuple[]',
@@ -97,13 +95,18 @@ const safe7579LaunchpadAbi = [{
         { name: 'moduleType', type: 'uint256' },
       ],
     },
-    { name: 'attesters', type: 'address[]' },
-    { name: 'threshold', type: 'uint8' },
+    {
+      name: 'registryInit',
+      type: 'tuple',
+      components: [
+        { name: 'registry', type: 'address' },
+        { name: 'attesters', type: 'address[]' },
+        { name: 'threshold', type: 'uint8' },
+      ],
+    },
   ],
   outputs: [],
-}] as const;
-
-const safe7579AccountAbi = [{
+}, {
   type: 'function',
   name: 'installModule',
   stateMutability: 'nonpayable',
@@ -466,8 +469,8 @@ export async function ensureAutonomousVaultRuntime(
   moduleAddress: string,
   saltNonce?: string
 ): Promise<AutonomousRuntimeResult> {
-  if (!SAFE_7579_ADAPTER_ADDRESS || !SAFE_7579_LAUNCHPAD_ADDRESS || !DELEGATE_VALIDATOR_ADDRESS) {
-    throw new Error('Configure Safe7579 adapter, launchpad and delegate validator addresses before enabling AA runtime.');
+  if (!SAFE_7579_ADAPTER_ADDRESS || !DELEGATE_VALIDATOR_ADDRESS) {
+    throw new Error('Configure Safe7579 adapter and delegate validator addresses before enabling AA runtime.');
   }
   if (!NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS || /^0x0{40}$/i.test(NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS)) {
     throw new Error('Configure the NeuralRate agent session signer address before enabling AA runtime.');
@@ -505,22 +508,30 @@ export async function ensureAutonomousVaultRuntime(
   );
 
   if (!safe7579Enabled) {
-    safe7579InstallTxHash = await executeSafeTransactions(safe, provider, [
+    const enableSafe7579ModuleTx = await retryOnUnknownBlock(() => safe.createEnableModuleTx(SAFE_7579_ADAPTER_ADDRESS));
+    const enableSafe7579ModuleResult = await retryOnUnknownBlock(() => safe.executeTransaction(enableSafe7579ModuleTx));
+    await waitForTransactionReceipt(provider, enableSafe7579ModuleResult.hash);
+    safe7579InstallTxHash = enableSafe7579ModuleResult.hash;
+    safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
+
+    await executeSafeTransactions(safe, provider, [
       {
-        to: SAFE_7579_LAUNCHPAD_ADDRESS,
+        to: SAFE_7579_ADAPTER_ADDRESS,
         value: '0',
         data: encodeFunctionData({
-          abi: safe7579LaunchpadAbi,
-          functionName: 'addSafe7579',
+          abi: safe7579AdapterAbi,
+          functionName: 'initializeAccount',
           args: [
-            SAFE_7579_ADAPTER_ADDRESS as `0x${string}`,
             [{
               module: DELEGATE_VALIDATOR_ADDRESS as `0x${string}`,
               initData: delegateValidatorInitData,
               moduleType: MODULE_TYPE_VALIDATOR,
             }],
-            [] as `0x${string}`[],
-            0,
+            {
+              registry: ZERO_ADDRESS as `0x${string}`,
+              attesters: [] as `0x${string}`[],
+              threshold: 0,
+            },
           ],
         }),
       },
@@ -534,10 +545,10 @@ export async function ensureAutonomousVaultRuntime(
   if (installedDelegate === ZERO_ADDRESS) {
     validatorInstallTxHash = await executeSafeTransactions(safe, provider, [
       {
-        to: deployment.safeAddress,
+        to: SAFE_7579_ADAPTER_ADDRESS,
         value: '0',
         data: encodeFunctionData({
-          abi: safe7579AccountAbi,
+          abi: safe7579AdapterAbi,
           functionName: 'installModule',
           args: [
             MODULE_TYPE_VALIDATOR,

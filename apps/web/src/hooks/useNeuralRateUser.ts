@@ -10,7 +10,6 @@ import {
   MANTLE_CHAIN_ID,
   MANTLE_RPC_URL,
   SAFE_7579_ADAPTER_ADDRESS,
-  SAFE_7579_LAUNCHPAD_ADDRESS,
   SESSION_POLICY_VERSION,
   VAULT_MODULE_ADDRESS,
   VAULT_MODULE_ENABLED,
@@ -699,7 +698,6 @@ export const useNeuralRateUser = ({
     if (prepared.actions.length > 0 && VAULT_MODULE_ENABLED) {
       const aaReady = Boolean(
         SAFE_7579_ADAPTER_ADDRESS &&
-        SAFE_7579_LAUNCHPAD_ADDRESS &&
         DELEGATE_VALIDATOR_ADDRESS
       );
       if (aaReady && prepared.actions.some((action) =>

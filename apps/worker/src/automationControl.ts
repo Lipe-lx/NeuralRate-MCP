@@ -906,7 +906,6 @@ export async function prepareVaultRuntimeEnable(
   const runtime = state.runtimeState;
   const needsSafe7579 =
     Boolean(env.NEURALRATE_SAFE_7579_ADAPTER_ADDRESS) &&
-    Boolean(env.NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS) &&
     Boolean(env.NEURALRATE_DELEGATE_VALIDATOR_ADDRESS);
 
   const actions = [
@@ -984,7 +983,6 @@ export async function submitVaultRuntimeEnable(
   const requiresVaultModule = Boolean(env.NEURALRATE_VAULT_MODULE_ADDRESS);
   const requiresSafe7579 =
     Boolean(env.NEURALRATE_SAFE_7579_ADAPTER_ADDRESS) &&
-    Boolean(env.NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS) &&
     Boolean(env.NEURALRATE_DELEGATE_VALIDATOR_ADDRESS);
   const requiresExecutionGuard = Boolean(env.NEURALRATE_EXECUTION_GUARD_CONTRACT);
 
