@@ -1282,21 +1282,21 @@ export class NeuralRateExecutionMcpAgent extends McpAgent<Env, Record<string, ne
 
     this.server.tool(
       "decrease_position",
-      "Attempts to reduce a supported position and returns a blocked preflight until a pinned unwind adapter exists",
+      "Reduces a supported wallet-held MNT or USDY position through the governed NeuralRate execution path with mandatory preflight checks",
       decreasePositionSchema,
       async (args) => runGovernedAction("decrease_position", args as Record<string, unknown>)
     );
 
     this.server.tool(
       "close_position",
-      "Attempts to close a supported position and returns a blocked preflight until a pinned unwind adapter exists",
+      "Closes a supported wallet-held MNT or USDY position through the governed NeuralRate execution path with mandatory preflight checks",
       closePositionSchema,
       async (args) => runGovernedAction("close_position", args as Record<string, unknown>)
     );
 
     this.server.tool(
       "claim_rewards",
-      "Attempts to claim protocol rewards and returns a blocked preflight until a pinned rewards adapter exists",
+      "Claims protocol rewards when a pinned rewards path exists, otherwise returning a noop or blocked preflight with full readiness details",
       claimRewardsSchema,
       async (args) => runGovernedAction("claim_rewards", args as Record<string, unknown>)
     );
@@ -1317,14 +1317,14 @@ export class NeuralRateExecutionMcpAgent extends McpAgent<Env, Record<string, ne
 
     this.server.tool(
       "rotate_strategy",
-      "Attempts to rotate between strategies and returns a blocked preflight until pinned unwind and destination adapters both exist",
+      "Rotates into the supported USDY target path when possible, otherwise returning a noop or blocked preflight with full readiness details",
       rotateStrategySchema,
       async (args) => runGovernedAction("rotate_strategy", args as Record<string, unknown>)
     );
 
     this.server.tool(
       "approve_strategy_spender",
-      "Attempts to manage strategy spender allowance and returns a blocked preflight until spender governance is pinned",
+      "Approves a governed USDY strategy spender through the pinned vault-module path with mandatory preflight checks",
       approveStrategySpenderSchema,
       async (args) => runGovernedAction("approve_strategy_spender", args as Record<string, unknown>)
     );
