@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readVaultBalances, resetVaultBalanceCacheForTests } from "./onchainState";
+import { deriveAutomationReady, readVaultBalances, resetVaultBalanceCacheForTests } from "./onchainState";
 
 const vaultAddress = "0x1111111111111111111111111111111111111111";
 
@@ -91,4 +91,52 @@ test("readVaultBalances returns the last successful cached native balance when R
   assert.equal(second.nativeBalance.asOf, "2026-06-05T12:00:00.000Z");
   assert.equal(second.sources[0]?.status, "configured");
   assert.equal(second.sources.some((source) => source.id === "vault_balance_cache"), true);
+});
+
+test("deriveAutomationReady requires active execution scope, synced policy, and full runtime readiness", () => {
+  const baseState = {
+    vault: { vault_id: "vault_1" },
+    config: { user_id: "user_1" },
+    activeGrant: { status: "active", allowed_domains: ["state", "execution"] },
+    activeMcpSession: { status: "active", allowed_domains: ["state", "execution"] },
+  } satisfies Record<string, unknown>;
+  const runtimeState = {
+    safeDeployed: true,
+    vaultModuleEnabled: true,
+    safe7579Enabled: true,
+    fallbackHandlerReady: true,
+    moduleGuardReady: true,
+    delegateReady: true,
+  };
+  const onchainPolicy = {
+    validAfter: Math.floor(Date.parse("2026-06-05T18:00:00.000Z") / 1000),
+    validUntil: Math.floor(Date.parse("2026-06-06T06:00:00.000Z") / 1000),
+  };
+  const nowMs = Date.parse("2026-06-05T19:00:00.000Z");
+
+  assert.equal(
+    deriveAutomationReady(baseState, runtimeState, onchainPolicy, "in_sync", nowMs),
+    true,
+  );
+  assert.equal(
+    deriveAutomationReady(baseState, { ...runtimeState, vaultModuleEnabled: false }, onchainPolicy, "in_sync", nowMs),
+    false,
+  );
+  assert.equal(
+    deriveAutomationReady(baseState, runtimeState, onchainPolicy, "pending_publish", nowMs),
+    false,
+  );
+  assert.equal(
+    deriveAutomationReady(
+      {
+        ...baseState,
+        activeGrant: { status: "active", allowed_domains: ["state"] },
+      },
+      runtimeState,
+      onchainPolicy,
+      "in_sync",
+      nowMs,
+    ),
+    false,
+  );
 });

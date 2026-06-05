@@ -148,7 +148,6 @@ const VaultPanel: React.FC<Props> = ({
   const fundingStatus = humanize(vault?.funding_status ?? "not-created");
   const consentRecordedAt = activeGrant?.issued_at ?? session?.consent_verified_at ?? null;
   const onchainPolicy = state?.onchainPolicy ?? null;
-  const aa = state?.aa ?? null;
   const hasAutomation = Boolean(activeGrant && activeGrant.status === "active");
   const runtimePending = hasAutomation && !state?.automationReady;
   const runtimeChecklist = [
@@ -178,6 +177,14 @@ const VaultPanel: React.FC<Props> = ({
       done: Boolean(state?.runtimeState?.fallbackHandlerReady ?? state?.runtimeState?.fallbackReady),
     },
   ];
+  const completedRuntimeSteps = runtimeChecklist.filter((item) => item.done).length;
+  const aaRuntimeStatus = state?.automationReady
+    ? "Ready"
+    : hasAutomation
+      ? completedRuntimeSteps > 0
+        ? `Partial ${completedRuntimeSteps}/5`
+        : "Pending"
+      : "Not enabled";
   const hasDemoQueued = (state?.automationJobs ?? []).length > 0;
   const mcpExecutionCatalog = mcpAccessBundle?.catalogs.execution ?? null;
   const mcpConfigCatalog = mcpAccessBundle?.catalogs.config ?? null;
@@ -401,9 +408,9 @@ const VaultPanel: React.FC<Props> = ({
               <span>AA Runtime</span>
               {renderCopyValue(
                 "aa_runtime",
-                aa?.safe4337ModuleAddress ? "Safe4337 + 7579" : "Safe module path",
-                aa?.safe4337ModuleAddress ? "Safe4337 + 7579" : "Safe module path",
-                { accent: Boolean(aa?.safe4337ModuleAddress) },
+                aaRuntimeStatus,
+                aaRuntimeStatus,
+                { accent: Boolean(state?.automationReady) },
               )}
             </div>
           </div>

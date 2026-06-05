@@ -266,7 +266,7 @@ export const useNeuralRateUser = ({
       return;
     }
 
-    if (state.activeGrant?.status === "active" && state.automationReady) {
+    if (state.activeGrant?.status === "active") {
       return;
     }
 
