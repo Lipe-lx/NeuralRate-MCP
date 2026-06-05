@@ -60,6 +60,7 @@ import {
   updateAgentPolicySchema,
 } from "./mcp/tools";
 import { withOnchainPolicyState } from "./onchainState";
+import { getScopedCatalogRequest } from "./scopedMcp";
 
 type ExecutorServiceBinding = {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
@@ -475,13 +476,6 @@ const registerReadonlyCatalog = (
   );
 };
 
-const getScopedCatalogRequest = (request: Request) => {
-  return {
-    sessionToken: request.headers.get("x-neuralrate-session-token")?.trim() ?? null,
-    mcpSessionId: request.headers.get("mcp-session-id")?.trim() ?? null,
-  };
-};
-
 const requireScopedCatalogAccess = async (
   request: Request,
   env: Env,
@@ -666,13 +660,14 @@ export class NeuralRateStateMcpAgent extends McpAgent<Env, Record<string, never>
 
   async init() {
     const { handlers, automation } = createServices(this.env);
-    const scoped = await resolveScopedMcpSession(this.env, "state", this.getSessionId());
+    const getScoped = () => resolveScopedMcpSession(this.env, "state", this.getSessionId());
 
     this.server.tool(
       "get_user_state",
       "Fetches the scoped user, vault, grant, session and job state",
       getUserStateSchema,
       async () => {
+        const scoped = await getScoped();
         const state = await withOnchainPolicyState(await automation.getAutomationState(scoped.ownerEoa), this.env);
         return {
           content: [{ type: "text", text: JSON.stringify(state, null, 2) }],
@@ -686,6 +681,7 @@ export class NeuralRateStateMcpAgent extends McpAgent<Env, Record<string, never>
       "Lists scoped benchmark and execution jobs for a user vault",
       listJobsSchema,
       async () => {
+        const scoped = await getScoped();
         const [automationJobs, benchmarkJobs] = await Promise.all([
           automation.listAutomationJobs(scoped.ownerEoa),
           automation.listBenchmarkJobs(scoped.ownerEoa),
@@ -703,6 +699,7 @@ export class NeuralRateStateMcpAgent extends McpAgent<Env, Record<string, never>
       "Fetches the scoped decision history for the bound owner",
       getDecisionsSchema,
       async ({ limit }) => {
+        const scoped = await getScoped();
         const result = await handlers.handleGetDecisions({
           limit,
           ownerEoa: scoped.ownerEoa,
@@ -716,6 +713,7 @@ export class NeuralRateStateMcpAgent extends McpAgent<Env, Record<string, never>
       "Fetches scoped benchmark decision history",
       getDecisionsSchema,
       async ({ limit }) => {
+        const scoped = await getScoped();
         const decisions = await automation.listBenchmarkHistory(scoped.ownerEoa, limit ?? 50);
         const structured = { decisions };
         return {
@@ -730,6 +728,7 @@ export class NeuralRateStateMcpAgent extends McpAgent<Env, Record<string, never>
       "Returns snapshot and rationale lineage for one scoped decision",
       getDecisionLineageSchema,
       async ({ decisionId }) => {
+        const scoped = await getScoped();
         const lineage = await this.env.DECISIONS_DB
           .prepare("SELECT decision_id, data_snapshot_hash, allocation_json, applied_constraints_json, rationale_json, created_at FROM decisions WHERE decision_id = ? AND (requested_by = ? OR agent_address = ?) LIMIT 1")
           .bind(decisionId, scoped.ownerEoa.toLowerCase(), scoped.ownerEoa.toLowerCase())
@@ -751,6 +750,7 @@ export class NeuralRateStateMcpAgent extends McpAgent<Env, Record<string, never>
       "Returns a compact audit summary for the bound owner",
       {},
       async () => {
+        const scoped = await getScoped();
         const state = await withOnchainPolicyState(await automation.getAutomationState(scoped.ownerEoa), this.env);
         const summary = buildAuditSummary(state as unknown as Record<string, unknown>);
         return {
@@ -771,13 +771,14 @@ export class NeuralRateConfigMcpAgent extends McpAgent<Env, Record<string, never
   async init() {
     const { handlers, automation } = createServices(this.env);
     registerReadonlyCatalog(this.server, handlers, automation, this.env);
-    const scoped = await resolveScopedMcpSession(this.env, "config", this.getSessionId());
+    const getScoped = () => resolveScopedMcpSession(this.env, "config", this.getSessionId());
 
     this.server.tool(
       "update_agent_policy",
       "Updates the scoped NeuralRate agent policy for a user vault",
       updateAgentPolicySchema,
       async (args) => {
+        const scoped = await getScoped();
         const config = await updateAgentPolicyFromScopedAccess(automation, scoped, args as unknown as Record<string, unknown>);
         const state = await withOnchainPolicyState(await automation.getAutomationState(scoped.ownerEoa), this.env);
         return {
@@ -802,6 +803,7 @@ export class NeuralRateConfigMcpAgent extends McpAgent<Env, Record<string, never
       "Builds the canonical on-chain publishPolicy transaction for the bound owner",
       preparePolicyPublishSchema,
       async () => {
+        const scoped = await getScoped();
         const result = await preparePolicyPublish(automation, this.env, scoped);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -815,6 +817,7 @@ export class NeuralRateConfigMcpAgent extends McpAgent<Env, Record<string, never
       "Verifies the active on-chain policy and returns the synchronized state",
       submitPolicyPublishSchema,
       async ({ txHash, expectedPolicy }) => {
+        const scoped = await getScoped();
         const result = await submitPolicyPublish(automation, this.env, scoped, {
           txHash,
           expectedPolicy,
@@ -831,6 +834,7 @@ export class NeuralRateConfigMcpAgent extends McpAgent<Env, Record<string, never
       "Builds the canonical on-chain revokeActivePolicy transaction for the bound owner",
       preparePolicyRevokeSchema,
       async () => {
+        const scoped = await getScoped();
         const result = await preparePolicyRevoke(automation, this.env, scoped);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -844,6 +848,7 @@ export class NeuralRateConfigMcpAgent extends McpAgent<Env, Record<string, never
       "Verifies that the active on-chain policy has been revoked",
       submitPolicyRevokeSchema,
       async ({ txHash }) => {
+        const scoped = await getScoped();
         const result = await submitPolicyRevoke(automation, this.env, scoped, txHash);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -857,6 +862,7 @@ export class NeuralRateConfigMcpAgent extends McpAgent<Env, Record<string, never
       "Returns the ordered runtime actions needed to enable autonomous execution for the vault",
       prepareVaultRuntimeEnableSchema,
       async () => {
+        const scoped = await getScoped();
         const result = await prepareVaultRuntimeEnable(automation, this.env, scoped);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -870,6 +876,7 @@ export class NeuralRateConfigMcpAgent extends McpAgent<Env, Record<string, never
       "Verifies the vault runtime is active on-chain after owner-approved transactions",
       submitVaultRuntimeEnableSchema,
       async ({ txHashes }) => {
+        const scoped = await getScoped();
         const result = await submitVaultRuntimeEnable(automation, this.env, scoped, txHashes);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -883,6 +890,7 @@ export class NeuralRateConfigMcpAgent extends McpAgent<Env, Record<string, never
       "Returns the ordered runtime actions needed to disable autonomous execution for the vault",
       prepareVaultRuntimeDisableSchema,
       async () => {
+        const scoped = await getScoped();
         const result = await prepareVaultRuntimeDisable(automation, this.env, scoped);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -896,6 +904,7 @@ export class NeuralRateConfigMcpAgent extends McpAgent<Env, Record<string, never
       "Verifies the vault runtime state after disable transactions",
       submitVaultRuntimeDisableSchema,
       async ({ txHashes }) => {
+        const scoped = await getScoped();
         const result = await submitVaultRuntimeDisable(automation, this.env, scoped, txHashes);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -909,6 +918,7 @@ export class NeuralRateConfigMcpAgent extends McpAgent<Env, Record<string, never
       "Creates the canonical automation grant challenge to be signed by the owner",
       prepareAutomationGrantSchema,
       async (args) => {
+        const scoped = await getScoped();
         const challenge = await createAutomationGrantChallenge(automation, {
           ownerEoa: scoped.ownerEoa,
           agentSubject: args.agentSubject,
@@ -930,6 +940,7 @@ export class NeuralRateConfigMcpAgent extends McpAgent<Env, Record<string, never
       "Finalizes the automation grant after owner signature",
       submitAutomationGrantSchema,
       async (args) => {
+        const scoped = await getScoped();
         const result = await issueAutomationGrant(automation, this.env, {
           ownerEoa: scoped.ownerEoa,
           agentSubject: args.agentSubject,
@@ -953,6 +964,7 @@ export class NeuralRateConfigMcpAgent extends McpAgent<Env, Record<string, never
       "Revokes the active automation grant bound to the owner",
       revokeAutomationGrantSchema,
       async ({ grantId }) => {
+        const scoped = await getScoped();
         const resolvedGrantId = grantId || scoped.grantId;
         const result = await revokeAutomationGrant(automation, resolvedGrantId);
         return {
@@ -973,13 +985,14 @@ export class NeuralRateBenchmarkMcpAgent extends McpAgent<Env, Record<string, ne
   async init() {
     const { handlers, automation } = createServices(this.env);
     registerReadonlyCatalog(this.server, handlers, automation, this.env);
-    const scoped = await resolveScopedMcpSession(this.env, "benchmark", this.getSessionId());
+    const getScoped = () => resolveScopedMcpSession(this.env, "benchmark", this.getSessionId());
 
     this.server.tool(
       "queue_benchmark",
       "Queues a scoped benchmark job through the internal executor",
       queueBenchmarkSchema,
       async (args) => {
+        const scoped = await getScoped();
         const result = await queueBenchmarkThroughExecutor(this.env, scoped, {
           decisionId: args.decisionId,
           dataSnapshotHash: args.dataSnapshotHash,
@@ -1004,13 +1017,14 @@ export class NeuralRateExecutionMcpAgent extends McpAgent<Env, Record<string, ne
   async init() {
     const { handlers, automation } = createServices(this.env);
     registerReadonlyCatalog(this.server, handlers, automation, this.env);
-    const scoped = await resolveScopedMcpSession(this.env, "execution", this.getSessionId());
+    const getScoped = () => resolveScopedMcpSession(this.env, "execution", this.getSessionId());
 
     this.server.tool(
       "execute_strategy",
       "Queues and dispatches a scoped strategy execution through the internal executor",
       executeStrategySchema,
       async (args) => {
+        const scoped = await getScoped();
         const result = await queueStrategyThroughExecutor(this.env, scoped, {
           strategyKey: args.strategyKey,
           intent: args.intent as Record<string, unknown>,
