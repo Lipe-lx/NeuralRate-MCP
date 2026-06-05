@@ -45,6 +45,7 @@ export type PolicySurfaceSnapshot = {
   source: "onchain" | "draft" | "none";
   syncStatus: string;
   policyVersion: string | null;
+  requireSnapshot: boolean;
   limits: {
     perUseUsd: number | null;
     dailyUsd: number | null;
@@ -451,6 +452,7 @@ export function buildPolicySurfaceSnapshot(
       asString(onchainPolicy?.policyVersion) ??
       asString(draftPolicy?.policyVersion) ??
       asString(config?.policy_version),
+    requireSnapshot: Boolean(onchainPolicy?.requireSnapshot ?? draftPolicy?.requireSnapshot ?? true),
     limits: {
       perUseUsd,
       dailyUsd,

@@ -26,7 +26,7 @@ export type PolicyRequest = {
 
 export function buildExecutionPolicy(input: PolicyRequest, policyVersion: string) {
   const approvedSurface = getApprovedStrategySurface();
-  const allowedContracts = approvedSurface.allowedContracts.map((value) => value.toLowerCase());
+  const allowedContracts: string[] = [];
   const allowedSelectors = approvedSurface.allowedSelectors.map((value) => value.toLowerCase());
   const approvedAssets = new Set(approvedSurface.allowedAssets.map((value) => value.toUpperCase()));
   const approvedProtocols = new Set(approvedSurface.allowedProtocols.map((value) => value.toUpperCase()));

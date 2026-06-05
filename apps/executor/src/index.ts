@@ -570,6 +570,20 @@ const server = createServer(async (request, response) => {
               typeof body.intent.amountUsd === "number"
                 ? body.intent.amountUsd
                 : Number.parseFloat(String(body.intent.amountUsd ?? "")),
+            amountToken:
+              typeof body.intent.amountToken === "number"
+                ? body.intent.amountToken
+                : body.intent.amountToken == null
+                  ? null
+                  : Number.parseFloat(String(body.intent.amountToken)),
+            recipientAddress:
+              typeof body.intent.recipientAddress === "string" ? body.intent.recipientAddress : null,
+            protocolHint:
+              typeof body.intent.protocolHint === "string" ? body.intent.protocolHint : null,
+            positionId:
+              typeof body.intent.positionId === "string" ? body.intent.positionId : null,
+            spenderAddress:
+              typeof body.intent.spenderAddress === "string" ? body.intent.spenderAddress : null,
             slippageBps:
               typeof body.intent.slippageBps === "number"
                 ? body.intent.slippageBps

@@ -31,8 +31,12 @@ import {
   updateAgentPolicyFromScopedAccess,
 } from "./automationControl";
 import {
+  approveStrategySpenderSchema,
   McpToolHandlers,
   bootstrapUserVaultSchema,
+  claimRewardsSchema,
+  closePositionSchema,
+  decreasePositionSchema,
   executeStrategySchema,
   getActivityFeedSchema,
   getDecisionLineageSchema,
@@ -42,6 +46,12 @@ import {
   getPolicySurfaceSchema,
   getUserStateSchema,
   getVaultBalancesSchema,
+  increasePositionSchema,
+  openPositionSchema,
+  rebalanceToTargetSchema,
+  rotateStrategySchema,
+  sweepIdleBalanceSchema,
+  transferAssetSchema,
   yieldScanSchema,
   issueAutomationGrantSchema,
   listJobsSchema,
@@ -75,6 +85,7 @@ import {
   loadScopedStateCatalogSnapshot,
   type StateCatalogSnapshot,
 } from "./stateCatalog";
+import { planGovernedExecutionAction } from "./executionActions";
 
 type ExecutorServiceBinding = {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
@@ -1212,6 +1223,111 @@ export class NeuralRateExecutionMcpAgent extends McpAgent<Env, Record<string, ne
     const { handlers, automation } = createServices(this.env);
     registerReadonlyCatalog(this.server, handlers, automation, this.env);
     const getScoped = () => resolveScopedMcpSession(this.env, "execution", this.getSessionId());
+    const runGovernedAction = async (
+      action: Parameters<typeof planGovernedExecutionAction>[3],
+      args: Parameters<typeof planGovernedExecutionAction>[4]
+    ) => {
+      const scoped = await getScoped();
+      const preflight = await planGovernedExecutionAction(automation, this.env, scoped, action, args);
+      if (preflight.status === "noop") {
+        return buildJsonToolResult({
+          success: true,
+          queued: false,
+          noop: true,
+          preflight,
+        });
+      }
+      if (preflight.status !== "ready" || !preflight.strategyKey || !preflight.intent) {
+        return buildJsonToolResult({
+          success: false,
+          queued: false,
+          preflight,
+        });
+      }
+
+      const execution = await queueStrategyThroughExecutor(this.env, scoped, {
+        strategyKey: preflight.strategyKey,
+        intent: preflight.intent,
+        payload: preflight.payload,
+      });
+
+      return buildJsonToolResult({
+        success: true,
+        queued: true,
+        preflight,
+        execution,
+      });
+    };
+
+    this.server.tool(
+      "transfer_asset",
+      "Transfers a supported asset through the governed NeuralRate execution path with preflight and policy checks",
+      transferAssetSchema,
+      async (args) => runGovernedAction("transfer_asset", args as Record<string, unknown>)
+    );
+
+    this.server.tool(
+      "open_position",
+      "Opens a supported position through a pinned NeuralRate execution adapter with mandatory preflight checks",
+      openPositionSchema,
+      async (args) => runGovernedAction("open_position", args as Record<string, unknown>)
+    );
+
+    this.server.tool(
+      "increase_position",
+      "Increases a supported position through a pinned NeuralRate execution adapter with mandatory preflight checks",
+      increasePositionSchema,
+      async (args) => runGovernedAction("increase_position", args as Record<string, unknown>)
+    );
+
+    this.server.tool(
+      "decrease_position",
+      "Attempts to reduce a supported position and returns a blocked preflight until a pinned unwind adapter exists",
+      decreasePositionSchema,
+      async (args) => runGovernedAction("decrease_position", args as Record<string, unknown>)
+    );
+
+    this.server.tool(
+      "close_position",
+      "Attempts to close a supported position and returns a blocked preflight until a pinned unwind adapter exists",
+      closePositionSchema,
+      async (args) => runGovernedAction("close_position", args as Record<string, unknown>)
+    );
+
+    this.server.tool(
+      "claim_rewards",
+      "Attempts to claim protocol rewards and returns a blocked preflight until a pinned rewards adapter exists",
+      claimRewardsSchema,
+      async (args) => runGovernedAction("claim_rewards", args as Record<string, unknown>)
+    );
+
+    this.server.tool(
+      "sweep_idle_balance",
+      "Sweeps supported idle vault balances through the governed NeuralRate execution path with mandatory preflight checks",
+      sweepIdleBalanceSchema,
+      async (args) => runGovernedAction("sweep_idle_balance", args as Record<string, unknown>)
+    );
+
+    this.server.tool(
+      "rebalance_to_target",
+      "Rebalances supported idle vault capacity into a pinned target strategy with mandatory preflight checks",
+      rebalanceToTargetSchema,
+      async (args) => runGovernedAction("rebalance_to_target", args as Record<string, unknown>)
+    );
+
+    this.server.tool(
+      "rotate_strategy",
+      "Attempts to rotate between strategies and returns a blocked preflight until pinned unwind and destination adapters both exist",
+      rotateStrategySchema,
+      async (args) => runGovernedAction("rotate_strategy", args as Record<string, unknown>)
+    );
+
+    this.server.tool(
+      "approve_strategy_spender",
+      "Attempts to manage strategy spender allowance and returns a blocked preflight until spender governance is pinned",
+      approveStrategySpenderSchema,
+      async (args) => runGovernedAction("approve_strategy_spender", args as Record<string, unknown>)
+    );
 
     this.server.tool(
       "execute_strategy",

@@ -7,6 +7,7 @@ import {
   makeIntentHash,
   protocolRegistry,
   resolveNativeMntVaultTransfer,
+  resolveUsdYVaultApprove,
   resolveUsdYVaultTransfer,
   resolveTokenManifest,
   strategyRegistry,
@@ -16,6 +17,10 @@ import {
   type StrategyIntent,
 } from "./executionRegistry.js";
 import { keccak256, parseUnits, type Address, type Hex } from "viem";
+
+const ERC20_TRANSFER_SELECTOR = "0xa9059cbb" as Hex;
+const ERC20_APPROVE_SELECTOR = "0x095ea7b3" as Hex;
+const NATIVE_TRANSFER_SELECTOR = "0x00000000" as Hex;
 
 type ScopedExecutionContext = {
   ownerEoa: string;
@@ -269,6 +274,8 @@ export const resolveExecutionPlan = async (
     strategyKey,
     targetAsset: normalizedTargetAsset,
     amountUsd,
+    amountToken,
+    recipientAddress: intent.recipientAddress ?? null,
     slippageBps,
     snapshotHash,
     deadline: intent.deadline ?? null,
@@ -293,7 +300,7 @@ export const resolveExecutionPlan = async (
   let calldata: Hex | null = null;
 
   if (!validationFailure && protocol.address) {
-    if (strategy.strategyKey === "usdy-stable-allocation") {
+    if (strategy.strategyKey === "usdy-stable-allocation" || strategy.strategyKey === "usdy-vault-transfer") {
       const moduleEnabled = typeof publicClient.readContract === "function"
         ? Boolean(await publicClient.readContract({
             address: context.vaultAddress as Address,
@@ -319,10 +326,13 @@ export const resolveExecutionPlan = async (
           ownerEoa: context.ownerEoa.toLowerCase() as Address,
           vaultAddress: context.vaultAddress.toLowerCase() as Address,
           amountUsd,
+          recipientAddress: intent.recipientAddress
+            ? intent.recipientAddress.toLowerCase() as Address
+            : null,
           intentHash,
         });
-        targetContract = protocol.address;
-        targetSelector = action.selector;
+        targetContract = routedTransfer.targetContract;
+        targetSelector = ERC20_TRANSFER_SELECTOR;
         calldata = buildVaultExecutionModuleCalldata({
           ownerEoa: context.ownerEoa.toLowerCase() as Address,
           vaultAddress: context.vaultAddress.toLowerCase() as Address,
@@ -345,7 +355,10 @@ export const resolveExecutionPlan = async (
           BigInt(slippageBps),
           BigInt(deadlineTs),
         ];
-        executionSummary = `Strategy ${strategy.label} is ready to move ${amountUsd} USDY from the Safe to the configured recipient through the enabled NeuralRate module.`;
+        executionSummary =
+          strategy.strategyKey === "usdy-stable-allocation"
+            ? `Strategy ${strategy.label} is ready to move ${amountUsd} USDY from the Safe to the configured recipient through the enabled NeuralRate module.`
+            : `Strategy ${strategy.label} is ready to move ${amountToken ?? amountUsd} USDY from the Safe to ${routedTransfer.recipientAddress}.`;
         riskFlags = [
           token.riskClass,
           bytecodeValidation.status,
@@ -378,11 +391,14 @@ export const resolveExecutionPlan = async (
       if (!latestFailure) {
         const routedTransfer = resolveNativeMntVaultTransfer({
           ownerEoa: context.ownerEoa.toLowerCase() as Address,
+          recipientAddress: intent.recipientAddress
+            ? intent.recipientAddress.toLowerCase() as Address
+            : null,
           amountUsd,
           amountToken,
         });
-        targetContract = protocol.address;
-        targetSelector = action.selector;
+        targetContract = routedTransfer.targetContract;
+        targetSelector = NATIVE_TRANSFER_SELECTOR;
         calldata = buildVaultExecutionModuleCalldata({
           ownerEoa: context.ownerEoa.toLowerCase() as Address,
           vaultAddress: context.vaultAddress.toLowerCase() as Address,
@@ -410,6 +426,70 @@ export const resolveExecutionPlan = async (
           token.riskClass,
           bytecodeValidation.status,
           moduleEnabled ? "safe-module-enabled" : "safe-module-disabled",
+        ];
+      } else {
+        executionSummary = `Strategy ${strategy.label} is blocked until the Safe module checks pass.`;
+      }
+    } else if (strategy.strategyKey === "usdy-approve-spender") {
+      const moduleEnabled = typeof publicClient.readContract === "function"
+        ? Boolean(await publicClient.readContract({
+            address: context.vaultAddress as Address,
+            abi: safeModuleStatusAbi,
+            functionName: "isModuleEnabled",
+            args: [protocol.address],
+          }))
+        : false;
+
+      policyChecks.push(
+        makePolicyCheck(
+          "safe-module-enabled",
+          moduleEnabled,
+          moduleEnabled
+            ? `Safe ${context.vaultAddress} has enabled the NeuralRate vault module.`
+            : `Safe ${context.vaultAddress} has not enabled the NeuralRate vault module.`,
+        ),
+      );
+
+      const latestFailure = policyChecks.find((check) => !check.ok);
+      if (!latestFailure) {
+        if (!intent.spenderAddress) {
+          throw new Error("spenderAddress is required for approve strategies.");
+        }
+        const approval = resolveUsdYVaultApprove({
+          spenderAddress: intent.spenderAddress.toLowerCase() as Address,
+          amountUsd,
+          amountToken,
+        });
+        targetContract = approval.targetContract;
+        targetSelector = ERC20_APPROVE_SELECTOR;
+        calldata = buildVaultExecutionModuleCalldata({
+          ownerEoa: context.ownerEoa.toLowerCase() as Address,
+          vaultAddress: context.vaultAddress.toLowerCase() as Address,
+          targetContract: approval.targetContract,
+          value: 0n,
+          callData: approval.tokenCallData,
+          intentHash,
+          snapshotHash: snapshotHash as Hex,
+          slippageBps,
+          deadline: BigInt(deadlineTs),
+        });
+        resolvedArgs = [
+          context.ownerEoa.toLowerCase(),
+          context.vaultAddress.toLowerCase(),
+          approval.targetContract,
+          0n,
+          approval.tokenCallData,
+          intentHash,
+          snapshotHash,
+          BigInt(slippageBps),
+          BigInt(deadlineTs),
+        ];
+        executionSummary = `Strategy ${strategy.label} is ready to approve ${approval.spenderAddress} for ${amountToken ?? amountUsd} USDY through the enabled NeuralRate module.`;
+        riskFlags = [
+          token.riskClass,
+          bytecodeValidation.status,
+          moduleEnabled ? "safe-module-enabled" : "safe-module-disabled",
+          "erc20-approve",
         ];
       } else {
         executionSummary = `Strategy ${strategy.label} is blocked until the Safe module checks pass.`;
@@ -465,7 +545,12 @@ export const resolveExecutionPlan = async (
     intent: {
       targetAsset: normalizedTargetAsset,
       amountUsd,
+      amountToken,
+      recipientAddress: intent.recipientAddress ?? null,
       slippageBps,
+      protocolHint: intent.protocolHint ?? null,
+      positionId: intent.positionId ?? null,
+      spenderAddress: intent.spenderAddress ?? null,
       notes: intent.notes ?? null,
       snapshotHash: snapshotHash || null,
       snapshotCid: intent.snapshotCid ?? null,

@@ -7,7 +7,7 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "cf-typegen": "wrangler types",
-    "test": "node --import tsx --test src/auth.test.ts src/auth.smoke.test.ts src/grants.test.ts src/scopedMcp.test.ts src/stateCatalog.test.ts src/services/nansen.test.ts"
+    "test": "node --import tsx --test src/auth.test.ts src/auth.smoke.test.ts src/executionActions.test.ts src/grants.test.ts src/scopedMcp.test.ts src/stateCatalog.test.ts src/services/nansen.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

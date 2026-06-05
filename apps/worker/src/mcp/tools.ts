@@ -175,6 +175,10 @@ export const executeStrategySchema = {
     targetAsset: z.string(),
     amountUsd: z.number(),
     amountToken: z.number().optional(),
+    recipientAddress: z.string().optional(),
+    protocolHint: z.string().optional(),
+    positionId: z.string().optional(),
+    spenderAddress: z.string().optional(),
     slippageBps: z.number().optional(),
     notes: z.string().optional(),
     snapshotHash: z.string().optional(),
@@ -182,6 +186,91 @@ export const executeStrategySchema = {
     deadline: z.string().optional(),
   }),
   payload: z.record(z.string(), z.unknown()).optional(),
+};
+
+const governedExecutionCommonSchema = {
+  amountUsd: z.number().describe("Requested policy-accounted USD amount for this action"),
+  amountToken: z.number().optional().describe("Optional token-denominated amount when the action supports exact token sizing"),
+  snapshotHash: z.string().optional().describe("Optional 32-byte anchored market snapshot hash required by the active policy"),
+  snapshotCid: z.string().optional().describe("Optional snapshot CID paired with the snapshot hash"),
+  deadline: z.string().optional().describe("Optional ISO-8601 deadline; defaults inside the active policy window when omitted"),
+  notes: z.string().optional().describe("Optional operator notes stored with the execution intent"),
+};
+
+export const transferAssetSchema = {
+  asset: z.string().describe("Asset symbol to transfer, currently MNT only"),
+  recipientAddress: z.string().optional().describe("Destination EVM address; defaults to the owner EOA for sweep-like flows"),
+  ...governedExecutionCommonSchema,
+};
+
+export const openPositionSchema = {
+  asset: z.string().describe("Target asset to deploy, currently USDY only"),
+  protocolHint: z.string().optional().describe("Optional protocol hint, currently limited to the pinned NeuralRate vault module surface"),
+  slippageBps: z.number().optional().describe("Optional slippage bound in basis points"),
+  ...governedExecutionCommonSchema,
+};
+
+export const increasePositionSchema = {
+  asset: z.string().describe("Target asset to increase, currently USDY only"),
+  positionId: z.string().optional().describe("Optional normalized position identifier returned by get_open_positions"),
+  protocolHint: z.string().optional().describe("Optional protocol hint, currently limited to the pinned NeuralRate vault module surface"),
+  slippageBps: z.number().optional().describe("Optional slippage bound in basis points"),
+  ...governedExecutionCommonSchema,
+};
+
+export const decreasePositionSchema = {
+  positionId: z.string().optional().describe("Normalized position identifier returned by get_open_positions"),
+  asset: z.string().optional().describe("Asset symbol for the position to reduce"),
+  recipientAddress: z.string().optional().describe("Optional recipient for withdrawn assets; defaults to the owner EOA"),
+  protocolHint: z.string().optional().describe("Optional protocol hint for the position being reduced"),
+  slippageBps: z.number().optional().describe("Optional slippage bound in basis points"),
+  ...governedExecutionCommonSchema,
+};
+
+export const closePositionSchema = {
+  positionId: z.string().optional().describe("Normalized position identifier returned by get_open_positions"),
+  asset: z.string().optional().describe("Asset symbol for the position to close"),
+  recipientAddress: z.string().optional().describe("Optional recipient for withdrawn assets; defaults to the owner EOA"),
+  protocolHint: z.string().optional().describe("Optional protocol hint for the position being closed"),
+  snapshotHash: z.string().optional(),
+  snapshotCid: z.string().optional(),
+  deadline: z.string().optional(),
+  notes: z.string().optional(),
+};
+
+export const claimRewardsSchema = {
+  positionId: z.string().optional().describe("Normalized position identifier returned by get_open_positions"),
+  asset: z.string().optional().describe("Asset symbol for the rewards-bearing position"),
+  protocolHint: z.string().optional().describe("Optional protocol hint for the rewards position"),
+  deadline: z.string().optional(),
+  notes: z.string().optional(),
+};
+
+export const sweepIdleBalanceSchema = {
+  asset: z.string().optional().default("MNT").describe("Idle asset symbol to sweep, currently MNT only"),
+  recipientAddress: z.string().optional().describe("Destination EVM address; defaults to the owner EOA"),
+  ...governedExecutionCommonSchema,
+};
+
+export const rebalanceToTargetSchema = {
+  targetAsset: z.string().describe("Target asset for the rebalance destination, currently USDY only"),
+  protocolHint: z.string().optional().describe("Optional protocol hint, currently limited to the pinned NeuralRate vault module surface"),
+  slippageBps: z.number().optional().describe("Optional slippage bound in basis points"),
+  ...governedExecutionCommonSchema,
+};
+
+export const rotateStrategySchema = {
+  fromPositionId: z.string().optional().describe("Optional source position identifier"),
+  toAsset: z.string().describe("Target asset for the strategy rotation"),
+  protocolHint: z.string().optional().describe("Optional destination protocol hint"),
+  slippageBps: z.number().optional().describe("Optional slippage bound in basis points"),
+  ...governedExecutionCommonSchema,
+};
+
+export const approveStrategySpenderSchema = {
+  asset: z.string().describe("Asset whose spender allowance would be modified"),
+  spenderAddress: z.string().describe("Target spender EVM address"),
+  ...governedExecutionCommonSchema,
 };
 
 export const listJobsSchema = {};

@@ -52,6 +52,10 @@ export type StrategyIntent = {
   targetAsset: string;
   amountUsd: number;
   amountToken?: number | null;
+  recipientAddress?: string | null;
+  protocolHint?: string | null;
+  positionId?: string | null;
+  spenderAddress?: string | null;
   slippageBps?: number | null;
   notes?: string | null;
   snapshotHash?: string | null;
@@ -138,6 +142,8 @@ export const tokenRegistry: Record<string, TokenManifest> = {
   },
 };
 
+const getUsdYTokenAddress = () => tokenRegistry.USDY.address ?? configuredUsdYTokenAddress;
+
 const usdyStableAllocationAbi = [{
   type: "function",
   name: "executeUsdYStableAllocation",
@@ -176,6 +182,17 @@ const erc20TransferAbi = [{
   stateMutability: "nonpayable",
   inputs: [
     { name: "to", type: "address" },
+    { name: "amount", type: "uint256" },
+  ] as const,
+  outputs: [{ name: "", type: "bool" }] as const,
+}] as const;
+
+const erc20ApproveAbi = [{
+  type: "function",
+  name: "approve",
+  stateMutability: "nonpayable",
+  inputs: [
+    { name: "spender", type: "address" },
     { name: "amount", type: "uint256" },
   ] as const,
   outputs: [{ name: "", type: "bool" }] as const,
@@ -272,6 +289,13 @@ export const strategyRegistry: Record<string, StrategyManifest> = {
       ) {
         failures.push("amountToken must be a positive number when provided.");
       }
+      if (
+        intent.recipientAddress !== null &&
+        intent.recipientAddress !== undefined &&
+        !isAddress(intent.recipientAddress)
+      ) {
+        failures.push("recipientAddress must be a valid EVM address when provided.");
+      }
       const normalizedAsset = intent.targetAsset.trim().toUpperCase();
       if (normalizedAsset !== "MNT") {
         failures.push("MNT native transfer currently supports only the MNT asset.");
@@ -282,6 +306,82 @@ export const strategyRegistry: Record<string, StrategyManifest> = {
         intent.slippageBps !== 0
       ) {
         failures.push("slippageBps must be omitted or 0 for native MNT transfers.");
+      }
+      return failures;
+    },
+  },
+  "usdy-vault-transfer": {
+    strategyKey: "usdy-vault-transfer",
+    label: "USDY Safe Module Transfer",
+    chainId: MANTLE_SEPOLIA_CHAIN_ID,
+    supportedAssets: ["USDY"],
+    supportedProtocols: ["neuralrate-vault-module"],
+    defaultProtocolId: "neuralrate-vault-module-v1",
+    defaultActionId: "execute-vault-call",
+    maxSlippageBps: 0,
+    validateIntent: (intent) => {
+      const failures: string[] = [];
+      if (!Number.isFinite(intent.amountUsd) || intent.amountUsd <= 0) {
+        failures.push("amountUsd must be a positive number for policy accounting.");
+      }
+      if (
+        intent.amountToken !== null &&
+        intent.amountToken !== undefined &&
+        (!Number.isFinite(intent.amountToken) || intent.amountToken <= 0)
+      ) {
+        failures.push("amountToken must be a positive number when provided.");
+      }
+      if (!intent.recipientAddress || !isAddress(intent.recipientAddress)) {
+        failures.push("recipientAddress must be a valid EVM address for USDY transfers.");
+      }
+      const normalizedAsset = intent.targetAsset.trim().toUpperCase();
+      if (normalizedAsset !== "USDY") {
+        failures.push("USDY transfer currently supports only the USDY asset.");
+      }
+      if (
+        intent.slippageBps !== null &&
+        intent.slippageBps !== undefined &&
+        intent.slippageBps !== 0
+      ) {
+        failures.push("slippageBps must be omitted or 0 for USDY transfers.");
+      }
+      return failures;
+    },
+  },
+  "usdy-approve-spender": {
+    strategyKey: "usdy-approve-spender",
+    label: "USDY Safe Module Approve",
+    chainId: MANTLE_SEPOLIA_CHAIN_ID,
+    supportedAssets: ["USDY"],
+    supportedProtocols: ["neuralrate-vault-module"],
+    defaultProtocolId: "neuralrate-vault-module-v1",
+    defaultActionId: "execute-vault-call",
+    maxSlippageBps: 0,
+    validateIntent: (intent) => {
+      const failures: string[] = [];
+      if (!Number.isFinite(intent.amountUsd) || intent.amountUsd <= 0) {
+        failures.push("amountUsd must be a positive number for policy accounting.");
+      }
+      if (
+        intent.amountToken !== null &&
+        intent.amountToken !== undefined &&
+        (!Number.isFinite(intent.amountToken) || intent.amountToken <= 0)
+      ) {
+        failures.push("amountToken must be a positive number when provided.");
+      }
+      if (!intent.spenderAddress || !isAddress(intent.spenderAddress)) {
+        failures.push("spenderAddress must be a valid EVM address for approvals.");
+      }
+      const normalizedAsset = intent.targetAsset.trim().toUpperCase();
+      if (normalizedAsset !== "USDY") {
+        failures.push("USDY approval currently supports only the USDY asset.");
+      }
+      if (
+        intent.slippageBps !== null &&
+        intent.slippageBps !== undefined &&
+        intent.slippageBps !== 0
+      ) {
+        failures.push("slippageBps must be omitted or 0 for approvals.");
       }
       return failures;
     },
@@ -308,16 +408,14 @@ export const getApprovedExecutionPolicySurface = () => {
     strategyKeys.add(strategy.strategyKey);
     strategy.supportedAssets.forEach((asset) => assets.add(asset));
     strategy.supportedProtocols.forEach((protocolId) => protocols.add(protocolId));
-
-    const protocol = protocolRegistry[strategy.defaultProtocolId];
-    if (protocol?.address) {
-      contracts.add(protocol.address.toLowerCase());
-    }
-    const action = protocol?.actions[strategy.defaultActionId];
-    if (action?.selector) {
-      selectors.add(action.selector.toLowerCase());
-    }
   }
+
+  if (tokenRegistry.USDY.address) {
+    contracts.add(tokenRegistry.USDY.address.toLowerCase());
+  }
+  selectors.add("0xa9059cbb");
+  selectors.add("0x095ea7b3");
+  selectors.add("0x00000000");
 
   return {
     strategyKeys: Array.from(strategyKeys),
@@ -371,6 +469,16 @@ export const buildErc20TransferCalldata = (args: {
     args: [args.recipient, args.amount],
   });
 
+export const buildErc20ApproveCalldata = (args: {
+  spender: Address;
+  amount: bigint;
+}) =>
+  encodeFunctionData({
+    abi: erc20ApproveAbi,
+    functionName: "approve",
+    args: [args.spender, args.amount],
+  });
+
 export const buildVaultExecutionModuleCalldata = (args: {
   ownerEoa: Address;
   vaultAddress: Address;
@@ -402,25 +510,55 @@ export const resolveUsdYVaultTransfer = (args: {
   ownerEoa: Address;
   vaultAddress: Address;
   amountUsd: number;
+  recipientAddress?: Address | null;
   intentHash: Hex;
 }) => {
-  if (!configuredUsdYTokenAddress) {
+  const tokenAddress = getUsdYTokenAddress();
+  if (!tokenAddress) {
     throw new Error("NEURALRATE_USDY_TOKEN_ADDRESS is not configured.");
   }
-  if (!configuredUsdYRecipientAddress) {
-    throw new Error("NEURALRATE_USDY_STRATEGY_RECIPIENT_ADDRESS is not configured.");
+  const recipientAddress = args.recipientAddress ?? configuredUsdYRecipientAddress;
+  if (!recipientAddress) {
+    throw new Error("A USDY recipient address is required for this transfer.");
   }
 
   const amount = parseUnits(String(args.amountUsd), tokenRegistry.USDY.decimals);
   const tokenCallData = buildErc20TransferCalldata({
-    recipient: configuredUsdYRecipientAddress,
+    recipient: recipientAddress,
     amount,
   });
 
   return {
-    targetContract: configuredUsdYTokenAddress,
+    targetContract: tokenAddress,
     tokenCallData,
-    recipientAddress: configuredUsdYRecipientAddress,
+    recipientAddress,
+    amountAtomic: amount,
+  };
+};
+
+export const resolveUsdYVaultApprove = (args: {
+  spenderAddress: Address;
+  amountUsd: number;
+  amountToken?: number | null;
+}) => {
+  const tokenAddress = getUsdYTokenAddress();
+  if (!tokenAddress) {
+    throw new Error("NEURALRATE_USDY_TOKEN_ADDRESS is not configured.");
+  }
+
+  const amount = parseUnits(
+    String(args.amountToken ?? args.amountUsd),
+    tokenRegistry.USDY.decimals
+  );
+  const tokenCallData = buildErc20ApproveCalldata({
+    spender: args.spenderAddress,
+    amount,
+  });
+
+  return {
+    targetContract: tokenAddress,
+    tokenCallData,
+    spenderAddress: args.spenderAddress,
     amountAtomic: amount,
   };
 };

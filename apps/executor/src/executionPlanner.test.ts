@@ -88,6 +88,7 @@ test("resolveExecutionPlan blocks when runtime bytecode is missing on-chain", as
 test("resolveExecutionPlan prepares a real MNT Safe-module transfer on Mantle Sepolia", async () => {
   await withConfiguredVaultModuleProtocol(async () => {
     const futureDeadline = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const recipientAddress = "0x3333333333333333333333333333333333333333";
     const plan = await resolveExecutionPlan(
       {
         async getCode() {
@@ -102,6 +103,7 @@ test("resolveExecutionPlan prepares a real MNT Safe-module transfer on Mantle Se
         targetAsset: "MNT",
         amountUsd: 1,
         amountToken: 1,
+        recipientAddress,
         slippageBps: 0,
         snapshotHash: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         deadline: futureDeadline,
@@ -119,7 +121,93 @@ test("resolveExecutionPlan prepares a real MNT Safe-module transfer on Mantle Se
     assert.equal(plan.validationStatus, "ready");
     assert.equal(plan.targetAsset, "MNT");
     assert.notEqual(plan.calldata, null);
-    assert.match(plan.executionSummary, /ready to move 1 MNT/);
+    assert.match(plan.executionSummary, new RegExp(recipientAddress, "i"));
+    assert.equal(plan.intent.recipientAddress, recipientAddress);
+  });
+});
+
+test("resolveExecutionPlan prepares a USDY wallet transfer through the Safe module", async () => {
+  await withConfiguredUsdYToken(async () => {
+    await withConfiguredVaultModuleProtocol(async () => {
+      const futureDeadline = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      const recipientAddress = "0x4444444444444444444444444444444444444444";
+      const plan = await resolveExecutionPlan(
+        {
+          async getCode() {
+            return "0x6001600055";
+          },
+          async readContract() {
+            return true;
+          },
+        },
+        "usdy-vault-transfer",
+        {
+          targetAsset: "USDY",
+          amountUsd: 50,
+          amountToken: 50,
+          recipientAddress,
+          slippageBps: 0,
+          snapshotHash: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          deadline: futureDeadline,
+        },
+        makeContext({
+          maxActionUsd: 100,
+          maxDailyUsd: 100,
+          maxAutomationUsd: 1000,
+          maxSlippageBps: 0,
+          allowedAssets: ["USDY"],
+          allowedProtocols: [],
+          allowedSelectors: ["0xa9059cbb"],
+        }),
+      );
+
+      assert.equal(plan.validationStatus, "ready");
+      assert.equal(plan.targetAsset, "USDY");
+      assert.equal(plan.intent.recipientAddress, recipientAddress);
+      assert.match(plan.executionSummary, new RegExp(recipientAddress, "i"));
+    });
+  });
+});
+
+test("resolveExecutionPlan prepares a USDY approval through the Safe module", async () => {
+  await withConfiguredUsdYToken(async () => {
+    await withConfiguredVaultModuleProtocol(async () => {
+      const futureDeadline = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      const spenderAddress = "0x5555555555555555555555555555555555555555";
+      const plan = await resolveExecutionPlan(
+        {
+          async getCode() {
+            return "0x6001600055";
+          },
+          async readContract() {
+            return true;
+          },
+        },
+        "usdy-approve-spender",
+        {
+          targetAsset: "USDY",
+          amountUsd: 25,
+          amountToken: 25,
+          spenderAddress,
+          slippageBps: 0,
+          snapshotHash: "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          deadline: futureDeadline,
+        },
+        makeContext({
+          maxActionUsd: 100,
+          maxDailyUsd: 100,
+          maxAutomationUsd: 1000,
+          maxSlippageBps: 0,
+          allowedAssets: ["USDY"],
+          allowedProtocols: [],
+          allowedSelectors: ["0x095ea7b3"],
+        }),
+      );
+
+      assert.equal(plan.validationStatus, "ready");
+      assert.equal(plan.intent.spenderAddress, spenderAddress);
+      assert.match(plan.executionSummary, new RegExp(spenderAddress, "i"));
+    });
   });
 });
 

@@ -8,7 +8,7 @@ import {
   verifyAutomationGrantSignature,
 } from "./grants";
 import { withOnchainPolicyState } from "./onchainState";
-import { encodeFunctionData, toFunctionSelector, type Address } from "viem";
+import { encodeFunctionData, type Address } from "viem";
 
 type ExecutorServiceBinding = {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
@@ -116,9 +116,6 @@ const policyRegistryAbi = [
 const makeId = (prefix: string) => `${prefix}_${crypto.randomUUID()}`;
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const ONCHAIN_SETTLEMENT_DELAYS_MS = [0, 1200, 2500, 4500] as const;
-const EXECUTE_VAULT_CALL_SELECTOR = toFunctionSelector(
-  "executeVaultCall(address,address,address,uint256,bytes,bytes32)"
-);
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const asNumber = (value: unknown, fallback: number) => {
@@ -167,12 +164,12 @@ const buildPreparedTxRequest = (
 });
 
 const buildCanonicalExecutionSurface = (env: ExecutorEnv) => {
-  const vaultModuleAddress = env.NEURALRATE_VAULT_MODULE_ADDRESS?.trim();
-  if (!vaultModuleAddress) {
-    throw new Error("NEURALRATE_VAULT_MODULE_ADDRESS is required to publish a canonical execution policy.");
-  }
-  const allowedTargets = [vaultModuleAddress.toLowerCase()];
-  const allowedSelectors = [EXECUTE_VAULT_CALL_SELECTOR.toLowerCase()];
+  const allowedTargets: string[] = [];
+  const allowedSelectors = [
+    "0x00000000",
+    "0xa9059cbb",
+    "0x095ea7b3",
+  ];
 
   return {
     allowedTargets,

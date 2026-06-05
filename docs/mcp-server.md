@@ -100,8 +100,37 @@ The mutation catalogs remain intentionally narrow and reuse the same scoped sess
 ### `/mcp/scoped/execution`
 
 - tools:
+  - `transfer_asset`
+  - `open_position`
+  - `increase_position`
+  - `decrease_position`
+  - `close_position`
+  - `claim_rewards`
+  - `sweep_idle_balance`
+  - `rebalance_to_target`
+  - `rotate_strategy`
+  - `approve_strategy_spender`
   - `execute_strategy`
 - required session domain: `execution`
+
+The governed execution tools always run an internal preflight before any queueing side effect. As of June 5, 2026, the live execution surface is intentionally narrower than the full conceptual tool list:
+
+- fully queueable today:
+  - `transfer_asset` for `MNT`
+  - `sweep_idle_balance` for `MNT`
+  - `open_position` for `USDY`
+  - `increase_position` for `USDY`
+  - `decrease_position` for wallet-held `MNT` and `USDY`
+  - `close_position` for wallet-held `MNT` and `USDY`
+  - `rebalance_to_target` into `USDY`
+  - `approve_strategy_spender`
+- preflight-aware special cases:
+  - `claim_rewards` returns `noop` when the resolved position has no claimable rewards on the current state surface, and `blocked` when rewards exist but no pinned claim adapter exists yet
+  - `rotate_strategy` returns `noop` when the source position already matches the requested target asset, aliases to `rebalance_to_target` when rotating into `USDY`, and returns `blocked` for unsupported unwind or conversion paths
+- still intentionally blocked until more adapters are pinned:
+  - non-wallet position decrease and close flows
+  - reward-claim adapters for protocols that expose claimable rewards
+  - multi-venue rotation and unwind paths beyond the current one-sided USDY flow
 
 ## Scoped Resources
 
