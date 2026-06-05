@@ -182,6 +182,31 @@ const isUnknownBlockError = (error: unknown) => {
   return /unknown block/i.test(description);
 };
 
+const isSafeAlreadyDeployedError = (error: unknown) => {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const record = error as {
+    message?: unknown;
+    details?: unknown;
+    shortMessage?: unknown;
+    cause?: { message?: unknown; details?: unknown } | null;
+  };
+
+  const description = [
+    record.message,
+    record.details,
+    record.shortMessage,
+    record.cause?.message,
+    record.cause?.details,
+  ]
+    .filter((value) => typeof value === 'string')
+    .join(' ');
+
+  return /safe already deployed/i.test(description);
+};
+
 const retryOnUnknownBlock = async <T>(action: () => Promise<T>) => {
   let lastError: unknown;
 
@@ -308,9 +333,30 @@ export async function resolveUserSafeVault(
     })
   );
 
-  const deployment = await retryOnUnknownBlock(() => safe.createSafeDeploymentTransaction());
   const safeAddress = (await safe.getAddress()).toLowerCase();
   const isDeployed = await retryOnUnknownBlock(() => safe.isSafeDeployed());
+
+  if (isDeployed) {
+    return {
+      safeAddress,
+      isDeployed: true,
+      deploymentRequest: null,
+    };
+  }
+
+  let deployment: Awaited<ReturnType<typeof safe.createSafeDeploymentTransaction>>;
+  try {
+    deployment = await retryOnUnknownBlock(() => safe.createSafeDeploymentTransaction());
+  } catch (error) {
+    if (isSafeAlreadyDeployedError(error)) {
+      return {
+        safeAddress,
+        isDeployed: true,
+        deploymentRequest: null,
+      };
+    }
+    throw error;
+  }
 
   return {
     safeAddress,
@@ -343,7 +389,7 @@ export async function deployUserSafeVault(
   const txHash = await retryOnUnknownBlock(() =>
     provider.request({
       method: 'eth_sendTransaction',
-      params: [predicted.deploymentRequest],
+      params: [predicted.deploymentRequest!],
     })
   );
 
