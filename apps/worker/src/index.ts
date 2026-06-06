@@ -931,8 +931,7 @@ export class NeuralRateConfigMcpAgent extends McpAgent<Env, Record<string, never
   });
 
   async init() {
-    const { handlers, automation } = createServices(this.env);
-    registerReadonlyCatalog(this.server, handlers, automation, this.env);
+    const { automation } = createServices(this.env);
     const getScoped = () => resolveScopedMcpSession(this.env, "config", this.getSessionId());
 
     this.server.tool(
@@ -1145,8 +1144,7 @@ export class NeuralRateBenchmarkMcpAgent extends McpAgent<Env, Record<string, ne
   });
 
   async init() {
-    const { handlers, automation } = createServices(this.env);
-    registerReadonlyCatalog(this.server, handlers, automation, this.env);
+    const { automation } = createServices(this.env);
     const getScoped = () => resolveScopedMcpSession(this.env, "benchmark", this.getSessionId());
 
     this.server.tool(
@@ -1192,8 +1190,7 @@ export class NeuralRateExecutionMcpAgent extends McpAgent<Env, Record<string, ne
   });
 
   async init() {
-    const { handlers, automation } = createServices(this.env);
-    registerReadonlyCatalog(this.server, handlers, automation, this.env);
+    const { automation } = createServices(this.env);
     const getScoped = () => resolveScopedMcpSession(this.env, "execution", this.getSessionId());
     const runGovernedAction = async (
       action: Parameters<typeof planGovernedExecutionAction>[3],

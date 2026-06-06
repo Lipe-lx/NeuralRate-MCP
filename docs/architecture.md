@@ -37,7 +37,7 @@ graph TD
 - **Public**
   - worker REST endpoints under `/api/*`
   - worker read-only MCP endpoint at `/mcp`
-  - worker scoped MCP catalogs at `/mcp/scoped/config`, `/mcp/scoped/benchmark`, and `/mcp/scoped/execution`
+  - worker scoped MCP catalogs at `/mcp/scoped/state`, `/mcp/scoped/config`, `/mcp/scoped/benchmark`, and `/mcp/scoped/execution`
   - web frontend
 - **Internal**
   - executor HTTP API
@@ -56,15 +56,19 @@ To ensure high performance and isolation, `apps/worker` leverages Cloudflare Dur
 2. **Scoped Configuration Catalog (`/mcp/scoped/config` / SSE `/sse/scoped/config`)**:
    - Class: `NeuralRateConfigMcpAgent`
    - Binding: `MCP_CONFIG_OBJECT`
-   - Purpose: Exposes the `update_agent_policy` tool, restricted to sessions carrying `config` domain approval.
-3. **Scoped Benchmarking Catalog (`/mcp/scoped/benchmark` / SSE `/sse/scoped/benchmark`)**:
+   - Purpose: Exposes scoped policy, grant, and runtime-management tools, restricted to sessions carrying `config` domain approval.
+3. **Scoped State Catalog (`/mcp/scoped/state` / SSE `/sse/scoped/state`)**:
+   - Class: `NeuralRateStateMcpAgent`
+   - Binding: `MCP_STATE_OBJECT`
+   - Purpose: Exposes scoped vault state, balances, policy surface, activity, and audit-oriented read tools.
+4. **Scoped Benchmarking Catalog (`/mcp/scoped/benchmark` / SSE `/sse/scoped/benchmark`)**:
    - Class: `NeuralRateBenchmarkMcpAgent`
    - Binding: `MCP_BENCHMARK_OBJECT`
    - Purpose: Exposes `queue_benchmark` plus `get_benchmark_history`, restricted to sessions carrying `benchmark` domain approval.
-4. **Scoped Strategy Execution Catalog (`/mcp/scoped/execution` / SSE `/sse/scoped/execution`)**:
+5. **Scoped Strategy Execution Catalog (`/mcp/scoped/execution` / SSE `/sse/scoped/execution`)**:
    - Class: `NeuralRateExecutionMcpAgent`
    - Binding: `MCP_EXECUTION_OBJECT`
-   - Purpose: Exposes the `execute_strategy` tool, restricted to sessions carrying `execution` domain approval.
+   - Purpose: Exposes governed execution and strategy tools, restricted to sessions carrying `execution` domain approval.
 
 ## Client-Side Telemetry Pipeline
 
