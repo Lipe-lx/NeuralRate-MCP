@@ -941,7 +941,7 @@ export async function prepareVaultRuntimeEnable(
           mode: "wallet_tx",
         }
       : null,
-    needsSafe7579 && !runtime?.fallbackReady
+    needsSafe7579 && !runtime?.fallbackHandlerReady
       ? {
           key: "enable_fallback_handler",
           label: "Enable fallback handler",
@@ -998,7 +998,7 @@ export async function submitVaultRuntimeEnable(
     ready = Boolean(
       runtime?.safeDeployed &&
       (!requiresVaultModule || runtime.vaultModuleEnabled) &&
-      (!requiresSafe7579 || (runtime.safe7579Enabled && runtime.delegateReady && runtime.fallbackReady)) &&
+      (!requiresSafe7579 || (runtime.safe7579Enabled && runtime.delegateReady && runtime.fallbackHandlerReady)) &&
       (!requiresExecutionGuard || runtime.moduleGuardReady)
     );
     if (ready) {

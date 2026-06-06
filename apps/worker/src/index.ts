@@ -2338,6 +2338,9 @@ export default {
       } catch (err: any) {
         const message = err instanceof Error ? err.message : String(err);
         const status =
+          /not yet fully enabled on-chain|still active after revoke|still active after disable|still active after enable/i.test(message)
+            ? 409
+            :
           /EXECUTOR service binding|EXECUTOR_BASE_URL|Executor origin .*403\/1003|Executor .* 5\d\d/i.test(message)
             ? 503
             : 500;

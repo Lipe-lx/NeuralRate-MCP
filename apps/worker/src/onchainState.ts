@@ -656,6 +656,10 @@ export async function withOnchainPolicyState<T extends Record<string, unknown>>(
         fallbackHandlerReady: env.NEURALRATE_SAFE_7579_ADAPTER_ADDRESS
           ? String(fallbackHandler).toLowerCase() === env.NEURALRATE_SAFE_7579_ADAPTER_ADDRESS.toLowerCase()
           : false,
+        // Backward-compatible alias for older callers that still read fallbackReady.
+        fallbackReady: env.NEURALRATE_SAFE_7579_ADAPTER_ADDRESS
+          ? String(fallbackHandler).toLowerCase() === env.NEURALRATE_SAFE_7579_ADAPTER_ADDRESS.toLowerCase()
+          : false,
         moduleGuard: String(moduleGuard).toLowerCase(),
         moduleGuardReady: env.NEURALRATE_EXECUTION_GUARD_CONTRACT
           ? String(moduleGuard).toLowerCase() === env.NEURALRATE_EXECUTION_GUARD_CONTRACT.toLowerCase()
