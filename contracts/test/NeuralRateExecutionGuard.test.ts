@@ -93,6 +93,12 @@ describe("NeuralRateExecutionGuard", function () {
     ).to.be.revertedWith("Untrusted module");
   });
 
+  it("advertises the Safe module guard interface for Safe 1.5.0 installation", async function () {
+    const { guard } = await deployFixture();
+    expect(await guard.supportsInterface("0x58401ed8")).to.equal(true);
+    expect(await guard.supportsInterface("0x01ffc9a7")).to.equal(true);
+  });
+
   it("permits AA executions where the Safe is the effective executor", async function () {
     const { module, safe, token, ownerEoa, recipient, snapshotHash } = await deployFixture();
     const amount = ethers.parseUnits("10", 18);

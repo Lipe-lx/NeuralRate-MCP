@@ -54,7 +54,7 @@ All production contracts are deployed on Mantle Sepolia (`5003`):
 | :--- | :--- | :--- |
 | **`NeuralRateDecisionReceiptRegistry`** | Immutable decision receipt registry for benchmarking | [`0xC0C836A220D006398cdE4D5caf529196E63f81A8`](https://sepolia.mantlescan.xyz/address/0xC0C836A220D006398cdE4D5caf529196E63f81A8) |
 | **`NeuralRatePolicyRegistry`** | Anchors owner policy parameters & snapshot references | [`0xc4580b5831f36eCc3E4865e635c970C75DD9869C`](https://sepolia.mantlescan.xyz/address/0xc4580b5831f36eCc3E4865e635c970C75DD9869C) |
-| **`NeuralRateExecutionGuard`** | On-chain guard validating vault transaction limits | [`0xe6a70b147fB54F693d1ADAF566Fa52d871D2412b`](https://sepolia.mantlescan.xyz/address/0xe6a70b147fB54F693d1ADAF566Fa52d871D2412b) |
+| **`NeuralRateExecutionGuard`** | On-chain guard validating vault transaction limits | [`0x8B2cE65c9B18BF50CF26fa8eDe70b2477dFdca9B`](https://sepolia.mantlescan.xyz/address/0x8B2cE65c9B18BF50CF26fa8eDe70b2477dFdca9B) |
 | **`NeuralRateVaultModule`** | Safe Module executing automated transactions | [`0xf7061501a464e893636a5BF8eB4ab7Ba2819154D`](https://sepolia.mantlescan.xyz/address/0xf7061501a464e893636a5BF8eB4ab7Ba2819154D) |
 | **`NeuralRateUsdYStrategyAdapter`** | Preserved strategy adapter for USDY allocation | [`0xFeE16FAd13789e9bBA4779D025186341e58799a3`](https://sepolia.mantlescan.xyz/address/0xFeE16FAd13789e9bBA4779D025186341e58799a3) |
 

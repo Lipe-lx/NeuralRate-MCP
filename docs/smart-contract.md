@@ -31,7 +31,7 @@ Important functions:
 
 - file: `contracts/contracts/NeuralRateExecutionGuard.sol`
 - role: on-chain execution policy enforcement for the Safe module path
-- live Sepolia guard deployment: [`0xe6a70b147fB54F693d1ADAF566Fa52d871D2412b`](https://sepolia.mantlescan.xyz/address/0xe6a70b147fB54F693d1ADAF566Fa52d871D2412b)
+- live Sepolia guard deployment: [`0x8B2cE65c9B18BF50CF26fa8eDe70b2477dFdca9B`](https://sepolia.mantlescan.xyz/address/0x8B2cE65c9B18BF50CF26fa8eDe70b2477dFdca9B)
 
 What it does:
 

@@ -2,6 +2,8 @@
 pragma solidity ^0.8.20;
 
 interface IModuleGuard {
+    function supportsInterface(bytes4 interfaceId) external view returns (bool);
+
     function checkModuleTransaction(
         address to,
         uint256 value,
@@ -30,6 +32,9 @@ contract MockSafeModuleAvatar {
     }
 
     function setModuleGuard(address guard) external {
+        if (guard != address(0)) {
+            require(IModuleGuard(guard).supportsInterface(0x58401ed8), "GS301");
+        }
         moduleGuard = guard;
         emit ModuleGuardSet(guard);
     }

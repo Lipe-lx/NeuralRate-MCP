@@ -1,6 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+interface IERC165 {
+    function supportsInterface(bytes4 interfaceId) external view returns (bool);
+}
+
+interface IModuleGuard is IERC165 {
+    function checkModuleTransaction(
+        address to,
+        uint256 value,
+        bytes memory data,
+        uint8 operation,
+        address module
+    ) external returns (bytes32 moduleTxHash);
+
+    function checkAfterModuleExecution(bytes32 moduleTxHash, bool success) external;
+}
+
 interface INeuralRatePolicyRegistry {
     struct PolicyMetadata {
         bytes32 policyId;
@@ -38,7 +54,10 @@ interface INeuralRatePolicyRegistry {
     function getSnapshotAnchor(bytes32 snapshotHash) external view returns (SnapshotAnchor memory);
 }
 
-contract NeuralRateExecutionGuard {
+contract NeuralRateExecutionGuard is IModuleGuard {
+    bytes4 private constant IERC165_INTERFACE_ID = 0x01ffc9a7;
+    bytes4 private constant IMODULE_GUARD_INTERFACE_ID = 0x58401ed8;
+
     address public owner;
     INeuralRatePolicyRegistry public policyRegistry;
     address public trustedModule;
@@ -175,6 +194,10 @@ contract NeuralRateExecutionGuard {
     }
 
     function checkAfterModuleExecution(bytes32, bool) external pure {}
+
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+        return interfaceId == IERC165_INTERFACE_ID || interfaceId == IMODULE_GUARD_INTERFACE_ID;
+    }
 
     function _resolveSpendAmount(
         uint256 value,
