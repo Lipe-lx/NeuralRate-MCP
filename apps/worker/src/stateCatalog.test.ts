@@ -5,6 +5,7 @@ import {
   buildExecutionReadinessSnapshot,
   buildPolicySurfaceSnapshot,
   loadScopedStateCatalogSnapshot,
+  reconcileScopedAutomationState,
   resetStateCatalogCachesForTests,
   type VaultBalancesSnapshot,
 } from "./stateCatalog";
@@ -194,4 +195,102 @@ test("scoped state snapshots are reused briefly to avoid cross-tool drift", asyn
 
   assert.equal(reads, 1);
   assert.strictEqual(second, first);
+});
+
+test("scoped state reconciles deployed vault and detected funding from live balances", () => {
+  const state = {
+    vault: {
+      status: "predicted",
+      safe_deployment_status: "predicted",
+      funding_status: "awaiting_deposit",
+    },
+    account: {
+      deployment_status: "predicted",
+    },
+  } satisfies Record<string, unknown>;
+
+  const balances: VaultBalancesSnapshot = {
+    vaultAddress: "0xvault",
+    chainId: 5003,
+    asOf: "2026-06-05T12:00:00.000Z",
+    nativeBalance: {
+      asset: "MNT",
+      kind: "native",
+      address: null,
+      decimals: 18,
+      balanceRaw: "1000000000000000000",
+      balanceFormatted: "1",
+      hasBalance: true,
+      valuationUsd: null,
+      valuationSource: null,
+      readStatus: "live",
+      asOf: "2026-06-05T12:00:00.000Z",
+    },
+    tokenBalances: [],
+    spendableUsd: null,
+    sources: [],
+  };
+
+  const readiness = {
+    status: "ready",
+    balance: {
+      vaultAddress: "0xvault",
+      nativeGasAsset: "MNT",
+      nativeGasBalanceFormatted: "1",
+      nativeGasReady: true,
+      tokenBalances: [],
+      spendableUsd: null,
+    },
+    policy: {
+      published: true,
+      syncStatus: "in_sync",
+      policyVersion: "vault-v1",
+      limits: {
+        perUseUsd: 1000,
+        dailyUsd: 2500,
+        totalUsd: 10000,
+        manualApprovalUsd: 2500,
+        maxSlippageBps: 50,
+      },
+    },
+    delegate: {
+      expected: null,
+      installed: null,
+      ready: true,
+    },
+    guard: {
+      expected: null,
+      installed: null,
+      ready: true,
+    },
+    module: {
+      safeDeployed: true,
+      vaultModuleEnabled: true,
+      safe7579Enabled: true,
+      fallbackHandlerReady: true,
+    },
+    grant: {
+      id: null,
+      status: "unknown",
+      expiresAt: null,
+      executionAllowed: false,
+    },
+    session: {
+      id: null,
+      status: "unknown",
+      expiresAt: null,
+      executionAllowed: false,
+    },
+    blockedReasons: [],
+    warnings: [],
+  };
+
+  const reconciled = reconcileScopedAutomationState(state, balances, readiness);
+  const vault = reconciled.vault as Record<string, unknown>;
+  const account = reconciled.account as Record<string, unknown>;
+
+  assert.equal(vault.status, "deployed");
+  assert.equal(vault.safe_deployment_status, "deployed");
+  assert.equal(vault.funding_status, "deposit_detected");
+  assert.equal(account.deployment_status, "deployed");
 });

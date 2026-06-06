@@ -718,9 +718,10 @@ export async function loadScopedStateCatalogSnapshot(
   const policySurface = buildPolicySurfaceSnapshot(state);
   const readiness = buildExecutionReadinessSnapshot(state, balances, policySurface);
   const activityFeed = buildActivityFeedSnapshot(state);
+  const reconciledState = reconcileScopedAutomationState(state, balances, readiness);
 
   const snapshot = {
-    state,
+    state: reconciledState,
     balances,
     positions,
     policySurface,
@@ -757,6 +758,42 @@ export function listScopedVaultReferences(snapshot: StateCatalogSnapshot) {
 }
 
 const snapshotToJson = (value: unknown) => JSON.stringify(value, null, 2);
+
+const hasDetectedOnchainBalance = (balances: VaultBalancesSnapshot) =>
+  Boolean(
+    balances.nativeBalance?.hasBalance ||
+    balances.tokenBalances.some((entry) => entry.hasBalance)
+  );
+
+export function reconcileScopedAutomationState(
+  state: Record<string, unknown>,
+  balances: VaultBalancesSnapshot,
+  readiness: ExecutionReadinessSnapshot
+) {
+  const vault = asRecord(state.vault);
+  const account = asRecord(state.account);
+
+  if (!vault && !account) {
+    return state;
+  }
+
+  const hasDeposit = hasDetectedOnchainBalance(balances);
+  const safeDeployed = readiness.module.safeDeployed;
+
+  return {
+    ...state,
+    vault: vault ? {
+      ...vault,
+      status: safeDeployed ? "deployed" : (asString(vault.status) ?? "provisioning"),
+      safe_deployment_status: safeDeployed ? "deployed" : (asString(vault.safe_deployment_status) ?? "predicted"),
+      funding_status: hasDeposit ? "deposit_detected" : (asString(vault.funding_status) ?? "needs_funding"),
+    } : state.vault,
+    account: account ? {
+      ...account,
+      deployment_status: safeDeployed ? "deployed" : (asString(account.deployment_status) ?? "predicted"),
+    } : state.account,
+  };
+}
 
 export function buildPortfolioReviewPrompt(snapshot: StateCatalogSnapshot) {
   return {
