@@ -303,6 +303,16 @@ const executeSafeTransactions = async (
   return result.hash;
 };
 
+const buildSafe7579SelfCall = (
+  safeAddress: string,
+  data: `0x${string}`
+): MetaTransactionData => ({
+  // Safe7579 mutating entrypoints must be reached through the Safe fallback handler.
+  to: safeAddress,
+  value: '0',
+  data,
+});
+
 const readContractViaProvider = async (
   provider: EIP1193Provider,
   call: { to: string; data: string }
@@ -529,10 +539,9 @@ export async function ensureAutonomousVaultRuntime(
 
   try {
     await executeSafeTransactions(safe, provider, [
-      {
-        to: SAFE_7579_ADAPTER_ADDRESS,
-        value: '0',
-        data: encodeFunctionData({
+      buildSafe7579SelfCall(
+        deployment.safeAddress,
+        encodeFunctionData({
           abi: safe7579AdapterAbi,
           functionName: 'initializeAccount',
           args: [
@@ -543,8 +552,8 @@ export async function ensureAutonomousVaultRuntime(
               threshold: 0,
             },
           ],
-        }),
-      },
+        })
+      ),
     ]);
     safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
   } catch (error) {
@@ -556,10 +565,9 @@ export async function ensureAutonomousVaultRuntime(
   );
   if (installedDelegate === ZERO_ADDRESS) {
     validatorInstallTxHash = await executeSafeTransactions(safe, provider, [
-      {
-        to: SAFE_7579_ADAPTER_ADDRESS,
-        value: '0',
-        data: encodeFunctionData({
+      buildSafe7579SelfCall(
+        deployment.safeAddress,
+        encodeFunctionData({
           abi: safe7579AdapterAbi,
           functionName: 'installModule',
           args: [
@@ -567,8 +575,8 @@ export async function ensureAutonomousVaultRuntime(
             DELEGATE_VALIDATOR_ADDRESS as `0x${string}`,
             delegateValidatorInitData,
           ],
-        }),
-      },
+        })
+      ),
     ]);
     safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
   } else if (installedDelegate !== NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS.toLowerCase()) {
