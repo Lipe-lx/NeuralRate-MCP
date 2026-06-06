@@ -1150,6 +1150,21 @@ export class NeuralRateBenchmarkMcpAgent extends McpAgent<Env, Record<string, ne
     const getScoped = () => resolveScopedMcpSession(this.env, "benchmark", this.getSessionId());
 
     this.server.tool(
+      "get_benchmark_history",
+      "Fetches scoped benchmark decision history for the bound vault session",
+      getDecisionsSchema,
+      async ({ limit }) => {
+        const scoped = await getScoped();
+        const decisions = await automation.listBenchmarkHistory(scoped.ownerEoa, limit ?? 50);
+        const structured = { decisions };
+        return {
+          content: [{ type: "text", text: JSON.stringify(structured, null, 2) }],
+          structuredContent: structured,
+        };
+      }
+    );
+
+    this.server.tool(
       "queue_benchmark",
       "Queues a scoped benchmark job through the internal executor",
       queueBenchmarkSchema,

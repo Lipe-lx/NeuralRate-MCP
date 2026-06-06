@@ -94,6 +94,7 @@ The mutation catalogs remain intentionally narrow and reuse the same scoped sess
 ### `/mcp/scoped/benchmark`
 
 - tools:
+  - `get_benchmark_history`
   - `queue_benchmark`
 - required session domain: `benchmark`
 

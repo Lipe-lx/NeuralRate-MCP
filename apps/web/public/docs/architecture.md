@@ -60,7 +60,7 @@ To ensure high performance and isolation, `apps/worker` leverages Cloudflare Dur
 3. **Scoped Benchmarking Catalog (`/mcp/scoped/benchmark` / SSE `/sse/scoped/benchmark`)**:
    - Class: `NeuralRateBenchmarkMcpAgent`
    - Binding: `MCP_BENCHMARK_OBJECT`
-   - Purpose: Exposes the `queue_benchmark` tool, restricted to sessions carrying `benchmark` domain approval.
+   - Purpose: Exposes `queue_benchmark` plus `get_benchmark_history`, restricted to sessions carrying `benchmark` domain approval.
 4. **Scoped Strategy Execution Catalog (`/mcp/scoped/execution` / SSE `/sse/scoped/execution`)**:
    - Class: `NeuralRateExecutionMcpAgent`
    - Binding: `MCP_EXECUTION_OBJECT`
