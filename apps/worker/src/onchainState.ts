@@ -66,20 +66,6 @@ const safeModuleStatusAbi = [
     inputs: [{ name: "module", type: "address" }],
     outputs: [{ name: "", type: "bool" }],
   },
-  {
-    type: "function",
-    name: "getFallbackHandler",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ name: "handler", type: "address" }],
-  },
-  {
-    type: "function",
-    name: "getModuleGuard",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ name: "guard", type: "address" }],
-  },
 ] as const;
 
 const delegateValidatorAbi = [
@@ -110,6 +96,22 @@ export type RuntimeEnv = {
 };
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const SAFE_FALLBACK_HANDLER_STORAGE_SLOT =
+  "0x6c9a6c4a39284e37ed1cf53d337577d14212a4870fb976a4366c693b939918d5";
+const SAFE_MODULE_GUARD_STORAGE_SLOT =
+  "0xb104e0b93118902c651344349b610029d694cfdec91c589c91ebafbcd0289947";
+
+const normalizeStorageAddress = (value: string | null | undefined) => {
+  if (!value || value === "0x") {
+    return ZERO_ADDRESS;
+  }
+  const hex = value.startsWith("0x") ? value.slice(2) : value;
+  if (hex.length < 40) {
+    return ZERO_ADDRESS;
+  }
+  const addressHex = `0x${hex.slice(-40)}`;
+  return isAddress(addressHex) ? addressHex.toLowerCase() : ZERO_ADDRESS;
+};
 
 const asString = (value: unknown) => (typeof value === "string" ? value : "");
 const asNumber = (value: unknown) => {
@@ -628,16 +630,14 @@ export async function withOnchainPolicyState<T extends Record<string, unknown>>(
               args: [env.NEURALRATE_SAFE_7579_ADAPTER_ADDRESS as Address],
             }).catch(() => false)
           : Promise.resolve(false),
-        publicClient.readContract({
+        publicClient.getStorageAt({
           address: vaultAddress as Address,
-          abi: safeModuleStatusAbi,
-          functionName: "getFallbackHandler",
-        }).catch(() => ZERO_ADDRESS),
-        publicClient.readContract({
+          slot: SAFE_FALLBACK_HANDLER_STORAGE_SLOT,
+        }).then(normalizeStorageAddress).catch(() => ZERO_ADDRESS),
+        publicClient.getStorageAt({
           address: vaultAddress as Address,
-          abi: safeModuleStatusAbi,
-          functionName: "getModuleGuard",
-        }).catch(() => ZERO_ADDRESS),
+          slot: SAFE_MODULE_GUARD_STORAGE_SLOT,
+        }).then(normalizeStorageAddress).catch(() => ZERO_ADDRESS),
         env.NEURALRATE_DELEGATE_VALIDATOR_ADDRESS
           ? publicClient.readContract({
               address: env.NEURALRATE_DELEGATE_VALIDATOR_ADDRESS as Address,

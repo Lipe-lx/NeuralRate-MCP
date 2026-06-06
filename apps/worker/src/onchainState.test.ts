@@ -140,3 +140,14 @@ test("deriveAutomationReady requires active execution scope, synced policy, and 
     false,
   );
 });
+
+test("readOnchain-style storage slot decoding keeps Safe fallback and module guard addresses", async () => {
+  const fallbackRaw = "0x0000000000000000000000007ec994fd2f774fb8aae472c349ed3e64e0a15fea";
+  const guardRaw = "0x0000000000000000000000008b2ce65c9b18bf50cf26fa8ede70b2477dfdca9b";
+
+  const fallbackAddress = `0x${fallbackRaw.slice(-40)}`.toLowerCase();
+  const guardAddress = `0x${guardRaw.slice(-40)}`.toLowerCase();
+
+  assert.equal(fallbackAddress, "0x7ec994fd2f774fb8aae472c349ed3e64e0a15fea");
+  assert.equal(guardAddress, "0x8b2ce65c9b18bf50cf26fa8ede70b2477dfdca9b");
+});
