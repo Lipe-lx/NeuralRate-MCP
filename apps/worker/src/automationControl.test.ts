@@ -6,6 +6,7 @@ const requirements = {
   requiresVaultModule: true,
   requiresSafe7579: true,
   requiresExecutionGuard: true,
+  requiresTrustedSafeModule: true,
 };
 
 test("runtime install readiness does not require delegate signer gas", () => {
@@ -19,6 +20,7 @@ test("runtime install readiness does not require delegate signer gas", () => {
       fallbackHandlerReady: true,
       moduleGuardReady: true,
       trustedModuleReady: true,
+      trustedSafeModuleReady: true,
     }, requirements),
     true,
   );
@@ -35,6 +37,23 @@ test("runtime install readiness still requires guard to trust the vault module",
       fallbackHandlerReady: true,
       moduleGuardReady: true,
       trustedModuleReady: false,
+      trustedSafeModuleReady: true,
+    }, requirements),
+    false,
+  );
+});
+
+test("runtime install readiness requires Safe7579 trust when paymaster AA is required", () => {
+  assert.equal(
+    isVaultRuntimeInstallReady({
+      safeDeployed: true,
+      vaultModuleEnabled: true,
+      safe7579Enabled: true,
+      delegateReady: true,
+      fallbackHandlerReady: true,
+      moduleGuardReady: true,
+      trustedModuleReady: true,
+      trustedSafeModuleReady: false,
     }, requirements),
     false,
   );

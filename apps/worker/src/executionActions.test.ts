@@ -137,6 +137,9 @@ const makeSnapshot = (): StateCatalogSnapshot => ({
       trustedModuleExpected: "0xmodule",
       trustedModuleInstalled: "0xmodule",
       trustedModuleReady: true,
+      trustedSafeModuleExpected: "0xsafe7579",
+      trustedSafeModuleInstalled: "0xsafe7579",
+      trustedSafeModuleReady: true,
       ready: true,
     },
     module: {

@@ -31,6 +31,7 @@ type ExecutorEnv = {
   NEURALRATE_DELEGATE_VALIDATOR_ADDRESS?: string;
   NEURALRATE_4337_ENTRYPOINT_ADDRESS?: string;
   NEURALRATE_ERC7484_REGISTRY_ADDRESS?: string;
+  NEURALRATE_PAYMASTER_ENABLED?: string;
   MANTLE_SEPOLIA_RPC_URL?: string;
 };
 
@@ -965,6 +966,16 @@ export async function prepareVaultRuntimeEnable(
           mode: "wallet_tx",
         }
       : null,
+    env.NEURALRATE_EXECUTION_GUARD_CONTRACT &&
+    env.NEURALRATE_PAYMASTER_ENABLED?.trim().toLowerCase() === "true" &&
+    !runtime?.trustedSafeModuleReady
+      ? {
+          key: "configure_execution_guard_trusted_safe_module",
+          label: "Trust Safe7579 adapter",
+          required: true,
+          mode: "platform_tx",
+        }
+      : null,
   ].filter(Boolean);
 
   return {
@@ -988,6 +999,7 @@ export function isVaultRuntimeInstallReady(
     requiresVaultModule: boolean;
     requiresSafe7579: boolean;
     requiresExecutionGuard: boolean;
+    requiresTrustedSafeModule?: boolean;
   }
 ) {
   return Boolean(
@@ -999,7 +1011,11 @@ export function isVaultRuntimeInstallReady(
     ) &&
     (
       !requirements.requiresExecutionGuard ||
-      (runtime.moduleGuardReady === true && runtime.trustedModuleReady === true)
+      (
+        runtime.moduleGuardReady === true &&
+        runtime.trustedModuleReady === true &&
+        (!requirements.requiresTrustedSafeModule || runtime.trustedSafeModuleReady === true)
+      )
     )
   );
 }
@@ -1015,6 +1031,7 @@ export async function submitVaultRuntimeEnable(
     Boolean(env.NEURALRATE_SAFE_7579_ADAPTER_ADDRESS) &&
     Boolean(env.NEURALRATE_DELEGATE_VALIDATOR_ADDRESS);
   const requiresExecutionGuard = Boolean(env.NEURALRATE_EXECUTION_GUARD_CONTRACT);
+  const requiresTrustedSafeModule = env.NEURALRATE_PAYMASTER_ENABLED?.trim().toLowerCase() === "true";
 
   let state: Awaited<ReturnType<typeof readOnchainAutomationState>> | null = null;
   let runtime: Record<string, unknown> | null = null;
@@ -1029,6 +1046,7 @@ export async function submitVaultRuntimeEnable(
       requiresVaultModule,
       requiresSafe7579,
       requiresExecutionGuard,
+      requiresTrustedSafeModule,
     });
     if (ready) {
       break;

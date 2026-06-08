@@ -17,7 +17,11 @@ describe("NeuralRateVaultModule", function () {
     const module = await Module.deploy(executor.address, ethers.ZeroAddress);
 
     const ExecutionGuard = await ethers.getContractFactory("NeuralRateExecutionGuard");
-    const executionGuard = await ExecutionGuard.deploy(await policyRegistry.getAddress(), await module.getAddress());
+    const executionGuard = await ExecutionGuard.deploy(
+      await policyRegistry.getAddress(),
+      await module.getAddress(),
+      await module.getAddress()
+    );
     await module.setExecutionGuard(await executionGuard.getAddress());
 
     await safe.setModule(await module.getAddress(), true);

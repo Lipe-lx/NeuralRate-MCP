@@ -11,12 +11,13 @@ async function main() {
 
   const policyRegistry = process.env.NEURALRATE_POLICY_REGISTRY_CONTRACT?.trim();
   const trustedModule = process.env.NEURALRATE_VAULT_MODULE_ADDRESS?.trim();
+  const trustedSafeModule = process.env.NEURALRATE_SAFE_7579_ADAPTER_ADDRESS?.trim() || trustedModule;
   if (!policyRegistry || !trustedModule) {
     throw new Error("Set NEURALRATE_POLICY_REGISTRY_CONTRACT and NEURALRATE_VAULT_MODULE_ADDRESS before deploying the execution guard.");
   }
 
   const Guard = await ethers.getContractFactory("NeuralRateExecutionGuard");
-  const contract = await Guard.deploy(policyRegistry, trustedModule);
+  const contract = await Guard.deploy(policyRegistry, trustedModule, trustedSafeModule);
   await contract.waitForDeployment();
 
   const manifest = {
@@ -27,6 +28,7 @@ async function main() {
     txHash: contract.deploymentTransaction()?.hash ?? "",
     policyRegistry,
     trustedModule,
+    trustedSafeModule,
     updatedAt: new Date().toISOString(),
   };
 

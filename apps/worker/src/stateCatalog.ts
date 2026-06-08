@@ -115,6 +115,9 @@ export type ExecutionReadinessSnapshot = {
     trustedModuleExpected: string | null;
     trustedModuleInstalled: string | null;
     trustedModuleReady: boolean;
+    trustedSafeModuleExpected: string | null;
+    trustedSafeModuleInstalled: string | null;
+    trustedSafeModuleReady: boolean;
     ready: boolean;
   };
   module: {
@@ -546,6 +549,9 @@ export function buildExecutionReadinessSnapshot(
   if (!asBoolean(runtimeState?.trustedModuleReady)) {
     blockedReasons.push("Execution guard does not trust the configured vault execution module.");
   }
+  if (paymasterReady && !asBoolean(runtimeState?.trustedSafeModuleReady)) {
+    blockedReasons.push("Execution guard does not trust the configured Safe7579 adapter for sponsored ERC-4337 execution.");
+  }
   if (!asBoolean(runtimeState?.delegateReady)) {
     blockedReasons.push("Expected delegate session signer is not installed on the validator.");
   }
@@ -617,7 +623,12 @@ export function buildExecutionReadinessSnapshot(
       trustedModuleExpected: asString(aa?.vaultModuleAddress),
       trustedModuleInstalled: asString(runtimeState?.trustedModule),
       trustedModuleReady: asBoolean(runtimeState?.trustedModuleReady),
-      ready: asBoolean(runtimeState?.moduleGuardReady),
+      trustedSafeModuleExpected: asString(aa?.safe7579AdapterAddress),
+      trustedSafeModuleInstalled: asString(runtimeState?.trustedSafeModule),
+      trustedSafeModuleReady: asBoolean(runtimeState?.trustedSafeModuleReady),
+      ready: asBoolean(runtimeState?.moduleGuardReady) &&
+        asBoolean(runtimeState?.trustedModuleReady) &&
+        (!paymasterReady || asBoolean(runtimeState?.trustedSafeModuleReady)),
     },
     module: {
       safeDeployed: asBoolean(runtimeState?.safeDeployed),

@@ -60,13 +60,19 @@ contract NeuralRateExecutionGuard is IModuleGuard {
 
     address public owner;
     INeuralRatePolicyRegistry public policyRegistry;
+    // Governed execution module allowed to consume policy budget.
     address public trustedModule;
+    // Safe module allowed to enter the Safe module-guard hook. This is usually
+    // the Safe7579 adapter for ERC-4337 execution; trustedModule is still the
+    // NeuralRate VaultModule that performs policy validation.
+    address public trustedSafeModule;
 
     mapping(bytes32 => mapping(uint256 => uint256)) public dailySpendByPolicy;
     mapping(bytes32 => uint256) public totalSpendByPolicy;
     mapping(bytes32 => bool) public consumedIntentHashes;
 
     event TrustedModuleUpdated(address indexed previousModule, address indexed newModule);
+    event TrustedSafeModuleUpdated(address indexed previousModule, address indexed newModule);
     event PolicyRegistryUpdated(address indexed previousRegistry, address indexed newRegistry);
     event ExecutionValidated(
         bytes32 indexed policyId,
@@ -84,11 +90,14 @@ contract NeuralRateExecutionGuard is IModuleGuard {
         _;
     }
 
-    constructor(address initialPolicyRegistry, address initialTrustedModule) {
+    constructor(address initialPolicyRegistry, address initialTrustedModule, address initialTrustedSafeModule) {
         require(initialPolicyRegistry != address(0), "Invalid policy registry");
         owner = msg.sender;
         policyRegistry = INeuralRatePolicyRegistry(initialPolicyRegistry);
         trustedModule = initialTrustedModule;
+        trustedSafeModule = initialTrustedSafeModule == address(0)
+            ? initialTrustedModule
+            : initialTrustedSafeModule;
     }
 
     function setPolicyRegistry(address newRegistry) external onlyOwner {
@@ -102,6 +111,12 @@ contract NeuralRateExecutionGuard is IModuleGuard {
         address previousModule = trustedModule;
         trustedModule = newTrustedModule;
         emit TrustedModuleUpdated(previousModule, newTrustedModule);
+    }
+
+    function setTrustedSafeModule(address newTrustedSafeModule) external onlyOwner {
+        address previousModule = trustedSafeModule;
+        trustedSafeModule = newTrustedSafeModule;
+        emit TrustedSafeModuleUpdated(previousModule, newTrustedSafeModule);
     }
 
     function validateAndConsumeExecution(
@@ -188,9 +203,9 @@ contract NeuralRateExecutionGuard is IModuleGuard {
         uint8 operation,
         address module
     ) external view returns (bytes32 moduleTxHash) {
-        require(module == trustedModule, "Untrusted module");
-        require(operation == 0, "Unsupported operation");
-        return keccak256(abi.encode(module, operation, trustedModule));
+        require(module == trustedModule || module == trustedSafeModule, "Untrusted module");
+        require(operation == 0 || operation == 1, "Unsupported operation");
+        return keccak256(abi.encode(module, operation, trustedModule, trustedSafeModule));
     }
 
     function checkAfterModuleExecution(bytes32, bool) external pure {}

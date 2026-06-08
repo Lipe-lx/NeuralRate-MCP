@@ -228,6 +228,8 @@ export interface AutomationState {
     fallbackHandlerReady?: boolean;
     moduleGuardReady?: boolean;
     trustedModuleReady?: boolean;
+    trustedSafeModuleReady?: boolean;
+    trustedSafeModule?: string | null;
     delegateGasReady?: boolean;
     delegateGasBalanceFormatted?: string | null;
     paymasterConfigured?: boolean;

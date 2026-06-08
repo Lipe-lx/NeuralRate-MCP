@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-08T18:54:03.972Z",
+  "generatedAt": "2026-06-08T21:56:30.984Z",
   "deployments": {
     "mantle-sepolia-delegate-validator.json": {
       "network": "mantleSepolia",
@@ -15,11 +15,12 @@
       "network": "mantleSepolia",
       "chainId": 5003,
       "contractName": "NeuralRateExecutionGuard",
-      "address": "0x8B2cE65c9B18BF50CF26fa8eDe70b2477dFdca9B",
-      "txHash": "0xc961f37e52bebb07f066739a3872d39f9ba18c34441025a5d32d390cb4bdbdc4",
+      "address": "0x666Bc822156824F40F2b70aAaAcBfe87467D79A5",
+      "txHash": "0x984bc0f8daf9e59496aef8156e827011c6d96297a72b57d8e7e5c6fe9ec73f31",
       "policyRegistry": "0xc4580b5831f36eCc3E4865e635c970C75DD9869C",
       "trustedModule": "0xf7061501a464e893636a5BF8eB4ab7Ba2819154D",
-      "updatedAt": "2026-06-06T00:39:05.944Z"
+      "trustedSafeModule": "0x7ec994fD2F774Fb8AAe472C349ED3E64E0A15FEa",
+      "updatedAt": "2026-06-08T21:35:07.300Z"
     },
     "mantle-sepolia-policy-registry.json": {
       "network": "mantleSepolia",
@@ -132,11 +133,12 @@
       "network": "mantleSepolia",
       "chainId": 5003,
       "contractName": "NeuralRateExecutionGuard",
-      "address": "0x8B2cE65c9B18BF50CF26fa8eDe70b2477dFdca9B",
-      "txHash": "0xc961f37e52bebb07f066739a3872d39f9ba18c34441025a5d32d390cb4bdbdc4",
+      "address": "0x666Bc822156824F40F2b70aAaAcBfe87467D79A5",
+      "txHash": "0x984bc0f8daf9e59496aef8156e827011c6d96297a72b57d8e7e5c6fe9ec73f31",
       "policyRegistry": "0xc4580b5831f36eCc3E4865e635c970C75DD9869C",
       "trustedModule": "0xf7061501a464e893636a5BF8eB4ab7Ba2819154D",
-      "updatedAt": "2026-06-06T00:39:05.944Z"
+      "trustedSafeModule": "0x7ec994fD2F774Fb8AAe472C349ED3E64E0A15FEa",
+      "updatedAt": "2026-06-08T21:35:07.300Z"
     },
     "vaultModule": {
       "network": "mantleSepolia",

@@ -86,6 +86,13 @@ const executionGuardAbi = [
     inputs: [],
     outputs: [{ name: "", type: "address" }],
   },
+  {
+    type: "function",
+    name: "trustedSafeModule",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
 ] as const;
 
 export type RuntimeEnv = {
@@ -635,6 +642,7 @@ export async function withOnchainPolicyState<T extends Record<string, unknown>>(
         moduleGuard,
         installedDelegate,
         trustedModule,
+        trustedSafeModule,
         delegateGasBalance,
       ] = await Promise.all([
         publicClient.getCode({ address: vaultAddress as Address }).catch(() => undefined),
@@ -677,6 +685,13 @@ export async function withOnchainPolicyState<T extends Record<string, unknown>>(
               functionName: "trustedModule",
             }).catch(() => ZERO_ADDRESS)
           : Promise.resolve(ZERO_ADDRESS),
+        env.NEURALRATE_EXECUTION_GUARD_CONTRACT
+          ? publicClient.readContract({
+              address: env.NEURALRATE_EXECUTION_GUARD_CONTRACT as Address,
+              abi: executionGuardAbi,
+              functionName: "trustedSafeModule",
+            }).catch(() => ZERO_ADDRESS)
+          : Promise.resolve(ZERO_ADDRESS),
         env.NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS && isAddress(env.NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS)
           ? publicClient.getBalance({
               address: env.NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS as Address,
@@ -704,6 +719,10 @@ export async function withOnchainPolicyState<T extends Record<string, unknown>>(
         trustedModuleReady: env.NEURALRATE_VAULT_MODULE_ADDRESS
           ? String(trustedModule).toLowerCase() === env.NEURALRATE_VAULT_MODULE_ADDRESS.toLowerCase()
           : false,
+        trustedSafeModule: String(trustedSafeModule).toLowerCase(),
+        trustedSafeModuleReady: env.NEURALRATE_SAFE_7579_ADAPTER_ADDRESS
+          ? String(trustedSafeModule).toLowerCase() === env.NEURALRATE_SAFE_7579_ADAPTER_ADDRESS.toLowerCase()
+          : true,
         installedDelegate: String(installedDelegate).toLowerCase(),
         delegateReady: env.NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS
           ? String(installedDelegate).toLowerCase() === env.NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS.toLowerCase()

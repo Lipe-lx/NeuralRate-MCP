@@ -160,6 +160,7 @@ test("execution readiness does not require delegate gas when paymaster is ready"
       fallbackHandlerReady: true,
       moduleGuardReady: true,
       trustedModuleReady: true,
+      trustedSafeModuleReady: true,
       delegateReady: true,
       delegateGasBalanceFormatted: "0",
       delegateGasReady: false,
@@ -216,6 +217,74 @@ test("execution readiness does not require delegate gas when paymaster is ready"
   assert.equal(readiness.delegate.paymasterReady, true);
   assert.equal(readiness.delegate.gasPayer, "paymaster");
   assert.doesNotMatch(readiness.blockedReasons.join(" | "), /signer has no native gas balance/);
+});
+
+test("execution readiness blocks sponsored AA when the guard does not trust Safe7579", () => {
+  const now = Date.parse("2026-06-05T12:00:00.000Z");
+  const state = {
+    policySyncStatus: "in_sync",
+    runtimeState: {
+      safeDeployed: true,
+      vaultModuleEnabled: true,
+      safe7579Enabled: true,
+      fallbackHandlerReady: true,
+      moduleGuardReady: true,
+      trustedModuleReady: true,
+      trustedSafeModuleReady: false,
+      delegateReady: true,
+      delegateGasBalanceFormatted: "0",
+      delegateGasReady: false,
+      paymasterReady: true,
+      installedDelegate: "0xdelegate",
+    },
+    onchainPolicy: {
+      policyVersion: "vault-v1",
+      validAfter: Math.floor((now - 60_000) / 1000),
+      validUntil: Math.floor((now + 60_000) / 1000),
+      maxPerUse: "1000",
+      maxDaily: "2500",
+      maxTotal: "10000",
+      maxSlippageBps: 50,
+      allowedAssets: ["MNT"],
+      allowedProtocols: ["neuralrate-vault-module"],
+    },
+    activeGrant: {
+      status: "active",
+      allowed_domains: ["state", "execution"],
+    },
+    activeMcpSession: {
+      status: "active",
+      allowed_domains: ["state", "execution"],
+    },
+    automationJobs: [],
+  } satisfies Record<string, unknown>;
+  const balances: VaultBalancesSnapshot = {
+    vaultAddress: "0xvault",
+    chainId: 5003,
+    asOf: "2026-06-05T12:00:00.000Z",
+    nativeBalance: {
+      asset: "MNT",
+      kind: "native",
+      address: null,
+      decimals: 18,
+      balanceRaw: "1000000000000000000",
+      balanceFormatted: "1",
+      hasBalance: true,
+      valuationUsd: null,
+      valuationSource: null,
+      readStatus: "live",
+      asOf: "2026-06-05T12:00:00.000Z",
+    },
+    tokenBalances: [],
+    spendableUsd: null,
+    sources: [],
+  };
+
+  const readiness = buildExecutionReadinessSnapshot(state, balances, buildPolicySurfaceSnapshot(state, now));
+
+  assert.equal(readiness.status, "blocked");
+  assert.match(readiness.blockedReasons.join(" | "), /Safe7579 adapter/);
+  assert.equal(readiness.guard.trustedSafeModuleReady, false);
 });
 
 test("activity feed sorts newest events first and preserves benchmark linkage", () => {
@@ -344,6 +413,9 @@ test("scoped state reconciles deployed vault and detected funding from live bala
       trustedModuleExpected: null,
       trustedModuleInstalled: null,
       trustedModuleReady: true,
+      trustedSafeModuleExpected: null,
+      trustedSafeModuleInstalled: null,
+      trustedSafeModuleReady: false,
       ready: true,
     },
     module: {

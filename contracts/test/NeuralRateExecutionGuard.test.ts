@@ -16,11 +16,19 @@ describe("NeuralRateExecutionGuard", function () {
     const Module = await ethers.getContractFactory("NeuralRateVaultModule");
     const module = await Module.deploy(delegate.address, ethers.ZeroAddress);
 
+    const Safe7579Module = await ethers.getContractFactory("MockModuleCaller");
+    const safe7579Module = await Safe7579Module.deploy();
+
     const Guard = await ethers.getContractFactory("NeuralRateExecutionGuard");
-    const guard = await Guard.deploy(await policyRegistry.getAddress(), await module.getAddress());
+    const guard = await Guard.deploy(
+      await policyRegistry.getAddress(),
+      await module.getAddress(),
+      await safe7579Module.getAddress()
+    );
     await module.setExecutionGuard(await guard.getAddress());
 
     await safe.setModule(await module.getAddress(), true);
+    await safe.setModule(await safe7579Module.getAddress(), true);
     await safe.setModuleGuard(await guard.getAddress());
     await token.mint(await safe.getAddress(), ethers.parseUnits("1000", 18));
 
@@ -53,7 +61,7 @@ describe("NeuralRateExecutionGuard", function () {
       "defillama+fred+nansen"
     );
 
-    return { ownerEoa, delegate, recipient, safe, token, module, guard, policyRegistry, snapshotHash };
+    return { ownerEoa, delegate, recipient, safe, token, module, safe7579Module, guard, policyRegistry, snapshotHash };
   }
 
   it("requires an anchored snapshot when the active policy says so", async function () {
@@ -91,6 +99,29 @@ describe("NeuralRateExecutionGuard", function () {
     await expect(
       otherModule.executeViaSafe(await safe.getAddress(), await token.getAddress(), 0, calldata)
     ).to.be.revertedWith("Untrusted module");
+  });
+
+  it("permits Safe7579 adapter entry while the VaultModule consumes policy", async function () {
+    const { module, safe, safe7579Module, token, ownerEoa, recipient, snapshotHash } = await deployFixture();
+    const amount = ethers.parseUnits("10", 18);
+    const intentHash = ethers.keccak256(ethers.toUtf8Bytes("aa-safe7579-entry"));
+    const calldata = token.interface.encodeFunctionData("transfer", [recipient.address, amount]);
+    const deadline = (await ethers.provider.getBlock("latest"))!.timestamp + 3600;
+    const moduleCall = module.interface.encodeFunctionData("executeVaultCall", [
+      ownerEoa.address,
+      await safe.getAddress(),
+      await token.getAddress(),
+      0,
+      calldata,
+      intentHash,
+      snapshotHash,
+      25,
+      deadline,
+    ]);
+
+    await expect(
+      safe7579Module.executeViaSafe(await safe.getAddress(), await module.getAddress(), 0, moduleCall)
+    ).to.emit(module, "VaultCallExecuted");
   });
 
   it("advertises the Safe module guard interface for Safe 1.5.0 installation", async function () {
