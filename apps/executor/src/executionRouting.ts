@@ -11,9 +11,27 @@ export const isVaultModuleStrategy = (strategyKey: string | null | undefined) =>
 export const shouldUseAARuntimeForStrategy = (args: {
   runtimeCanUseAA: boolean;
   strategyKey: string | null | undefined;
-}) => args.runtimeCanUseAA && !isVaultModuleStrategy(args.strategyKey);
+  paymasterConfigured?: boolean;
+}) => {
+  if (!args.runtimeCanUseAA) {
+    return false;
+  }
+  if (isVaultModuleStrategy(args.strategyKey)) {
+    return args.paymasterConfigured === true;
+  }
+  return true;
+};
 
 export const shouldUseAARuntimeForPlan = (args: {
   runtimeCanUseAA: boolean;
   protocolId: string | null | undefined;
-}) => args.runtimeCanUseAA && !isVaultModuleProtocol(args.protocolId);
+  paymasterConfigured?: boolean;
+}) => {
+  if (!args.runtimeCanUseAA) {
+    return false;
+  }
+  if (isVaultModuleProtocol(args.protocolId)) {
+    return args.paymasterConfigured === true;
+  }
+  return true;
+};

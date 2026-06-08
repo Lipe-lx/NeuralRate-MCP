@@ -230,6 +230,9 @@ export interface AutomationState {
     trustedModuleReady?: boolean;
     delegateGasReady?: boolean;
     delegateGasBalanceFormatted?: string | null;
+    paymasterConfigured?: boolean;
+    paymasterReady?: boolean;
+    gasPayer?: string | null;
     delegateReady?: boolean;
     installedDelegate?: string | null;
     nativeBalanceWei?: string | null;

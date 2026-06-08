@@ -127,6 +127,8 @@ const makeSnapshot = (): StateCatalogSnapshot => ({
       installed: "0xdelegate",
       nativeGasBalanceFormatted: "1",
       nativeGasReady: true,
+      paymasterReady: false,
+      gasPayer: "delegate-signer",
       ready: true,
     },
     guard: {

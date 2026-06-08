@@ -6,7 +6,7 @@ import { executeBenchmarkJob } from "./benchmarkExecutor.js";
 import { getApprovedStrategySurface, resolveExecutionPlan } from "./executionPlanner.js";
 import type { StrategyIntent } from "./executionRegistry.js";
 import { shouldUseAARuntimeForPlan, shouldUseAARuntimeForStrategy } from "./executionRouting.js";
-import { canUseAARuntime, getAARuntimeStatus, sendAAVaultUserOperation } from "./aaRuntime.js";
+import { canUseAARuntime, getAARuntimeStatus, hasAAPaymaster, sendAAVaultUserOperation } from "./aaRuntime.js";
 import { safeJsonStringify } from "./json.js";
 import { buildAnchorSnapshotCalldata, ensureAnchoredSnapshot, getActivePolicy } from "./onchainPolicy.js";
 import { getExecutorRuntime, initializeExecutorRuntime, initializeLocalExecutorRuntime } from "./runtime.js";
@@ -147,6 +147,9 @@ const server = createServer(async (request, response) => {
           enabled: canUseAARuntime(managedSigner) && Boolean(aaRuntimeStatus.selectedBundlerUrl),
           bundlerUrlsConfigured: config.aaBundlerUrls.length,
           selectedBundlerUrl: aaRuntimeStatus.selectedBundlerUrl,
+          selectedPaymasterUrl: aaRuntimeStatus.selectedPaymasterUrl,
+          paymasterConfigured: aaRuntimeStatus.paymasterConfigured,
+          gasPayer: aaRuntimeStatus.gasPayer,
           entryPointAddress: aaRuntimeStatus.entryPointAddress,
           safe7579AdapterAddress: config.safe7579AdapterAddress,
           safe7579LaunchpadAddress: config.safe7579LaunchpadAddress,
@@ -619,7 +622,12 @@ const server = createServer(async (request, response) => {
         }
 
         const runtimeCanUseAA = canUseAARuntime(managedSigner) && (body.executionDomain ?? "execution") === "execution";
-        const useAARuntimeForStrategy = shouldUseAARuntimeForStrategy({ runtimeCanUseAA, strategyKey });
+        const paymasterConfigured = hasAAPaymaster();
+        const useAARuntimeForStrategy = shouldUseAARuntimeForStrategy({
+          runtimeCanUseAA,
+          strategyKey,
+          paymasterConfigured,
+        });
 
         const anchoredSnapshot = await ensureAnchoredSnapshot({
           signer: managedSigner,
@@ -662,9 +670,11 @@ const server = createServer(async (request, response) => {
           aaRuntime: shouldUseAARuntimeForPlan({
             runtimeCanUseAA: useAARuntimeForStrategy,
             protocolId: resolvedPlan.protocolId,
+            paymasterConfigured,
           })
             ? "safe7579-delegate-validator"
             : "legacy-signer",
+          gasPayer: useAARuntimeForStrategy ? "paymaster" : "delegate-signer",
           anchoredSnapshot: anchoredSnapshot.anchored,
           strategyKey: resolvedPlan.strategyKey,
           strategyLabel: resolvedPlan.strategyLabel,
@@ -716,6 +726,7 @@ const server = createServer(async (request, response) => {
             shouldUseAARuntimeForPlan({
               runtimeCanUseAA: canUseAARuntime(managedSigner) && (body.executionDomain ?? "execution") === "execution",
               protocolId: typeof effectivePayload.protocolId === "string" ? effectivePayload.protocolId : null,
+              paymasterConfigured: hasAAPaymaster(),
             });
           let txHash: string;
           let userOpHash: string | null = null;
@@ -760,6 +771,7 @@ const server = createServer(async (request, response) => {
               ...effectivePayload,
               userOpHash,
               anchoredSnapshot: true,
+              gasPayer: aaExecution.gasPayer,
             };
           } else {
             txHash = await managedSigner.signAndSendTransaction({

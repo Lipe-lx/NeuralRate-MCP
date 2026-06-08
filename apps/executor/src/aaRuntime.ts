@@ -6,6 +6,7 @@ import {
 } from "viem";
 import {
   createBundlerClient,
+  createPaymasterClient,
   entryPoint07Abi,
   getUserOperationHash,
   toSmartAccount,
@@ -64,6 +65,9 @@ export type AARuntimeStatus = {
   signerCanSign: boolean;
   entryPointAddress: string;
   selectedBundlerUrl: string | null;
+  selectedPaymasterUrl: string | null;
+  paymasterConfigured: boolean;
+  gasPayer: "paymaster" | "smart-account-or-signer";
   endpoints: BundlerEndpointStatus[];
 };
 
@@ -107,6 +111,28 @@ let cachedBundlerStatus:
 
 const normalizeAddress = (value: string) => value.toLowerCase();
 const redactBundlerUrl = (url: string) => url.replace(/([?&](?:apikey|apiKey|key|token)=)[^&]+/gi, "$1<redacted>");
+const redactRpcUrl = redactBundlerUrl;
+
+export const hasAAPaymaster = () => Boolean(getExecutorRuntime().config.aaPaymasterUrl);
+
+const createPaymasterOptions = () => {
+  const { config } = getExecutorRuntime();
+  if (!config.aaPaymasterUrl) {
+    return {};
+  }
+
+  const paymasterClient = createPaymasterClient({
+    transport: http(config.aaPaymasterUrl),
+  });
+
+  return {
+    paymaster: {
+      getPaymasterData: paymasterClient.getPaymasterData,
+      getPaymasterStubData: paymasterClient.getPaymasterStubData,
+    },
+    ...(config.aaPaymasterContext === null ? {} : { paymasterContext: config.aaPaymasterContext }),
+  };
+};
 
 const estimateUserOperationFees = async () => {
   const { publicClient } = getExecutorRuntime();
@@ -221,6 +247,9 @@ export async function getAARuntimeStatus(signer: ManagedSigner, forceRefresh = f
     signerCanSign,
     entryPointAddress: config.aaEntryPointAddress,
     selectedBundlerUrl,
+    selectedPaymasterUrl: config.aaPaymasterUrl,
+    paymasterConfigured: Boolean(config.aaPaymasterUrl),
+    gasPayer: config.aaPaymasterUrl ? "paymaster" : "smart-account-or-signer",
     endpoints,
   };
 
@@ -331,6 +360,7 @@ export async function sendAAVaultUserOperation(args: {
     data: (call.data ?? "0x") as Hex,
   }));
   const fees = await estimateUserOperationFees();
+  const paymasterOptions = createPaymasterOptions();
 
   let userOpHash: Hex | null = null;
   let sendingBundlerUrl: string | null = null;
@@ -342,6 +372,7 @@ export async function sendAAVaultUserOperation(args: {
         account,
         chain,
         transport: http(bundlerUrl),
+        ...paymasterOptions,
       });
       const request = await bundlerClient.prepareUserOperation({
         account,
@@ -357,7 +388,8 @@ export async function sendAAVaultUserOperation(args: {
       sendingBundlerUrl = bundlerUrl;
       break;
     } catch (error) {
-      sendErrors.push(`${redactBundlerUrl(bundlerUrl)}: ${error instanceof Error ? error.message : String(error)}`);
+      const paymasterDetail = config.aaPaymasterUrl ? ` paymaster=${redactRpcUrl(config.aaPaymasterUrl)}` : "";
+      sendErrors.push(`${redactBundlerUrl(bundlerUrl)}${paymasterDetail}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -377,6 +409,7 @@ export async function sendAAVaultUserOperation(args: {
         account,
         chain,
         transport: http(bundlerUrl),
+        ...paymasterOptions,
       });
       const receipt = await bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
 
@@ -384,6 +417,8 @@ export async function sendAAVaultUserOperation(args: {
         userOpHash,
         txHash: receipt.receipt.transactionHash,
         bundlerUrl: sendingBundlerUrl,
+        gasPayer: config.aaPaymasterUrl ? "paymaster" : "smart-account-or-signer",
+        paymasterUrl: config.aaPaymasterUrl ?? null,
       };
     } catch (error) {
       lastReceiptError = error instanceof Error ? error.message : String(error);

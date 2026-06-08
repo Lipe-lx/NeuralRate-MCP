@@ -923,13 +923,16 @@ export const useNeuralRateUser = ({
     try {
       await enableRuntimeFromPlan();
       const refreshed = await refresh(ownerEoa);
+      const paymasterReady = refreshed?.runtimeState?.paymasterReady === true || refreshed?.runtimeState?.paymasterConfigured === true;
       if (refreshed?.automationReady) {
-        if (refreshed.runtimeState?.delegateGasReady === false) {
+        if (refreshed.runtimeState?.delegateGasReady === false && !paymasterReady) {
           setNotice("Automation runtime verified on-chain. Fund the delegate signer with MNT before asking the agent to execute or create receipts.");
+        } else if (paymasterReady) {
+          setNotice("Automation runtime verified on-chain. Paymaster gas sponsorship is active.");
         } else {
           setNotice("Automation runtime verified on-chain. Agent execution is ready.");
         }
-      } else if (isRuntimeInstallVerified(refreshed) && refreshed?.runtimeState?.delegateGasReady === false) {
+      } else if (isRuntimeInstallVerified(refreshed) && refreshed?.runtimeState?.delegateGasReady === false && !paymasterReady) {
         setNotice("Runtime setup verified on-chain. Fund the delegate signer with MNT before asking the agent to execute or create receipts.");
       } else {
         setNotice("Runtime setup is still pending on-chain. Review the checklist and retry after the wallet confirmations settle.");

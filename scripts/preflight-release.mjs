@@ -107,6 +107,7 @@ const checks = [
   ["Executor data API base URL", executorDataApiBaseUrlOk, executorDataApiBaseUrlDetail],
   ["Worker RPC URL", !isUnset(env.MANTLE_SEPOLIA_RPC_URL), env.MANTLE_SEPOLIA_RPC_URL || "missing"],
   ["Pimlico or explicit bundler URL", Boolean((env.PIMLICO_API_KEY || "").trim() || (env.NEURALRATE_4337_BUNDLER_URL || "").trim()), (env.PIMLICO_API_KEY || env.NEURALRATE_4337_BUNDLER_URL) ? "present" : "missing"],
+  ["Paymaster sponsorship", Boolean((env.PIMLICO_API_KEY || "").trim() || (env.NEURALRATE_PAYMASTER_RPC_URL || "").trim()), (env.PIMLICO_API_KEY || env.NEURALRATE_PAYMASTER_RPC_URL) ? "present" : "missing"],
   ["Turnkey Organization ID", !isUnset(env.TURNKEY_ORGANIZATION_ID), env.TURNKEY_ORGANIZATION_ID ? "present" : "missing"],
   ["Turnkey API Public Key", !isUnset(env.TURNKEY_API_PUBLIC_KEY), env.TURNKEY_API_PUBLIC_KEY ? "present" : "missing"],
   ["Turnkey API Private Key", !isUnset(env.TURNKEY_API_PRIVATE_KEY), env.TURNKEY_API_PRIVATE_KEY ? "present" : "missing"],

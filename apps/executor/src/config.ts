@@ -22,6 +22,8 @@ export type ExecutorConfig = {
   delegateValidatorAddress: string | null;
   aaBundlerUrl: string | null;
   aaBundlerUrls: string[];
+  aaPaymasterUrl: string | null;
+  aaPaymasterContext: unknown | null;
   aaEntryPointAddress: string;
   erc7484RegistryAddress: string;
   agentSmartWallet: string;
@@ -59,6 +61,18 @@ const parseList = (...values: Array<string | null>) =>
       .filter(Boolean)
   )];
 
+const parseOptionalJson = (value: string | null, name: string) => {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return null;
+  }
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch (error) {
+    throw new Error(`Environment variable ${name} must be valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+};
+
 const optionalAddress = (env: ExecutorEnvBindings, name: string) => {
   const value = optional(env, name)?.trim() || null;
   if (!value || value.toLowerCase() === ZERO_ADDRESS.toLowerCase()) {
@@ -85,6 +99,7 @@ export const createExecutorConfig = (env: ExecutorEnvBindings): ExecutorConfig =
   const derivedPrimary = pimlicoApiKey
     ? `https://api.pimlico.io/v2/${runtimeChainId}/rpc?apikey=${pimlicoApiKey.trim()}`
     : null;
+  const explicitPaymaster = optional(env, "NEURALRATE_PAYMASTER_RPC_URL");
 
   return {
     envProfile: optional(env, "NEURALRATE_ENV_PROFILE", "demo") ?? "demo",
@@ -108,6 +123,8 @@ export const createExecutorConfig = (env: ExecutorEnvBindings): ExecutorConfig =
     delegateValidatorAddress: optionalAddress(env, "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS"),
     aaBundlerUrl: explicitPrimary,
     aaBundlerUrls: parseList(explicitPrimary || derivedPrimary, explicitFallbacks),
+    aaPaymasterUrl: explicitPaymaster || derivedPrimary,
+    aaPaymasterContext: parseOptionalJson(optional(env, "NEURALRATE_PAYMASTER_CONTEXT_JSON"), "NEURALRATE_PAYMASTER_CONTEXT_JSON"),
     aaEntryPointAddress: required(env, "NEURALRATE_4337_ENTRYPOINT_ADDRESS", "0x0000000071727De22E5E9d8BAf0edAc6f37da032"),
     erc7484RegistryAddress: required(env, "NEURALRATE_ERC7484_REGISTRY_ADDRESS", "0x000000000069E2a187AEFFb852bF3cCdC95151B2"),
     agentSmartWallet: requiredAddress(env, "NEURALRATE_AGENT_SMART_WALLET"),

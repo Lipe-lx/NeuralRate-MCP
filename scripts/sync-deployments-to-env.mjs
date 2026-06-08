@@ -241,6 +241,7 @@ updateEnvFile("apps/worker/.dev.vars.example", [
   { key: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", value: delegateValidatorAddress || ZERO_ADDRESS, after: "NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS", style: "quoted" },
   { key: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", value: aaEntrypointAddress || ZERO_ADDRESS, after: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", style: "quoted" },
   { key: "NEURALRATE_ERC7484_REGISTRY_ADDRESS", value: erc7484RegistryAddress || ZERO_ADDRESS, after: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", style: "quoted" },
+  { key: "NEURALRATE_PAYMASTER_ENABLED", value: readOptionalEnv("NEURALRATE_PAYMASTER_ENABLED") || "true", after: "NEURALRATE_ERC7484_REGISTRY_ADDRESS", style: "quoted" },
   { key: "EXECUTOR_BASE_URL", value: readOptionalEnv("EXECUTOR_BASE_URL") || "http://127.0.0.1:8788", after: "INTERNAL_API_TOKEN", style: "quoted" },
 ]);
 
@@ -260,6 +261,7 @@ updateEnvFile("apps/worker/wrangler.toml", [
   { key: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", value: delegateValidatorAddress || "", after: "NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS", style: "tomlQuoted" },
   { key: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", value: aaEntrypointAddress || "", after: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", style: "tomlQuoted" },
   { key: "NEURALRATE_ERC7484_REGISTRY_ADDRESS", value: erc7484RegistryAddress || "", after: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", style: "tomlQuoted" },
+  { key: "NEURALRATE_PAYMASTER_ENABLED", value: readOptionalEnv("NEURALRATE_PAYMASTER_ENABLED") || "true", after: "NEURALRATE_ERC7484_REGISTRY_ADDRESS", style: "tomlQuoted" },
 ]);
 
 updateEnvFile("apps/executor/wrangler.toml", [
@@ -278,6 +280,8 @@ updateEnvFile("apps/executor/wrangler.toml", [
   { key: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", value: delegateValidatorAddress || "", after: "NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS", style: "tomlQuoted" },
   { key: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", value: aaEntrypointAddress || "", after: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", style: "tomlQuoted" },
   { key: "NEURALRATE_ERC7484_REGISTRY_ADDRESS", value: erc7484RegistryAddress || "", after: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", style: "tomlQuoted" },
+  { key: "NEURALRATE_PAYMASTER_RPC_URL", value: readOptionalEnv("NEURALRATE_PAYMASTER_RPC_URL") || "", after: "NEURALRATE_ERC7484_REGISTRY_ADDRESS", style: "tomlQuoted" },
+  { key: "NEURALRATE_PAYMASTER_CONTEXT_JSON", value: readOptionalEnv("NEURALRATE_PAYMASTER_CONTEXT_JSON") || "", after: "NEURALRATE_PAYMASTER_RPC_URL", style: "tomlQuoted" },
   { key: "NEURALRATE_AGENT_SMART_WALLET", value: readOptionalEnv("NEURALRATE_AGENT_SMART_WALLET") || "", after: "NEURALRATE_ERC7484_REGISTRY_ADDRESS", style: "tomlQuoted" },
   { key: "NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS", value: readOptionalEnv("NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS") || "", after: "NEURALRATE_AGENT_SMART_WALLET", style: "tomlQuoted" },
   { key: "NEURALRATE_SESSION_POLICY_VERSION", value: readOptionalEnv("NEURALRATE_SESSION_POLICY_VERSION") || "v1", after: "NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS", style: "tomlQuoted" },

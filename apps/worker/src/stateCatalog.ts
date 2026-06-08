@@ -105,6 +105,8 @@ export type ExecutionReadinessSnapshot = {
     installed: string | null;
     nativeGasBalanceFormatted: string | null;
     nativeGasReady: boolean;
+    paymasterReady: boolean;
+    gasPayer: string;
     ready: boolean;
   };
   guard: {
@@ -515,6 +517,7 @@ export function buildExecutionReadinessSnapshot(
   const onchainPolicy = asRecord(state.onchainPolicy) ?? asRecord(state.activeOnchainPolicy);
   const aa = asRecord(state.aa);
   const nativeGas = balances.nativeBalance;
+  const paymasterReady = asBoolean(runtimeState?.paymasterReady) || asBoolean(runtimeState?.paymasterConfigured);
 
   const blockedReasons: string[] = [];
   const warnings: string[] = [];
@@ -546,7 +549,7 @@ export function buildExecutionReadinessSnapshot(
   if (!asBoolean(runtimeState?.delegateReady)) {
     blockedReasons.push("Expected delegate session signer is not installed on the validator.");
   }
-  if (!asBoolean(runtimeState?.delegateGasReady)) {
+  if (!paymasterReady && !asBoolean(runtimeState?.delegateGasReady)) {
     blockedReasons.push("Delegate session signer has no native gas balance for direct execution and benchmark receipts.");
   }
   if (asString(activeGrant?.status) !== "active") {
@@ -603,7 +606,9 @@ export function buildExecutionReadinessSnapshot(
       expected: asString(aa?.agentSessionSignerAddress),
       installed: asString(runtimeState?.installedDelegate),
       nativeGasBalanceFormatted: asString(runtimeState?.delegateGasBalanceFormatted),
-      nativeGasReady: asBoolean(runtimeState?.delegateGasReady),
+      nativeGasReady: paymasterReady || asBoolean(runtimeState?.delegateGasReady),
+      paymasterReady,
+      gasPayer: paymasterReady ? "paymaster" : "delegate-signer",
       ready: asBoolean(runtimeState?.delegateReady),
     },
     guard: {

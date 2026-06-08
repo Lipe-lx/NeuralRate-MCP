@@ -100,6 +100,7 @@ export type RuntimeEnv = {
   NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS?: string;
   NEURALRATE_DELEGATE_VALIDATOR_ADDRESS?: string;
   NEURALRATE_4337_ENTRYPOINT_ADDRESS?: string;
+  NEURALRATE_PAYMASTER_ENABLED?: string;
   NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS?: string;
   NEURALRATE_VAULT_MODULE_ADDRESS?: string;
   NEURALRATE_USDY_TOKEN_ADDRESS?: string;
@@ -169,6 +170,9 @@ const isPolicyActiveNow = (policy: Record<string, unknown> | null, nowMs: number
   }
   return true;
 };
+
+const isPaymasterConfigured = (env: RuntimeEnv) =>
+  env.NEURALRATE_PAYMASTER_ENABLED?.trim().toLowerCase() === "true";
 
 export const deriveAutomationReady = (
   state: Record<string, unknown>,
@@ -582,6 +586,7 @@ export async function withOnchainPolicyState<T extends Record<string, unknown>>(
 
   if (vaultAddress) {
     try {
+      const paymasterConfigured = isPaymasterConfigured(env);
       const publicClient = buildPublicClient(env);
 
       if (policyRegistryAddress) {
@@ -706,6 +711,9 @@ export async function withOnchainPolicyState<T extends Record<string, unknown>>(
         delegateGasBalanceRaw: delegateGasBalance.toString(),
         delegateGasBalanceFormatted: formatUnits(delegateGasBalance, 18),
         delegateGasReady: delegateGasBalance > 0n,
+        paymasterConfigured,
+        paymasterReady: paymasterConfigured,
+        gasPayer: paymasterConfigured ? "paymaster" : "delegate-signer",
       };
     } catch {
       onchainPolicy = null;

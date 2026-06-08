@@ -149,6 +149,75 @@ test("execution readiness blocks when execution policy, grant domain, session do
   assert.equal(readiness.session.executionAllowed, false);
 });
 
+test("execution readiness does not require delegate gas when paymaster is ready", () => {
+  const now = Date.parse("2026-06-05T12:00:00.000Z");
+  const state = {
+    policySyncStatus: "in_sync",
+    runtimeState: {
+      safeDeployed: true,
+      vaultModuleEnabled: true,
+      safe7579Enabled: true,
+      fallbackHandlerReady: true,
+      moduleGuardReady: true,
+      trustedModuleReady: true,
+      delegateReady: true,
+      delegateGasBalanceFormatted: "0",
+      delegateGasReady: false,
+      paymasterReady: true,
+      installedDelegate: "0xdelegate",
+    },
+    onchainPolicy: {
+      policyVersion: "vault-v1",
+      validAfter: Math.floor((now - 60_000) / 1000),
+      validUntil: Math.floor((now + 60_000) / 1000),
+      maxPerUse: "1000",
+      maxDaily: "2500",
+      maxTotal: "10000",
+      maxSlippageBps: 50,
+      allowedAssets: ["MNT"],
+      allowedProtocols: ["neuralrate-vault-module"],
+    },
+    activeGrant: {
+      status: "active",
+      allowed_domains: ["state", "execution"],
+    },
+    activeMcpSession: {
+      status: "active",
+      allowed_domains: ["state", "execution"],
+    },
+    automationJobs: [],
+  } satisfies Record<string, unknown>;
+  const balances: VaultBalancesSnapshot = {
+    vaultAddress: "0xvault",
+    chainId: 5003,
+    asOf: "2026-06-05T12:00:00.000Z",
+    nativeBalance: {
+      asset: "MNT",
+      kind: "native",
+      address: null,
+      decimals: 18,
+      balanceRaw: "1000000000000000000",
+      balanceFormatted: "1",
+      hasBalance: true,
+      valuationUsd: null,
+      valuationSource: null,
+      readStatus: "live",
+      asOf: "2026-06-05T12:00:00.000Z",
+    },
+    tokenBalances: [],
+    spendableUsd: null,
+    sources: [],
+  };
+
+  const readiness = buildExecutionReadinessSnapshot(state, balances, buildPolicySurfaceSnapshot(state, now));
+
+  assert.equal(readiness.status, "ready");
+  assert.equal(readiness.delegate.nativeGasReady, true);
+  assert.equal(readiness.delegate.paymasterReady, true);
+  assert.equal(readiness.delegate.gasPayer, "paymaster");
+  assert.doesNotMatch(readiness.blockedReasons.join(" | "), /signer has no native gas balance/);
+});
+
 test("activity feed sorts newest events first and preserves benchmark linkage", () => {
   const now = Date.parse("2026-06-05T12:00:00.000Z");
   const feed = buildActivityFeedSnapshot({
@@ -265,6 +334,8 @@ test("scoped state reconciles deployed vault and detected funding from live bala
       installed: null,
       nativeGasBalanceFormatted: "1",
       nativeGasReady: true,
+      paymasterReady: false,
+      gasPayer: "delegate-signer",
       ready: true,
     },
     guard: {
