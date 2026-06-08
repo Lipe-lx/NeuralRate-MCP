@@ -9,6 +9,7 @@ import {
   MANTLE_CHAIN_NAME,
   MANTLE_CHAIN_ID,
   MANTLE_RPC_URL,
+  NEURALRATE_EXECUTION_GUARD_CONTRACT,
   SAFE_7579_ADAPTER_ADDRESS,
   SESSION_POLICY_VERSION,
   VAULT_MODULE_ADDRESS,
@@ -879,6 +880,27 @@ export const useNeuralRateUser = ({
     }
   };
 
+  const isRuntimeInstallVerified = (candidate: AutomationState | null | undefined) => {
+    const runtime = candidate?.runtimeState;
+    if (!runtime?.safeDeployed) {
+      return false;
+    }
+    if (VAULT_MODULE_ENABLED && !runtime.vaultModuleEnabled) {
+      return false;
+    }
+    if ((SAFE_7579_ADAPTER_ADDRESS || DELEGATE_VALIDATOR_ADDRESS) && (
+      !runtime.safe7579Enabled ||
+      !runtime.delegateReady ||
+      !(runtime.fallbackHandlerReady ?? runtime.fallbackReady)
+    )) {
+      return false;
+    }
+    if (NEURALRATE_EXECUTION_GUARD_CONTRACT && (!runtime.moduleGuardReady || !runtime.trustedModuleReady)) {
+      return false;
+    }
+    return true;
+  };
+
   const completeRuntimeSetup = async () => {
     if (!ownerEoa) {
       throw new Error("Connect a wallet before completing the runtime setup.");
@@ -891,6 +913,8 @@ export const useNeuralRateUser = ({
       const refreshed = await refresh(ownerEoa);
       if (refreshed?.automationReady) {
         setNotice("Automation runtime verified on-chain. Agent execution is ready.");
+      } else if (isRuntimeInstallVerified(refreshed) && refreshed?.runtimeState?.delegateGasReady === false) {
+        setNotice("Runtime setup verified on-chain. Fund the delegate signer with MNT before asking the agent to execute or create receipts.");
       } else {
         setNotice("Runtime setup is still pending on-chain. Review the checklist and retry after the wallet confirmations settle.");
       }

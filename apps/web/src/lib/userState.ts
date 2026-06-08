@@ -227,6 +227,9 @@ export interface AutomationState {
     fallbackReady?: boolean;
     fallbackHandlerReady?: boolean;
     moduleGuardReady?: boolean;
+    trustedModuleReady?: boolean;
+    delegateGasReady?: boolean;
+    delegateGasBalanceFormatted?: string | null;
     delegateReady?: boolean;
     installedDelegate?: string | null;
     nativeBalanceWei?: string | null;

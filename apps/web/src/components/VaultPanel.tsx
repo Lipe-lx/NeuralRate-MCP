@@ -1,9 +1,12 @@
 import React, { useState } from "react";
 import {
   DEMO_TARGET_ASSET,
+  DELEGATE_VALIDATOR_ADDRESS,
   MANAGED_SIGNER_PROVIDER,
   MANTLE_EXPLORER_BASE_URL,
+  NEURALRATE_EXECUTION_GUARD_CONTRACT,
   ONBOARDING_PROVIDER,
+  SAFE_7579_ADAPTER_ADDRESS,
   VAULT_PROVIDER_STRATEGY,
 } from "../config";
 import type { McpAccessBundle } from "../lib/mcpAccess";
@@ -156,33 +159,44 @@ const VaultPanel: React.FC<Props> = ({
       label: "Enable vault module",
       done: Boolean(state?.runtimeState?.vaultModuleEnabled),
     },
-    {
+    SAFE_7579_ADAPTER_ADDRESS ? {
       key: "safe7579",
       label: "Install Safe7579",
       done: Boolean(state?.runtimeState?.safe7579Enabled),
-    },
-    {
+    } : null,
+    DELEGATE_VALIDATOR_ADDRESS ? {
       key: "delegate",
       label: "Install delegate validator",
       done: Boolean(state?.runtimeState?.delegateReady),
-    },
-    {
+    } : null,
+    SAFE_7579_ADAPTER_ADDRESS ? {
       key: "fallback",
       label: "Enable fallback handler",
       done: Boolean(state?.runtimeState?.fallbackHandlerReady ?? state?.runtimeState?.fallbackReady),
-    },
-    {
+    } : null,
+    NEURALRATE_EXECUTION_GUARD_CONTRACT ? {
       key: "guard",
       label: "Enable execution guard",
       done: Boolean(state?.runtimeState?.moduleGuardReady),
-    },
-  ];
+    } : null,
+    NEURALRATE_EXECUTION_GUARD_CONTRACT ? {
+      key: "trusted_module",
+      label: "Trust vault module",
+      done: Boolean(state?.runtimeState?.trustedModuleReady),
+    } : null,
+    DELEGATE_VALIDATOR_ADDRESS ? {
+      key: "delegate_gas",
+      label: "Fund signer",
+      done: Boolean(state?.runtimeState?.delegateGasReady),
+    } : null,
+  ].filter((item): item is { key: string; label: string; done: boolean } => Boolean(item));
   const completedRuntimeSteps = runtimeChecklist.filter((item) => item.done).length;
+  const runtimeStepCount = runtimeChecklist.length;
   const aaRuntimeStatus = state?.automationReady
     ? "Ready"
     : hasAutomation
       ? completedRuntimeSteps > 0
-        ? `Partial ${completedRuntimeSteps}/5`
+        ? `Partial ${completedRuntimeSteps}/${runtimeStepCount}`
         : "Pending"
       : "Not enabled";
   const hasDemoQueued = (state?.automationJobs ?? []).length > 0;

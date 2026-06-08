@@ -941,14 +941,6 @@ export async function prepareVaultRuntimeEnable(
           mode: "wallet_tx",
         }
       : null,
-    needsSafe7579 && !runtime?.delegateGasReady
-      ? {
-          key: "fund_delegate_signer",
-          label: "Fund delegate signer",
-          required: true,
-          mode: "wallet_tx",
-        }
-      : null,
     needsSafe7579 && !runtime?.fallbackHandlerReady
       ? {
           key: "enable_fallback_handler",
@@ -990,6 +982,28 @@ export async function prepareVaultRuntimeEnable(
   };
 }
 
+export function isVaultRuntimeInstallReady(
+  runtime: Record<string, unknown> | null | undefined,
+  requirements: {
+    requiresVaultModule: boolean;
+    requiresSafe7579: boolean;
+    requiresExecutionGuard: boolean;
+  }
+) {
+  return Boolean(
+    runtime?.safeDeployed &&
+    (!requirements.requiresVaultModule || runtime.vaultModuleEnabled === true) &&
+    (
+      !requirements.requiresSafe7579 ||
+      (runtime.safe7579Enabled === true && runtime.delegateReady === true && runtime.fallbackHandlerReady === true)
+    ) &&
+    (
+      !requirements.requiresExecutionGuard ||
+      (runtime.moduleGuardReady === true && runtime.trustedModuleReady === true)
+    )
+  );
+}
+
 export async function submitVaultRuntimeEnable(
   store: AutomationStore,
   env: ExecutorEnv,
@@ -1011,12 +1025,11 @@ export async function submitVaultRuntimeEnable(
     }
     state = await readOnchainAutomationState(store, env, access);
     runtime = state.runtimeState;
-    ready = Boolean(
-      runtime?.safeDeployed &&
-      (!requiresVaultModule || runtime.vaultModuleEnabled) &&
-      (!requiresSafe7579 || (runtime.safe7579Enabled && runtime.delegateReady && runtime.delegateGasReady && runtime.fallbackHandlerReady)) &&
-      (!requiresExecutionGuard || (runtime.moduleGuardReady && runtime.trustedModuleReady))
-    );
+    ready = isVaultRuntimeInstallReady(runtime, {
+      requiresVaultModule,
+      requiresSafe7579,
+      requiresExecutionGuard,
+    });
     if (ready) {
       break;
     }
