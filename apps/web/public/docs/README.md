@@ -37,6 +37,8 @@ This directory contains the current documentation split into two groups:
   Health and audit endpoints plus operator runbook.
 - [build-warnings.md](build-warnings.md)
   Known third-party build warnings and escalation policy.
+- [security-dependency-triage.md](security-dependency-triage.md)
+  Current production-scope dependency audit findings and release posture.
 - [hackathon-submission.md](hackathon-submission.md)
   Factual submission notes aligned to the current repository state.
 

@@ -35,10 +35,12 @@ Legacy aliases also exist under `/sse/scoped/*`.
 
 Each scoped route requires:
 
-- `sessionToken` in the query string, or
-- `x-neuralrate-session-token` header
+- `x-neuralrate-session-token` header, preferred for browser and agent clients
+- `sessionToken` in the query string, legacy bootstrap fallback only
 
 If the token does not contain the required domain, the catalog is rejected before tool advertisement.
+
+Do not share scoped URLs containing query-string tokens in screenshots, logs, or issue reports. Prefer copyable header-based client configuration so the token is not stored in browser history, intermediary logs, or referrers.
 
 ## Public Tool Catalog
 

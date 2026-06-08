@@ -57,9 +57,13 @@ const main = async () => {
       'nansen_context',
       'risk_assess',
       'optimal_allocation',
+    ];
+    const scopedOnlyTools = [
       'get_decisions',
       'get_user_state',
       'list_jobs',
+      'update_agent_policy',
+      'execute_strategy',
     ];
     const unexpectedTools = listed.tools
       .map((tool) => tool.name)
@@ -72,6 +76,12 @@ const main = async () => {
     for (const toolName of requiredTools) {
       if (!toolNames.has(toolName)) {
         throw new Error(`Public tool missing from catalog: ${toolName}`);
+      }
+    }
+
+    for (const toolName of scopedOnlyTools) {
+      if (toolNames.has(toolName)) {
+        throw new Error(`Public MCP catalog exposed scoped-only tool: ${toolName}`);
       }
     }
 
@@ -133,36 +143,6 @@ const main = async () => {
       summary.toolCalls.update_agent_policy = summarizeContent(guardedMutation);
     } catch (error) {
       summary.toolCalls.update_agent_policy = {
-        isError: true,
-        text: error instanceof Error ? error.message : String(error),
-        structuredContent: null,
-      };
-    }
-
-    try {
-      const userState = await client.callTool({
-        name: 'get_user_state',
-        arguments: { ownerEoa: '0x0000000000000000000000000000000000000000' },
-      });
-      summary.toolCalls.get_user_state = summarizeContent(userState);
-      throw new Error('Public get_user_state should reject anonymous ownerEoa-only access.');
-    } catch (error) {
-      summary.toolCalls.get_user_state = {
-        isError: true,
-        text: error instanceof Error ? error.message : String(error),
-        structuredContent: null,
-      };
-    }
-
-    try {
-      const jobs = await client.callTool({
-        name: 'list_jobs',
-        arguments: { ownerEoa: '0x0000000000000000000000000000000000000000' },
-      });
-      summary.toolCalls.list_jobs = summarizeContent(jobs);
-      throw new Error('Public list_jobs should reject anonymous ownerEoa-only access.');
-    } catch (error) {
-      summary.toolCalls.list_jobs = {
         isError: true,
         text: error instanceof Error ? error.message : String(error),
         structuredContent: null,

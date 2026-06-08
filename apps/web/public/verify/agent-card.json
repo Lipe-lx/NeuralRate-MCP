@@ -13,10 +13,44 @@
         "tbill_spread",
         "nansen_context",
         "risk_assess",
-        "optimal_allocation",
-        "get_decisions",
-        "get_user_state",
-        "list_jobs"
+        "optimal_allocation"
+      ],
+      "transport": "streamable-http",
+      "legacyTransportAlias": "https://neuralrate-worker.neuralrate.workers.dev/sse",
+      "scopedCatalogs": [
+        {
+          "name": "state",
+          "endpoint": "https://neuralrate-worker.neuralrate.workers.dev/mcp/scoped/state",
+          "requiresHeader": "x-neuralrate-session-token",
+          "tools": [
+            "get_user_state",
+            "get_vault_balances",
+            "get_open_positions",
+            "get_execution_readiness",
+            "get_policy_surface",
+            "get_activity_feed",
+            "list_jobs",
+            "get_decisions",
+            "get_benchmark_history",
+            "get_decision_lineage",
+            "get_audit_summary"
+          ]
+        },
+        {
+          "name": "config",
+          "endpoint": "https://neuralrate-worker.neuralrate.workers.dev/mcp/scoped/config",
+          "requiresHeader": "x-neuralrate-session-token"
+        },
+        {
+          "name": "benchmark",
+          "endpoint": "https://neuralrate-worker.neuralrate.workers.dev/mcp/scoped/benchmark",
+          "requiresHeader": "x-neuralrate-session-token"
+        },
+        {
+          "name": "execution",
+          "endpoint": "https://neuralrate-worker.neuralrate.workers.dev/mcp/scoped/execution",
+          "requiresHeader": "x-neuralrate-session-token"
+        }
       ]
     }
   ],

@@ -20,6 +20,18 @@ NeuralRate MCP is a Mantle Sepolia worker and MCP server that anchors per-user v
 8. The executor anchors the referenced snapshot and writes the receipt transaction on-chain.
 9. The default live execution demo queues a real `MNT` transfer through the Safe module.
 
+## Final-Week Proof Checklist
+
+Before submitting, capture a fresh proof bundle from the live environment:
+
+- public MCP `/mcp` tools list showing only the five read-only advisory tools
+- scoped state MCP `get_execution_readiness` returning `ready`
+- active on-chain policy or policy publication transaction hash
+- latest successful execution or receipt transaction hash
+- screenshot of the verify page or operator history showing the same identifiers
+
+Do not reuse stale failed or blocked jobs as the main evidence trail. If a live execution is intentionally skipped, document the reason and submit readiness plus policy proof as the fallback evidence.
+
 ## Architecture Slide
 
 - **Worker**

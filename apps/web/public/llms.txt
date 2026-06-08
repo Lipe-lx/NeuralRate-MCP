@@ -12,17 +12,20 @@ NeuralRate MCP integrates decentralized finance (DeFi) yields, Nansen on-chain d
 *   [Risk Model Specification](/docs/risk-model.md): Deterministic 6-factor risk formula with thresholds and worked examples.
 
 ## Callable Model Context Protocol (MCP) Tools
-The public server exposes the following tools at `/mcp` over Server-Sent Events (SSE):
+The public server exposes the following read-only advisory tools at `/mcp` over Streamable HTTP. `/sse` remains available only as a legacy compatibility alias:
 1.  `yield_scan`: Scans major Mantle venues (Agni, Merchant Moe, Lendle) for APY/TVL.
 2.  `tbill_spread`: Calculates basis points spread over US 3-Month Treasury Bill rate.
 3.  `nansen_context`: Fetches real-time institutional Smart Money flows and labels for assets.
 4.  `risk_assess`: Evaluates the deterministic 6-factor risk metrics returning a 0-100 score.
 5.  `optimal_allocation`: Distributes capital dynamically based on user risk policies and allowance presets.
-6.  `get_decisions`: Fetches historical recommendation ledgers with pagination.
-7.  `get_user_state`: Returns indexed vault, grant, job, and on-chain policy overlay state.
-8.  `list_jobs`: Returns benchmark and execution job history.
 
-Scoped mutation routes exist separately at `/mcp/scoped/config`, `/mcp/scoped/benchmark`, and `/mcp/scoped/execution`.
+Vault-bound state and mutation tools require a short-lived scoped MCP session. Present `x-neuralrate-session-token` as a request header when connecting to scoped routes; `sessionToken` in the query string is supported only as a legacy bootstrap fallback.
+
+Scoped routes:
+*   `/mcp/scoped/state`: session-bound vault, policy, readiness, audit, job, and decision history tools.
+*   `/mcp/scoped/config`: policy, runtime, and grant configuration flows.
+*   `/mcp/scoped/benchmark`: benchmark history and receipt queueing flows.
+*   `/mcp/scoped/execution`: governed strategy execution tools that preflight against policy and runtime state.
 
 ## On-Chain Deployments
 *   **Target Chain:** Mantle Sepolia Testnet (Chain ID `5003`)

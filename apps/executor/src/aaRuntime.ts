@@ -41,6 +41,8 @@ const safe7579Abi = [
 const MODE_SINGLE = `0x${"00".repeat(32)}` as Hex;
 const MODE_BATCH = `0x01${"00".repeat(31)}` as Hex;
 const STUB_SIGNATURE = `0x${"11".repeat(65)}` as Hex;
+const FALLBACK_MAX_PRIORITY_FEE_PER_GAS = 1_000_000n;
+const FALLBACK_MAX_FEE_PER_GAS = 50_000_000n;
 
 type AARuntimeCall = {
   to: string;
@@ -104,6 +106,43 @@ let cachedBundlerStatus:
   | null = null;
 
 const normalizeAddress = (value: string) => value.toLowerCase();
+const redactBundlerUrl = (url: string) => url.replace(/([?&](?:apikey|apiKey|key|token)=)[^&]+/gi, "$1<redacted>");
+
+const estimateUserOperationFees = async () => {
+  const { publicClient } = getExecutorRuntime();
+  try {
+    const estimated = await publicClient.estimateFeesPerGas();
+    const maxPriorityFeePerGas =
+      estimated.maxPriorityFeePerGas && estimated.maxPriorityFeePerGas > 0n
+        ? estimated.maxPriorityFeePerGas
+        : FALLBACK_MAX_PRIORITY_FEE_PER_GAS;
+    const maxFeePerGas =
+      estimated.maxFeePerGas && estimated.maxFeePerGas >= maxPriorityFeePerGas
+        ? estimated.maxFeePerGas
+        : maxPriorityFeePerGas + FALLBACK_MAX_FEE_PER_GAS;
+
+    return {
+      maxFeePerGas,
+      maxPriorityFeePerGas,
+    };
+  } catch {
+    try {
+      const gasPrice = await publicClient.getGasPrice();
+      const maxPriorityFeePerGas = gasPrice > FALLBACK_MAX_PRIORITY_FEE_PER_GAS
+        ? FALLBACK_MAX_PRIORITY_FEE_PER_GAS
+        : gasPrice;
+      return {
+        maxFeePerGas: gasPrice + maxPriorityFeePerGas,
+        maxPriorityFeePerGas,
+      };
+    } catch {
+      return {
+        maxFeePerGas: FALLBACK_MAX_FEE_PER_GAS,
+        maxPriorityFeePerGas: FALLBACK_MAX_PRIORITY_FEE_PER_GAS,
+      };
+    }
+  }
+};
 
 const callBundlerRpc = async (url: string, method: string, params: unknown[] = []) => {
   const response = await fetch(url, {
@@ -291,6 +330,7 @@ export async function sendAAVaultUserOperation(args: {
     value: call.value ?? 0n,
     data: (call.data ?? "0x") as Hex,
   }));
+  const fees = await estimateUserOperationFees();
 
   let userOpHash: Hex | null = null;
   let sendingBundlerUrl: string | null = null;
@@ -303,14 +343,21 @@ export async function sendAAVaultUserOperation(args: {
         chain,
         transport: http(bundlerUrl),
       });
-      userOpHash = await bundlerClient.sendUserOperation({
+      const request = await bundlerClient.prepareUserOperation({
         account,
         calls,
+        ...fees,
+      });
+      if (!request.maxFeePerGas || !request.maxPriorityFeePerGas) {
+        throw new Error("Bundler prepareUserOperation did not populate required gas fee fields.");
+      }
+      userOpHash = await bundlerClient.sendUserOperation({
+        ...request,
       });
       sendingBundlerUrl = bundlerUrl;
       break;
     } catch (error) {
-      sendErrors.push(`${bundlerUrl}: ${error instanceof Error ? error.message : String(error)}`);
+      sendErrors.push(`${redactBundlerUrl(bundlerUrl)}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

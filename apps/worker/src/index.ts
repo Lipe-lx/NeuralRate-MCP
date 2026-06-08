@@ -145,6 +145,22 @@ const getInternalApiToken = (env: Env) =>
 
 const MCP_CANONICAL_ROUTE = "/mcp";
 const MCP_SSE_ALIAS_ROUTE = "/sse";
+const CORS_ALLOW_METHODS = "GET, POST, PATCH, DELETE, OPTIONS";
+const CORS_ALLOW_HEADERS = [
+  "Content-Type",
+  "Accept",
+  "Authorization",
+  "X-NeuralRate-Internal-Token",
+  "X-NeuralRate-Auth-Owner-Eoa",
+  "X-NeuralRate-Auth-Nonce",
+  "X-NeuralRate-Auth-Issued-At",
+  "X-NeuralRate-Auth-Expires-At",
+  "X-NeuralRate-Auth-Signature",
+  "X-NeuralRate-Session-Token",
+  "x-neuralrate-session-token",
+  "mcp-session-id",
+  "mcp-protocol-version",
+].join(", ");
 
 const readJsonBody = async <T>(request: Request) => (await request.json()) as T;
 const jsonText = (value: unknown) => JSON.stringify(value, null, 2);
@@ -159,6 +175,38 @@ const buildJsonResourceResult = (uri: string, value: unknown) => ({
     text: jsonText(value),
   }],
 });
+const applyCorsHeaders = (headers: Headers) => {
+  headers.set("Access-Control-Allow-Origin", "*");
+  headers.set("Access-Control-Allow-Methods", CORS_ALLOW_METHODS);
+  headers.set("Access-Control-Allow-Headers", CORS_ALLOW_HEADERS);
+  return headers;
+};
+
+const compactMcpText = (value: string, maxLength = 600) => {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  const redactedHex = normalized.replace(/\b0x[a-fA-F0-9]{67,}\b/g, (match) => `${match.slice(0, 10)}...${match.slice(-8)}`);
+  return redactedHex.length > maxLength ? `${redactedHex.slice(0, maxLength - 3)}...` : redactedHex;
+};
+
+const sanitizeJobRecordForMcp = (record: Record<string, unknown>) => {
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (key === "payload_json") {
+      sanitized.payload_json_omitted = true;
+      continue;
+    }
+    if (key === "failure_reason" && typeof value === "string") {
+      sanitized.failure_reason = compactMcpText(value);
+      continue;
+    }
+    if (typeof value === "string" && value.length > 800) {
+      sanitized[key] = compactMcpText(value);
+      continue;
+    }
+    sanitized[key] = value;
+  }
+  return sanitized;
+};
 
 const getAuthEnvelope = (body: unknown) => {
   if (!body || typeof body !== "object") {
@@ -794,7 +842,11 @@ export class NeuralRateStateMcpAgent extends McpAgent<Env, Record<string, never>
           automation.listAutomationJobs(scoped.ownerEoa),
           automation.listBenchmarkJobs(scoped.ownerEoa),
         ]);
-        const structured = { automationJobs, benchmarkJobs };
+        const structured = {
+          automationJobs: automationJobs.map((job) => sanitizeJobRecordForMcp(job as Record<string, unknown>)),
+          benchmarkJobs: benchmarkJobs.map((job) => sanitizeJobRecordForMcp(job as Record<string, unknown>)),
+          note: "Large payload_json fields are omitted from MCP list_jobs output; use internal logs or database access for full raw payloads.",
+        };
         return {
           content: [{ type: "text", text: JSON.stringify(structured, null, 2) }],
           structuredContent: structured,
@@ -1328,20 +1380,8 @@ export default {
       return new Response(null, {
         headers: {
           "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
-          "Access-Control-Allow-Headers": [
-            "Content-Type",
-            "X-NeuralRate-Internal-Token",
-            "X-NeuralRate-Auth-Owner-Eoa",
-            "X-NeuralRate-Auth-Nonce",
-            "X-NeuralRate-Auth-Issued-At",
-            "X-NeuralRate-Auth-Expires-At",
-            "X-NeuralRate-Auth-Signature",
-            "X-NeuralRate-Session-Token",
-            "mcp-session-id",
-            "mcp-protocol-version",
-            "Accept",
-          ].join(", "),
+          "Access-Control-Allow-Methods": CORS_ALLOW_METHODS,
+          "Access-Control-Allow-Headers": CORS_ALLOW_HEADERS,
         },
       });
     }
@@ -2412,7 +2452,7 @@ export default {
 
       const mcpResponse = await (scopedAgent as any).serve(scopedCatalog.route, { binding: scopedBinding }).fetch(mcpRequest, env, ctx);
       const newHeaders = new Headers(mcpResponse.headers);
-      newHeaders.set("Access-Control-Allow-Origin", "*");
+      applyCorsHeaders(newHeaders);
       const issuedMcpSessionId = mcpResponse.headers.get("mcp-session-id");
       if (!request.headers.get("mcp-session-id") && issuedMcpSessionId) {
         await bindScopedMcpSession(env, scopedCatalog.domain, issuedMcpSessionId, await requireScopedCatalogAccess(request, env, scopedCatalog.domain));
@@ -2440,7 +2480,7 @@ export default {
         .fetch(mcpRequest, env, ctx);
       // We must add CORS headers to the SSE response if the frontend tries to connect via EventSource
       const newHeaders = new Headers(mcpResponse.headers);
-      newHeaders.set("Access-Control-Allow-Origin", "*");
+      applyCorsHeaders(newHeaders);
       return new Response(mcpResponse.body, {
         status: mcpResponse.status,
         statusText: mcpResponse.statusText,
