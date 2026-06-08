@@ -78,6 +78,16 @@ const delegateValidatorAbi = [
   },
 ] as const;
 
+const executionGuardAbi = [
+  {
+    type: "function",
+    name: "trustedModule",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
+] as const;
+
 export type RuntimeEnv = {
   MANTLE_SEPOLIA_RPC_URL?: string;
   MANTLE_SEPOLIA_RPC_FALLBACK_URL?: string;
@@ -185,7 +195,9 @@ export const deriveAutomationReady = (
     runtimeState?.safe7579Enabled === true &&
     runtimeState?.fallbackHandlerReady === true &&
     runtimeState?.moduleGuardReady === true &&
-    runtimeState?.delegateReady === true
+    runtimeState?.trustedModuleReady === true &&
+    runtimeState?.delegateReady === true &&
+    runtimeState?.delegateGasReady === true
   );
 };
 
@@ -612,7 +624,16 @@ export async function withOnchainPolicyState<T extends Record<string, unknown>>(
         }
       }
 
-      const [vaultCode, vaultModuleEnabled, safe7579Enabled, fallbackHandler, moduleGuard, installedDelegate] = await Promise.all([
+      const [
+        vaultCode,
+        vaultModuleEnabled,
+        safe7579Enabled,
+        fallbackHandler,
+        moduleGuard,
+        installedDelegate,
+        trustedModule,
+        delegateGasBalance,
+      ] = await Promise.all([
         publicClient.getCode({ address: vaultAddress as Address }).catch(() => undefined),
         env.NEURALRATE_VAULT_MODULE_ADDRESS
           ? publicClient.readContract({
@@ -646,6 +667,18 @@ export async function withOnchainPolicyState<T extends Record<string, unknown>>(
               args: [vaultAddress as Address],
             }).catch(() => ZERO_ADDRESS)
           : Promise.resolve(ZERO_ADDRESS),
+        env.NEURALRATE_EXECUTION_GUARD_CONTRACT
+          ? publicClient.readContract({
+              address: env.NEURALRATE_EXECUTION_GUARD_CONTRACT as Address,
+              abi: executionGuardAbi,
+              functionName: "trustedModule",
+            }).catch(() => ZERO_ADDRESS)
+          : Promise.resolve(ZERO_ADDRESS),
+        env.NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS && isAddress(env.NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS)
+          ? publicClient.getBalance({
+              address: env.NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS as Address,
+            }).catch(() => 0n)
+          : Promise.resolve(0n),
       ]);
 
       runtimeState = {
@@ -664,10 +697,17 @@ export async function withOnchainPolicyState<T extends Record<string, unknown>>(
         moduleGuardReady: env.NEURALRATE_EXECUTION_GUARD_CONTRACT
           ? String(moduleGuard).toLowerCase() === env.NEURALRATE_EXECUTION_GUARD_CONTRACT.toLowerCase()
           : false,
+        trustedModule: String(trustedModule).toLowerCase(),
+        trustedModuleReady: env.NEURALRATE_VAULT_MODULE_ADDRESS
+          ? String(trustedModule).toLowerCase() === env.NEURALRATE_VAULT_MODULE_ADDRESS.toLowerCase()
+          : false,
         installedDelegate: String(installedDelegate).toLowerCase(),
         delegateReady: env.NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS
           ? String(installedDelegate).toLowerCase() === env.NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS.toLowerCase()
           : false,
+        delegateGasBalanceRaw: delegateGasBalance.toString(),
+        delegateGasBalanceFormatted: formatUnits(delegateGasBalance, 18),
+        delegateGasReady: delegateGasBalance > 0n,
       };
     } catch {
       onchainPolicy = null;
@@ -718,6 +758,7 @@ export async function withOnchainPolicyState<T extends Record<string, unknown>>(
     aa: {
       policyRegistryContract: env.NEURALRATE_POLICY_REGISTRY_CONTRACT ?? null,
       executionGuardContract: env.NEURALRATE_EXECUTION_GUARD_CONTRACT ?? null,
+      vaultModuleAddress: env.NEURALRATE_VAULT_MODULE_ADDRESS ?? null,
       safe4337ModuleAddress: env.NEURALRATE_SAFE_4337_MODULE_ADDRESS ?? null,
       safe7579AdapterAddress: env.NEURALRATE_SAFE_7579_ADAPTER_ADDRESS ?? null,
       safe7579LaunchpadAddress: env.NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS ?? null,

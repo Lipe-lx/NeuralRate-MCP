@@ -292,6 +292,7 @@ export const resolveExecutionPlan = async (
   ];
 
   let targetContract = protocol.address;
+  let policyTargetContract = protocol.address;
   let targetSelector = action.selector;
   let executionSummary = validationFailure
     ? `Strategy ${strategy.label} is blocked until all policy and deployment checks pass.`
@@ -331,7 +332,8 @@ export const resolveExecutionPlan = async (
             : null,
           intentHash,
         });
-        targetContract = routedTransfer.targetContract;
+        targetContract = protocol.address;
+        policyTargetContract = routedTransfer.targetContract;
         targetSelector = ERC20_TRANSFER_SELECTOR;
         calldata = buildVaultExecutionModuleCalldata({
           ownerEoa: context.ownerEoa.toLowerCase() as Address,
@@ -397,7 +399,8 @@ export const resolveExecutionPlan = async (
           amountUsd,
           amountToken,
         });
-        targetContract = routedTransfer.targetContract;
+        targetContract = protocol.address;
+        policyTargetContract = routedTransfer.targetContract;
         targetSelector = NATIVE_TRANSFER_SELECTOR;
         calldata = buildVaultExecutionModuleCalldata({
           ownerEoa: context.ownerEoa.toLowerCase() as Address,
@@ -460,7 +463,8 @@ export const resolveExecutionPlan = async (
           amountUsd,
           amountToken,
         });
-        targetContract = approval.targetContract;
+        targetContract = protocol.address;
+        policyTargetContract = approval.targetContract;
         targetSelector = ERC20_APPROVE_SELECTOR;
         calldata = buildVaultExecutionModuleCalldata({
           ownerEoa: context.ownerEoa.toLowerCase() as Address,
@@ -505,14 +509,14 @@ export const resolveExecutionPlan = async (
     }
   }
 
-  if (targetContract && targetSelector) {
+  if (policyTargetContract && targetSelector) {
     policyChecks.push(
       makePolicyCheck(
         "policy-allowed-targets",
-        normalizedAllowedTargets.length === 0 || normalizedAllowedTargets.includes(targetContract.toLowerCase()),
+        normalizedAllowedTargets.length === 0 || normalizedAllowedTargets.includes(policyTargetContract.toLowerCase()),
         normalizedAllowedTargets.length === 0
           ? "Active on-chain policy does not narrow allowed target contracts."
-          : `${targetContract.toLowerCase()} ${normalizedAllowedTargets.includes(targetContract.toLowerCase()) ? "is" : "is not"} present in the on-chain target allowlist.`,
+          : `${policyTargetContract.toLowerCase()} ${normalizedAllowedTargets.includes(policyTargetContract.toLowerCase()) ? "is" : "is not"} present in the on-chain target allowlist.`,
       ),
       makePolicyCheck(
         "policy-allowed-selectors",

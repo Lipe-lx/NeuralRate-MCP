@@ -103,11 +103,16 @@ export type ExecutionReadinessSnapshot = {
   delegate: {
     expected: string | null;
     installed: string | null;
+    nativeGasBalanceFormatted: string | null;
+    nativeGasReady: boolean;
     ready: boolean;
   };
   guard: {
     expected: string | null;
     installed: string | null;
+    trustedModuleExpected: string | null;
+    trustedModuleInstalled: string | null;
+    trustedModuleReady: boolean;
     ready: boolean;
   };
   module: {
@@ -535,8 +540,14 @@ export function buildExecutionReadinessSnapshot(
   if (!asBoolean(runtimeState?.moduleGuardReady)) {
     blockedReasons.push("Execution guard is not installed as the active module guard.");
   }
+  if (!asBoolean(runtimeState?.trustedModuleReady)) {
+    blockedReasons.push("Execution guard does not trust the configured vault execution module.");
+  }
   if (!asBoolean(runtimeState?.delegateReady)) {
     blockedReasons.push("Expected delegate session signer is not installed on the validator.");
+  }
+  if (!asBoolean(runtimeState?.delegateGasReady)) {
+    blockedReasons.push("Delegate session signer has no native gas balance for direct execution and benchmark receipts.");
   }
   if (asString(activeGrant?.status) !== "active") {
     blockedReasons.push("Active automation grant is missing or not active.");
@@ -591,11 +602,16 @@ export function buildExecutionReadinessSnapshot(
     delegate: {
       expected: asString(aa?.agentSessionSignerAddress),
       installed: asString(runtimeState?.installedDelegate),
+      nativeGasBalanceFormatted: asString(runtimeState?.delegateGasBalanceFormatted),
+      nativeGasReady: asBoolean(runtimeState?.delegateGasReady),
       ready: asBoolean(runtimeState?.delegateReady),
     },
     guard: {
       expected: asString(aa?.executionGuardContract),
       installed: asString(runtimeState?.moduleGuard),
+      trustedModuleExpected: asString(aa?.vaultModuleAddress),
+      trustedModuleInstalled: asString(runtimeState?.trustedModule),
+      trustedModuleReady: asBoolean(runtimeState?.trustedModuleReady),
       ready: asBoolean(runtimeState?.moduleGuardReady),
     },
     module: {

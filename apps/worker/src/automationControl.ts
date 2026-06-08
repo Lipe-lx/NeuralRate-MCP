@@ -941,6 +941,14 @@ export async function prepareVaultRuntimeEnable(
           mode: "wallet_tx",
         }
       : null,
+    needsSafe7579 && !runtime?.delegateGasReady
+      ? {
+          key: "fund_delegate_signer",
+          label: "Fund delegate signer",
+          required: true,
+          mode: "wallet_tx",
+        }
+      : null,
     needsSafe7579 && !runtime?.fallbackHandlerReady
       ? {
           key: "enable_fallback_handler",
@@ -953,6 +961,14 @@ export async function prepareVaultRuntimeEnable(
       ? {
           key: "enable_execution_guard",
           label: "Enable execution guard",
+          required: true,
+          mode: "wallet_tx",
+        }
+      : null,
+    env.NEURALRATE_EXECUTION_GUARD_CONTRACT && !runtime?.trustedModuleReady
+      ? {
+          key: "configure_execution_guard_trusted_module",
+          label: "Trust vault module",
           required: true,
           mode: "wallet_tx",
         }
@@ -998,8 +1014,8 @@ export async function submitVaultRuntimeEnable(
     ready = Boolean(
       runtime?.safeDeployed &&
       (!requiresVaultModule || runtime.vaultModuleEnabled) &&
-      (!requiresSafe7579 || (runtime.safe7579Enabled && runtime.delegateReady && runtime.fallbackHandlerReady)) &&
-      (!requiresExecutionGuard || runtime.moduleGuardReady)
+      (!requiresSafe7579 || (runtime.safe7579Enabled && runtime.delegateReady && runtime.delegateGasReady && runtime.fallbackHandlerReady)) &&
+      (!requiresExecutionGuard || (runtime.moduleGuardReady && runtime.trustedModuleReady))
     );
     if (ready) {
       break;

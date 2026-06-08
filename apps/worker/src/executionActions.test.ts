@@ -125,11 +125,16 @@ const makeSnapshot = (): StateCatalogSnapshot => ({
     delegate: {
       expected: "0xdelegate",
       installed: "0xdelegate",
+      nativeGasBalanceFormatted: "1",
+      nativeGasReady: true,
       ready: true,
     },
     guard: {
       expected: "0xguard",
       installed: "0xguard",
+      trustedModuleExpected: "0xmodule",
+      trustedModuleInstalled: "0xmodule",
+      trustedModuleReady: true,
       ready: true,
     },
     module: {

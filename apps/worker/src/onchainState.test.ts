@@ -106,7 +106,9 @@ test("deriveAutomationReady requires active execution scope, synced policy, and 
     safe7579Enabled: true,
     fallbackHandlerReady: true,
     moduleGuardReady: true,
+    trustedModuleReady: true,
     delegateReady: true,
+    delegateGasReady: true,
   };
   const onchainPolicy = {
     validAfter: Math.floor(Date.parse("2026-06-05T18:00:00.000Z") / 1000),
@@ -120,6 +122,14 @@ test("deriveAutomationReady requires active execution scope, synced policy, and 
   );
   assert.equal(
     deriveAutomationReady(baseState, { ...runtimeState, vaultModuleEnabled: false }, onchainPolicy, "in_sync", nowMs),
+    false,
+  );
+  assert.equal(
+    deriveAutomationReady(baseState, { ...runtimeState, trustedModuleReady: false }, onchainPolicy, "in_sync", nowMs),
+    false,
+  );
+  assert.equal(
+    deriveAutomationReady(baseState, { ...runtimeState, delegateGasReady: false }, onchainPolicy, "in_sync", nowMs),
     false,
   );
   assert.equal(

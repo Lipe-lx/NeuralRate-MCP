@@ -88,13 +88,18 @@ test("execution readiness blocks when execution policy, grant domain, session do
       safe7579Enabled: false,
       fallbackHandlerReady: false,
       moduleGuardReady: false,
+      trustedModule: "0xmodule",
+      trustedModuleReady: false,
       installedDelegate: "0xinstalled",
       delegateReady: false,
+      delegateGasBalanceFormatted: "0",
+      delegateGasReady: false,
       moduleGuard: "0xguard",
     },
     aa: {
       agentSessionSignerAddress: "0xexpecteddelegate",
       executionGuardContract: "0xexpectedguard",
+      vaultModuleAddress: "0xexpectedmodule",
     },
     activeGrant: {
       grant_id: "grant_1",
@@ -137,6 +142,8 @@ test("execution readiness blocks when execution policy, grant domain, session do
   assert.equal(readiness.status, "blocked");
   assert.match(readiness.blockedReasons.join(" | "), /No active on-chain execution policy/);
   assert.match(readiness.blockedReasons.join(" | "), /does not include the execution domain/);
+  assert.match(readiness.blockedReasons.join(" | "), /does not trust the configured vault execution module/);
+  assert.match(readiness.blockedReasons.join(" | "), /signer has no native gas balance/);
   assert.match(readiness.blockedReasons.join(" | "), /no native gas balance/i);
   assert.equal(readiness.grant.executionAllowed, false);
   assert.equal(readiness.session.executionAllowed, false);
@@ -256,11 +263,16 @@ test("scoped state reconciles deployed vault and detected funding from live bala
     delegate: {
       expected: null,
       installed: null,
+      nativeGasBalanceFormatted: "1",
+      nativeGasReady: true,
       ready: true,
     },
     guard: {
       expected: null,
       installed: null,
+      trustedModuleExpected: null,
+      trustedModuleInstalled: null,
+      trustedModuleReady: true,
       ready: true,
     },
     module: {

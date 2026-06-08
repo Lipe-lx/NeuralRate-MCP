@@ -120,7 +120,12 @@ test("resolveExecutionPlan prepares a real MNT Safe-module transfer on Mantle Se
 
     assert.equal(plan.validationStatus, "ready");
     assert.equal(plan.targetAsset, "MNT");
+    assert.equal(plan.targetContract, protocolRegistry["neuralrate-vault-module-v1"].address);
     assert.notEqual(plan.calldata, null);
+    assert.equal(
+      plan.policyChecks.find((check) => check.check === "policy-allowed-targets")?.detail,
+      "Active on-chain policy does not narrow allowed target contracts.",
+    );
     assert.match(plan.executionSummary, new RegExp(recipientAddress, "i"));
     assert.equal(plan.intent.recipientAddress, recipientAddress);
   });
@@ -163,6 +168,7 @@ test("resolveExecutionPlan prepares a USDY wallet transfer through the Safe modu
 
       assert.equal(plan.validationStatus, "ready");
       assert.equal(plan.targetAsset, "USDY");
+      assert.equal(plan.targetContract, protocolRegistry["neuralrate-vault-module-v1"].address);
       assert.equal(plan.intent.recipientAddress, recipientAddress);
       assert.match(plan.executionSummary, new RegExp(recipientAddress, "i"));
     });
@@ -205,6 +211,7 @@ test("resolveExecutionPlan prepares a USDY approval through the Safe module", as
       );
 
       assert.equal(plan.validationStatus, "ready");
+      assert.equal(plan.targetContract, protocolRegistry["neuralrate-vault-module-v1"].address);
       assert.equal(plan.intent.spenderAddress, spenderAddress);
       assert.match(plan.executionSummary, new RegExp(spenderAddress, "i"));
     });

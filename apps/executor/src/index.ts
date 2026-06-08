@@ -5,6 +5,7 @@ import { buildBenchmarkPolicy, buildExecutionPolicy } from "./policy.js";
 import { executeBenchmarkJob } from "./benchmarkExecutor.js";
 import { getApprovedStrategySurface, resolveExecutionPlan } from "./executionPlanner.js";
 import type { StrategyIntent } from "./executionRegistry.js";
+import { shouldUseAARuntimeForPlan, shouldUseAARuntimeForStrategy } from "./executionRouting.js";
 import { canUseAARuntime, getAARuntimeStatus, sendAAVaultUserOperation } from "./aaRuntime.js";
 import { safeJsonStringify } from "./json.js";
 import { buildAnchorSnapshotCalldata, ensureAnchoredSnapshot, getActivePolicy } from "./onchainPolicy.js";
@@ -617,7 +618,8 @@ const server = createServer(async (request, response) => {
           throw new Error("No active on-chain policy found for this vault.");
         }
 
-        const useAARuntime = canUseAARuntime(managedSigner) && (body.executionDomain ?? "execution") === "execution";
+        const runtimeCanUseAA = canUseAARuntime(managedSigner) && (body.executionDomain ?? "execution") === "execution";
+        const useAARuntimeForStrategy = shouldUseAARuntimeForStrategy({ runtimeCanUseAA, strategyKey });
 
         const anchoredSnapshot = await ensureAnchoredSnapshot({
           signer: managedSigner,
@@ -625,7 +627,7 @@ const server = createServer(async (request, response) => {
           snapshotHash: normalizedIntent.snapshotHash,
           snapshotCid: normalizedIntent.snapshotCid,
           descriptor: `strategy:${strategyKey}`,
-          mode: useAARuntime ? "read-only" : "submit",
+          mode: useAARuntimeForStrategy ? "read-only" : "submit",
         });
 
         normalizedIntent.snapshotHash = anchoredSnapshot.snapshotHash;
@@ -657,7 +659,12 @@ const server = createServer(async (request, response) => {
         effectiveCalldata = resolvedPlan.calldata;
         effectivePayload = {
           ...effectivePayload,
-          aaRuntime: useAARuntime ? "safe7579-delegate-validator" : "legacy-signer",
+          aaRuntime: shouldUseAARuntimeForPlan({
+            runtimeCanUseAA: useAARuntimeForStrategy,
+            protocolId: resolvedPlan.protocolId,
+          })
+            ? "safe7579-delegate-validator"
+            : "legacy-signer",
           anchoredSnapshot: anchoredSnapshot.anchored,
           strategyKey: resolvedPlan.strategyKey,
           strategyLabel: resolvedPlan.strategyLabel,
@@ -705,7 +712,11 @@ const server = createServer(async (request, response) => {
 
       if (status !== "blocked" && effectiveTargetContract && effectiveCalldata) {
         try {
-          const useAARuntime = canUseAARuntime(managedSigner) && (body.executionDomain ?? "execution") === "execution";
+          const useAARuntime =
+            shouldUseAARuntimeForPlan({
+              runtimeCanUseAA: canUseAARuntime(managedSigner) && (body.executionDomain ?? "execution") === "execution",
+              protocolId: typeof effectivePayload.protocolId === "string" ? effectivePayload.protocolId : null,
+            });
           let txHash: string;
           let userOpHash: string | null = null;
 
