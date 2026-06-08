@@ -10,7 +10,7 @@ import {
   VAULT_PROVIDER_STRATEGY,
 } from "../config";
 import type { McpAccessBundle } from "../lib/mcpAccess";
-import type { AutomationState } from "../lib/userState";
+import { hasRuntimeNativeDeposit, type AutomationState } from "../lib/userState";
 
 type Props = {
   state: AutomationState | null;
@@ -136,7 +136,8 @@ const VaultPanel: React.FC<Props> = ({
   const activeMcpSession = state?.activeMcpSession;
   const ownershipAcknowledged = Boolean(vault?.ownership_acknowledged_at);
   const isActionGated = Boolean(vault) && !ownershipAcknowledged;
-  const hasFundingIntent = parseNumeric(
+  const hasOnchainDeposit = hasRuntimeNativeDeposit(state);
+  const hasFundingIntent = hasOnchainDeposit || parseNumeric(
     typeof vault?.last_funding_intent?.amountUsd === "number" || typeof vault?.last_funding_intent?.amountUsd === "string"
       ? vault.last_funding_intent.amountUsd
       : 0,
@@ -148,7 +149,7 @@ const VaultPanel: React.FC<Props> = ({
     vault?.automation_status ??
     "inactive",
   );
-  const fundingStatus = humanize(vault?.funding_status ?? "not-created");
+  const fundingStatus = hasOnchainDeposit ? "Deposit detected" : humanize(vault?.funding_status ?? "not-created");
   const consentRecordedAt = activeGrant?.issued_at ?? session?.consent_verified_at ?? null;
   const onchainPolicy = state?.onchainPolicy ?? null;
   const hasAutomation = Boolean(activeGrant && activeGrant.status === "active");
@@ -178,16 +179,6 @@ const VaultPanel: React.FC<Props> = ({
       key: "guard",
       label: "Enable execution guard",
       done: Boolean(state?.runtimeState?.moduleGuardReady),
-    } : null,
-    NEURALRATE_EXECUTION_GUARD_CONTRACT ? {
-      key: "trusted_module",
-      label: "Trust vault module",
-      done: Boolean(state?.runtimeState?.trustedModuleReady),
-    } : null,
-    DELEGATE_VALIDATOR_ADDRESS ? {
-      key: "delegate_gas",
-      label: "Fund signer",
-      done: Boolean(state?.runtimeState?.delegateGasReady),
     } : null,
   ].filter((item): item is { key: string; label: string; done: boolean } => Boolean(item));
   const completedRuntimeSteps = runtimeChecklist.filter((item) => item.done).length;

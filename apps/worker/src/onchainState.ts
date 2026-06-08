@@ -195,9 +195,7 @@ export const deriveAutomationReady = (
     runtimeState?.safe7579Enabled === true &&
     runtimeState?.fallbackHandlerReady === true &&
     runtimeState?.moduleGuardReady === true &&
-    runtimeState?.trustedModuleReady === true &&
-    runtimeState?.delegateReady === true &&
-    runtimeState?.delegateGasReady === true
+    runtimeState?.delegateReady === true
   );
 };
 

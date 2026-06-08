@@ -31,7 +31,7 @@ import {
 } from "../lib/mcpAccess";
 import { authorizedGetJsonFetch, signedGetJsonFetch, signedJsonFetch } from "../lib/auth";
 import { buildLocalSnapshotHash, sendPreparedTransaction, type PreparedTxRequest } from "../lib/policyRegistry";
-import type { AutomationState } from "../lib/userState";
+import { mergeLiveFundingTelemetry, type AutomationState } from "../lib/userState";
 
 const fetchJson = async <T>(url: string, options?: RequestInit) => {
   const response = await fetch(url, options);
@@ -195,6 +195,7 @@ export const useNeuralRateUser = ({
   const [error, setError] = useState<string | null>(null);
   const [mcpAccessBundle, setMcpAccessBundle] = useState<McpAccessBundle | null>(null);
   const liveFundingDetectedRef = useRef(false);
+  const stateRef = useRef<AutomationState | null>(null);
 
   const refresh = useCallback(async (targetOwner = ownerEoa) => {
     if (!targetOwner) {
@@ -226,8 +227,10 @@ export const useNeuralRateUser = ({
           url: `${API_BASE_URL}/automation/state?ownerEoa=${encodeURIComponent(targetOwner)}`,
         });
       }
-      setState(json);
-      return json;
+      const mergedState = mergeLiveFundingTelemetry(json, stateRef.current);
+      stateRef.current = mergedState;
+      setState(mergedState);
+      return mergedState;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to refresh user state.";
       setError(message);
@@ -248,6 +251,7 @@ export const useNeuralRateUser = ({
   useEffect(() => {
     if (!ownerEoa) {
       setState(null);
+      stateRef.current = null;
       setMcpAccessBundle(null);
       clearStoredMcpAccessBundle(ownerEoa);
       liveFundingDetectedRef.current = false;
@@ -327,8 +331,14 @@ export const useNeuralRateUser = ({
             return current;
           }
 
-          return {
+          const next = {
             ...current,
+            vault: current.vault
+              ? {
+                  ...current.vault,
+                  funding_status: hasNativeBalance ? "deposit_detected" : current.vault.funding_status,
+                }
+              : current.vault,
             runtimeState: {
               ...(current.runtimeState ?? {}),
               nativeBalanceWei: balanceWei.toString(),
@@ -338,6 +348,8 @@ export const useNeuralRateUser = ({
               lastCheckedAt: new Date().toISOString(),
             },
           };
+          stateRef.current = next;
+          return next;
         });
 
         if (hasNativeBalance && !liveFundingDetectedRef.current) {
@@ -912,7 +924,11 @@ export const useNeuralRateUser = ({
       await enableRuntimeFromPlan();
       const refreshed = await refresh(ownerEoa);
       if (refreshed?.automationReady) {
-        setNotice("Automation runtime verified on-chain. Agent execution is ready.");
+        if (refreshed.runtimeState?.delegateGasReady === false) {
+          setNotice("Automation runtime verified on-chain. Fund the delegate signer with MNT before asking the agent to execute or create receipts.");
+        } else {
+          setNotice("Automation runtime verified on-chain. Agent execution is ready.");
+        }
       } else if (isRuntimeInstallVerified(refreshed) && refreshed?.runtimeState?.delegateGasReady === false) {
         setNotice("Runtime setup verified on-chain. Fund the delegate signer with MNT before asking the agent to execute or create receipts.");
       } else {

@@ -9,6 +9,7 @@
     "presync-env": "node ../../scripts/sync-web-public-env.mjs",
     "prebuild": "npm run presync-docs && npm run presync-env",
     "build": "tsc -b && vite build",
+    "test": "node --import tsx --test src/lib/userState.test.ts",
     "lint": "eslint .",
     "preview": "vite preview"
   },

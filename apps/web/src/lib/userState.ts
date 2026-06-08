@@ -266,6 +266,74 @@ export interface AutomationState {
   } | null;
 }
 
+const parsePositiveWei = (value: string | null | undefined) => {
+  if (!value) {
+    return false;
+  }
+
+  try {
+    return BigInt(value) > 0n;
+  } catch {
+    return false;
+  }
+};
+
+const parsePositiveDecimal = (value: string | number | null | undefined) => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value > 0;
+  }
+
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  const parsed = Number.parseFloat(value.replace(/,/g, ""));
+  return Number.isFinite(parsed) && parsed > 0;
+};
+
+export const hasRuntimeNativeDeposit = (state: Pick<AutomationState, "runtimeState"> | null | undefined) =>
+  Boolean(state?.runtimeState?.hasNativeBalance) ||
+  parsePositiveWei(state?.runtimeState?.nativeBalanceWei) ||
+  parsePositiveDecimal(state?.runtimeState?.nativeBalanceFormatted);
+
+const sameVaultAddress = (left: AutomationState | null | undefined, right: AutomationState | null | undefined) => {
+  const leftAddress = left?.vault?.vault_address?.toLowerCase();
+  const rightAddress = right?.vault?.vault_address?.toLowerCase();
+  return Boolean(leftAddress && rightAddress && leftAddress === rightAddress);
+};
+
+export const mergeLiveFundingTelemetry = (
+  incoming: AutomationState,
+  current: AutomationState | null | undefined,
+): AutomationState => {
+  const incomingHasDeposit = hasRuntimeNativeDeposit(incoming);
+  const canReuseCurrentDeposit = sameVaultAddress(incoming, current) && hasRuntimeNativeDeposit(current);
+
+  if (!incomingHasDeposit && !canReuseCurrentDeposit) {
+    return incoming;
+  }
+
+  const sourceRuntime = incomingHasDeposit ? incoming.runtimeState : current?.runtimeState;
+
+  return {
+    ...incoming,
+    vault: incoming.vault
+      ? {
+          ...incoming.vault,
+          funding_status: "deposit_detected",
+        }
+      : incoming.vault,
+    runtimeState: {
+      ...(incoming.runtimeState ?? {}),
+      nativeBalanceWei: incoming.runtimeState?.nativeBalanceWei ?? sourceRuntime?.nativeBalanceWei ?? null,
+      nativeBalanceFormatted: incoming.runtimeState?.nativeBalanceFormatted ?? sourceRuntime?.nativeBalanceFormatted ?? null,
+      nativeAssetSymbol: incoming.runtimeState?.nativeAssetSymbol ?? sourceRuntime?.nativeAssetSymbol ?? null,
+      hasNativeBalance: true,
+      lastCheckedAt: incoming.runtimeState?.lastCheckedAt ?? sourceRuntime?.lastCheckedAt ?? null,
+    },
+  };
+};
+
 export const restrictionPresetOptions = [
   { value: "stable-only", label: "Stable Only" },
   { value: "blue-chip-defi", label: "Blue-Chip DeFi" },

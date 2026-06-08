@@ -93,7 +93,7 @@ test("readVaultBalances returns the last successful cached native balance when R
   assert.equal(second.sources.some((source) => source.id === "vault_balance_cache"), true);
 });
 
-test("deriveAutomationReady requires active execution scope, synced policy, and full runtime readiness", () => {
+test("deriveAutomationReady requires active execution scope, synced policy, and installed runtime", () => {
   const baseState = {
     vault: { vault_id: "vault_1" },
     config: { user_id: "user_1" },
@@ -126,11 +126,11 @@ test("deriveAutomationReady requires active execution scope, synced policy, and 
   );
   assert.equal(
     deriveAutomationReady(baseState, { ...runtimeState, trustedModuleReady: false }, onchainPolicy, "in_sync", nowMs),
-    false,
+    true,
   );
   assert.equal(
     deriveAutomationReady(baseState, { ...runtimeState, delegateGasReady: false }, onchainPolicy, "in_sync", nowMs),
-    false,
+    true,
   );
   assert.equal(
     deriveAutomationReady(baseState, runtimeState, onchainPolicy, "pending_publish", nowMs),
