@@ -102,6 +102,7 @@ import {
   type StateCatalogSnapshot,
 } from "./stateCatalog";
 import { planGovernedExecutionAction } from "./executionActions";
+import { sanitizeJobRecordForMcp } from "./mcp/sanitize";
 
 type ExecutorServiceBinding = {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
@@ -180,32 +181,6 @@ const applyCorsHeaders = (headers: Headers) => {
   headers.set("Access-Control-Allow-Methods", CORS_ALLOW_METHODS);
   headers.set("Access-Control-Allow-Headers", CORS_ALLOW_HEADERS);
   return headers;
-};
-
-const compactMcpText = (value: string, maxLength = 600) => {
-  const normalized = value.replace(/\s+/g, " ").trim();
-  const redactedHex = normalized.replace(/\b0x[a-fA-F0-9]{67,}\b/g, (match) => `${match.slice(0, 10)}...${match.slice(-8)}`);
-  return redactedHex.length > maxLength ? `${redactedHex.slice(0, maxLength - 3)}...` : redactedHex;
-};
-
-const sanitizeJobRecordForMcp = (record: Record<string, unknown>) => {
-  const sanitized: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(record)) {
-    if (key === "payload_json") {
-      sanitized.payload_json_omitted = true;
-      continue;
-    }
-    if (key === "failure_reason" && typeof value === "string") {
-      sanitized.failure_reason = compactMcpText(value);
-      continue;
-    }
-    if (typeof value === "string" && value.length > 800) {
-      sanitized[key] = compactMcpText(value);
-      continue;
-    }
-    sanitized[key] = value;
-  }
-  return sanitized;
 };
 
 const getAuthEnvelope = (body: unknown) => {
