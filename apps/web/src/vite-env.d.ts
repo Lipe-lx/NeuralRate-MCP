@@ -7,6 +7,7 @@ interface ImportMetaEnv {
   readonly VITE_PUBLIC_MCP_SSE_URL?: string;
   readonly VITE_PUBLIC_MCP_SCOPED_SSE_URL?: string;
   readonly VITE_PUBLIC_MANTLE_RPC_URL?: string;
+  readonly VITE_PUBLIC_MANTLE_RPC_FALLBACK_URLS?: string;
   readonly VITE_PUBLIC_MANTLE_EXPLORER_BASE_URL?: string;
   readonly VITE_PUBLIC_MANTLE_CHAIN_ID?: string;
   readonly VITE_PUBLIC_MANTLE_CHAIN_NAME?: string;

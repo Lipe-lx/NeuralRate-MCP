@@ -27,6 +27,7 @@ const publicScopedMcpHttpUrl = import.meta.env.VITE_PUBLIC_MCP_SCOPED_HTTP_URL?.
 const publicMcpSseUrl = import.meta.env.VITE_PUBLIC_MCP_SSE_URL?.trim();
 const publicScopedMcpSseUrl = import.meta.env.VITE_PUBLIC_MCP_SCOPED_SSE_URL?.trim();
 const publicRpcUrl = import.meta.env.VITE_PUBLIC_MANTLE_RPC_URL?.trim();
+const publicRpcFallbackUrls = import.meta.env.VITE_PUBLIC_MANTLE_RPC_FALLBACK_URLS?.trim();
 const publicExplorerBaseUrl = import.meta.env.VITE_PUBLIC_MANTLE_EXPLORER_BASE_URL?.trim();
 const publicBenchmarkContract = import.meta.env.VITE_PUBLIC_NEURALRATE_BENCHMARK_CONTRACT?.trim();
 const publicPolicyRegistryContract = import.meta.env.VITE_PUBLIC_NEURALRATE_POLICY_REGISTRY_CONTRACT?.trim();
@@ -55,6 +56,14 @@ const publicMantleNetworkKey = import.meta.env.VITE_PUBLIC_MANTLE_NETWORK_KEY?.t
 const publicEnvProfile = import.meta.env.VITE_PUBLIC_ENV_PROFILE?.trim();
 const normalizeAddress = (value?: string | null) =>
   value && value.toLowerCase() !== ZERO_ADDRESS.toLowerCase() ? value : '';
+const parseUrlList = (...values: Array<string | null | undefined>) =>
+  [...new Set(
+    values
+      .flatMap((value) => (value ?? '').split(/[,\n]/))
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .map(trimTrailingSlash)
+  )];
 
 const workerOrigin = isLocal
   ? defaultLocalOrigin
@@ -86,6 +95,7 @@ export const SCOPED_SSE_URL = isLocal
   : trimTrailingSlash(publicScopedMcpSseUrl || `${workerOrigin}/sse/scoped/execution`);
 
 export const MANTLE_RPC_URL = trimTrailingSlash(publicRpcUrl || defaultPublicRpcUrl);
+export const MANTLE_RPC_FALLBACK_URLS = parseUrlList(MANTLE_RPC_URL, publicRpcFallbackUrls, defaultPublicRpcUrl);
 export const MANTLE_EXPLORER_BASE_URL = trimTrailingSlash(publicExplorerBaseUrl || defaultExplorerBaseUrl);
 export const MANTLE_CHAIN_ID = Number.isFinite(publicMantleChainId) ? publicMantleChainId : defaultMantleChainId;
 export const MANTLE_CHAIN_NAME = publicMantleChainName || defaultMantleChainName;

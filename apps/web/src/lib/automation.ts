@@ -16,6 +16,7 @@ import {
   SAFE_7579_ADAPTER_ADDRESS,
   SAFE_SALT_NONCE,
 } from '../config';
+import { describeRpcError, isRecoverableReadRpcError, withReadRpcFallback } from './rpcFallback';
 
 export type PreparedAutomationSession = {
   sessionId: string;
@@ -160,30 +161,7 @@ const normalizeValue = (value: unknown) => {
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
-const isUnknownBlockError = (error: unknown) => {
-  if (!error || typeof error !== 'object') {
-    return false;
-  }
-
-  const record = error as {
-    message?: unknown;
-    details?: unknown;
-    shortMessage?: unknown;
-    cause?: { message?: unknown; details?: unknown } | null;
-  };
-
-  const description = [
-    record.message,
-    record.details,
-    record.shortMessage,
-    record.cause?.message,
-    record.cause?.details,
-  ]
-    .filter((value) => typeof value === 'string')
-    .join(' ');
-
-  return /unknown block/i.test(description);
-};
+const isUnknownBlockError = (error: unknown) => /unknown block/i.test(describeRpcError(error));
 
 const isSafeAlreadyDeployedError = (error: unknown) => {
   if (!error || typeof error !== 'object') {
@@ -210,29 +188,7 @@ const isSafeAlreadyDeployedError = (error: unknown) => {
   return /safe already deployed/i.test(description);
 };
 
-const describeError = (error: unknown) => {
-  if (!error || typeof error !== 'object') {
-    return '';
-  }
-
-  const record = error as {
-    message?: unknown;
-    details?: unknown;
-    shortMessage?: unknown;
-    cause?: { message?: unknown; details?: unknown; shortMessage?: unknown } | null;
-  };
-
-  return [
-    record.message,
-    record.details,
-    record.shortMessage,
-    record.cause?.message,
-    record.cause?.details,
-    record.cause?.shortMessage,
-  ]
-    .filter((value) => typeof value === 'string')
-    .join(' ');
-};
+const describeError = describeRpcError;
 
 const retryOnUnknownBlock = async <T>(action: () => Promise<T>) => {
   let lastError: unknown;
@@ -267,7 +223,7 @@ const waitForTransactionReceipt = async (
         params: [txHash],
       });
     } catch (error) {
-      if (!isUnknownBlockError(error)) {
+      if (!isRecoverableReadRpcError(error)) {
         throw error;
       }
     }
@@ -361,7 +317,7 @@ export async function resolveUserSafeVault(
   wallet: WalletAccess,
   saltNonce?: string
 ) {
-  const provider = await wallet.getEthereumProvider();
+  const provider = withReadRpcFallback(await wallet.getEthereumProvider());
   const safe = await retryOnUnknownBlock(() =>
     buildPredictedSafe({
       ownerAddress,
@@ -412,7 +368,7 @@ export async function deployUserSafeVault(
   wallet: WalletAccess,
   saltNonce?: string
 ) {
-  const provider = await wallet.getEthereumProvider();
+  const provider = withReadRpcFallback(await wallet.getEthereumProvider());
   const predicted = await resolveUserSafeVault(ownerAddress, wallet, saltNonce);
 
   if (predicted.isDeployed) {
@@ -443,7 +399,7 @@ export async function ensureVaultModuleEnabled(
   moduleAddress: string,
   saltNonce?: string
 ): Promise<VaultModuleResult> {
-  const provider = await wallet.getEthereumProvider();
+  const provider = withReadRpcFallback(await wallet.getEthereumProvider());
   const deployment = await deployUserSafeVault(ownerAddress, wallet, saltNonce);
 
   if (deployment.txHash) {
@@ -486,7 +442,7 @@ export async function ensureAutonomousVaultRuntime(
     throw new Error('Configure the NeuralRate agent session signer address before enabling AA runtime.');
   }
 
-  const provider = await wallet.getEthereumProvider();
+  const provider = withReadRpcFallback(await wallet.getEthereumProvider());
   const deployment = await deployUserSafeVault(ownerAddress, wallet, saltNonce);
 
   if (deployment.txHash) {
@@ -641,7 +597,7 @@ export async function disableVaultModule(
   safeAddress: string,
   moduleAddress: string
 ) {
-  const provider = await wallet.getEthereumProvider();
+  const provider = withReadRpcFallback(await wallet.getEthereumProvider());
   const safe = await openSafeByAddress(ownerAddress, provider, safeAddress);
   const enabled = await retryOnUnknownBlock(() => safe.isModuleEnabled(moduleAddress));
   if (!enabled) {
