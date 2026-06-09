@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { hasRuntimeNativeDeposit, mergeLiveFundingTelemetry, type AutomationState } from "./userState";
+import { hasRuntimeNativeDeposit, mergeLiveFundingTelemetry, shouldAutoRefreshState, type AutomationState } from "./userState";
 
 const baseState = {
   ownerEoa: "0xowner",
@@ -96,4 +96,14 @@ test("mergeLiveFundingTelemetry does not carry funding across different vaults",
 
   assert.equal(merged.vault?.funding_status, "awaiting_deposit");
   assert.equal(merged.runtimeState?.hasNativeBalance, undefined);
+});
+
+test("shouldAutoRefreshState returns true if hasSession is true, regardless of cachedState", () => {
+  assert.equal(shouldAutoRefreshState(null, true), true);
+  assert.equal(shouldAutoRefreshState(baseState, true), true);
+});
+
+test("shouldAutoRefreshState returns false if hasSession is false, regardless of cachedState", () => {
+  assert.equal(shouldAutoRefreshState(null, false), false);
+  assert.equal(shouldAutoRefreshState(baseState, false), false);
 });

@@ -357,3 +357,10 @@ export const automationModeOptions = [
   { value: "recommend-only", label: "Recommend Only" },
   { value: "auto-within-limits", label: "Auto up to Limits" },
 ] as const;
+
+export const shouldAutoRefreshState = (
+  _cachedState: AutomationState | null,
+  hasSession: boolean
+): boolean => {
+  return hasSession;
+};

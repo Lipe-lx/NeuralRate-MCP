@@ -31,7 +31,7 @@ import {
 } from "../lib/mcpAccess";
 import { authorizedGetJsonFetch, signedGetJsonFetch, signedJsonFetch } from "../lib/auth";
 import { buildLocalSnapshotHash, sendPreparedTransaction, type PreparedTxRequest } from "../lib/policyRegistry";
-import { mergeLiveFundingTelemetry, type AutomationState } from "../lib/userState";
+import { mergeLiveFundingTelemetry, shouldAutoRefreshState, type AutomationState } from "../lib/userState";
 
 const fetchJson = async <T>(url: string, options?: RequestInit) => {
   const response = await fetch(url, options);
@@ -177,6 +177,28 @@ const isExecutorReachabilityError = (error: unknown) => {
   );
 };
 
+const stateStorageKey = (ownerEoa: string) => `neuralrate:state:${ownerEoa.trim().toLowerCase()}`;
+
+const loadStoredState = (ownerEoa: string): AutomationState | null => {
+  if (typeof window === "undefined" || !ownerEoa) return null;
+  try {
+    const raw = window.sessionStorage.getItem(stateStorageKey(ownerEoa));
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const storeState = (ownerEoa: string, state: AutomationState) => {
+  if (typeof window === "undefined" || !ownerEoa) return;
+  window.sessionStorage.setItem(stateStorageKey(ownerEoa), JSON.stringify(state));
+};
+
+const clearStoredState = (ownerEoa: string | null | undefined) => {
+  if (typeof window === "undefined" || !ownerEoa) return;
+  window.sessionStorage.removeItem(stateStorageKey(ownerEoa));
+};
+
 export const useNeuralRateUser = ({
   ownerEoa,
   externalWalletAddress,
@@ -188,7 +210,9 @@ export const useNeuralRateUser = ({
   getEthereumProvider,
   signMessage,
 }: WalletSessionContext) => {
-  const [state, setState] = useState<AutomationState | null>(null);
+  const [state, setState] = useState<AutomationState | null>(() => {
+    return ownerEoa ? loadStoredState(ownerEoa) : null;
+  });
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -260,16 +284,34 @@ export const useNeuralRateUser = ({
       stateRef.current = null;
       setMcpAccessBundle(null);
       clearStoredMcpAccessBundle(ownerEoa);
+      clearStoredState(ownerEoa);
       liveFundingDetectedRef.current = false;
       return;
     }
 
-    const timeoutId = window.setTimeout(() => {
-      void refresh(ownerEoa).catch(() => {});
-    }, 0);
+    const cached = loadStoredState(ownerEoa);
+    if (cached) {
+      setState(cached);
+      stateRef.current = cached;
+    }
 
-    return () => window.clearTimeout(timeoutId);
+    const storedBundle = loadStoredMcpAccessBundle(ownerEoa);
+    const hasSession = Boolean(storedBundle?.sessionToken);
+
+    if (shouldAutoRefreshState(cached, hasSession)) {
+      const timeoutId = window.setTimeout(() => {
+        void refresh(ownerEoa).catch(() => {});
+      }, 0);
+
+      return () => window.clearTimeout(timeoutId);
+    }
   }, [ownerEoa, refresh]);
+
+  useEffect(() => {
+    if (ownerEoa && state) {
+      storeState(ownerEoa, state);
+    }
+  }, [ownerEoa, state]);
 
   useEffect(() => {
     if (!ownerEoa || !state) {

@@ -344,6 +344,7 @@ function AppContent() {
                       onIssueMcpAccess={neuralRateUser.issueMcpAccessBundle}
                       onReviewOwnership={() => setIsOwnershipModalOpen(true)}
                       controlWalletLabel={controlWalletLabel}
+                      onRefreshState={neuralRateUser.refresh}
                     />
                   </div>
                 )}

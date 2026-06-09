@@ -9,7 +9,7 @@ import {
   SAFE_7579_ADAPTER_ADDRESS,
   VAULT_PROVIDER_STRATEGY,
 } from "../config";
-import type { McpAccessBundle } from "../lib/mcpAccess";
+import { loadStoredMcpAccessBundle, type McpAccessBundle } from "../lib/mcpAccess";
 import { hasRuntimeNativeDeposit, type AutomationState } from "../lib/userState";
 
 type Props = {
@@ -31,6 +31,7 @@ type Props = {
   onIssueMcpAccess: () => Promise<McpAccessBundle>;
   onReviewOwnership: () => void;
   controlWalletLabel: string;
+  onRefreshState: () => Promise<unknown>;
 };
 
 const parseNumeric = (value: string | number | null | undefined) => {
@@ -128,9 +129,12 @@ const VaultPanel: React.FC<Props> = ({
   onIssueMcpAccess,
   onReviewOwnership,
   controlWalletLabel,
+  onRefreshState,
 }) => {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const vault = state?.vault;
+  const storedBundle = React.useMemo(() => state?.ownerEoa ? loadStoredMcpAccessBundle(state.ownerEoa) : null, [state?.ownerEoa]);
+  const hasSession = Boolean(storedBundle?.sessionToken);
   const session = state?.activeSession;
   const activeGrant = state?.activeGrant;
   const activeMcpSession = state?.activeMcpSession;
@@ -348,7 +352,27 @@ const VaultPanel: React.FC<Props> = ({
                 Dedicated user vault, isolated from every other user
               </div>
             </div>
-            <div style={{ fontSize: "0.72rem", color: "var(--color-lime)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Sepolia</div>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              {state?.ownerEoa && (
+                <button
+                  onClick={() => void onRefreshState()}
+                  disabled={busy}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    color: "var(--color-lime)",
+                    cursor: busy ? "not-allowed" : "pointer",
+                    fontSize: "0.74rem",
+                    padding: "0.2rem 0.4rem",
+                    borderRadius: "4px",
+                    textDecoration: "underline",
+                  }}
+                >
+                  {busy ? "Refreshing..." : hasSession ? "Refresh" : "Refresh (Sign)"}
+                </button>
+              )}
+              <div style={{ fontSize: "0.72rem", color: "var(--color-lime)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Sepolia</div>
+            </div>
           </div>
 
           <div className="vault-detail-grid">
