@@ -758,20 +758,31 @@ export async function withOnchainPolicyState<T extends Record<string, unknown>>(
 
   const activeOnchainPolicy = onchainPolicy;
   let policySyncStatus: "not_published" | "in_sync" | "drifted" | "pending_publish" | "pending_revoke" = "not_published";
+  let _policyDriftDetails: Record<string, { onchain: unknown; draft: unknown }> | null = null;
   if (draftPolicy && !activeOnchainPolicy) {
     policySyncStatus = "pending_publish";
   } else if (draftPolicy && activeOnchainPolicy) {
-    const inSync =
-      asString(activeOnchainPolicy.policyVersion) === draftPolicy.policyVersion &&
-      asNumber(activeOnchainPolicy.maxPerUse) === draftPolicy.maxPerUse &&
-      asNumber(activeOnchainPolicy.maxDaily) === draftPolicy.maxDaily &&
-      asNumber(activeOnchainPolicy.maxTotal) === draftPolicy.maxTotal &&
-      asNumber(activeOnchainPolicy.maxSlippageBps) === draftPolicy.maxSlippageBps &&
-      Boolean(activeOnchainPolicy.requireSnapshot) === draftPolicy.requireSnapshot &&
-      sameStringSet(normalizeTextList(activeOnchainPolicy.allowedAssets), draftPolicy.allowedAssets) &&
-      sameStringSet(normalizeTextList(activeOnchainPolicy.allowedProtocols), draftPolicy.allowedProtocols);
+    const fieldChecks: Array<{ key: string; onchain: unknown; draft: unknown; match: boolean }> = [
+      { key: "policyVersion", onchain: asString(activeOnchainPolicy.policyVersion), draft: draftPolicy.policyVersion, match: asString(activeOnchainPolicy.policyVersion) === draftPolicy.policyVersion },
+      { key: "maxPerUse", onchain: asNumber(activeOnchainPolicy.maxPerUse), draft: draftPolicy.maxPerUse, match: asNumber(activeOnchainPolicy.maxPerUse) === draftPolicy.maxPerUse },
+      { key: "maxDaily", onchain: asNumber(activeOnchainPolicy.maxDaily), draft: draftPolicy.maxDaily, match: asNumber(activeOnchainPolicy.maxDaily) === draftPolicy.maxDaily },
+      { key: "maxTotal", onchain: asNumber(activeOnchainPolicy.maxTotal), draft: draftPolicy.maxTotal, match: asNumber(activeOnchainPolicy.maxTotal) === draftPolicy.maxTotal },
+      { key: "maxSlippageBps", onchain: asNumber(activeOnchainPolicy.maxSlippageBps), draft: draftPolicy.maxSlippageBps, match: asNumber(activeOnchainPolicy.maxSlippageBps) === draftPolicy.maxSlippageBps },
+      { key: "requireSnapshot", onchain: Boolean(activeOnchainPolicy.requireSnapshot), draft: draftPolicy.requireSnapshot, match: Boolean(activeOnchainPolicy.requireSnapshot) === draftPolicy.requireSnapshot },
+      { key: "allowedAssets", onchain: normalizeTextList(activeOnchainPolicy.allowedAssets), draft: draftPolicy.allowedAssets, match: sameStringSet(normalizeTextList(activeOnchainPolicy.allowedAssets), draftPolicy.allowedAssets) },
+      { key: "allowedProtocols", onchain: normalizeTextList(activeOnchainPolicy.allowedProtocols), draft: draftPolicy.allowedProtocols, match: sameStringSet(normalizeTextList(activeOnchainPolicy.allowedProtocols), draftPolicy.allowedProtocols) },
+    ];
 
+    const inSync = fieldChecks.every((check) => check.match);
     policySyncStatus = inSync ? "in_sync" : "drifted";
+    if (!inSync) {
+      _policyDriftDetails = {};
+      for (const check of fieldChecks) {
+        if (!check.match) {
+          _policyDriftDetails[check.key] = { onchain: check.onchain, draft: check.draft };
+        }
+      }
+    }
   }
 
   const { ready: automationReady, diagnostics: _readyDiagnostics } = deriveAutomationReady(state, runtimeState, activeOnchainPolicy, policySyncStatus);
@@ -780,6 +791,7 @@ export async function withOnchainPolicyState<T extends Record<string, unknown>>(
     ...state,
     automationReady,
     _readyDiagnostics,
+    _policyDriftDetails,
     draftPolicy,
     activeOnchainPolicy,
     policySyncStatus,

@@ -230,6 +230,9 @@ export const useNeuralRateUser = ({
       const mergedState = mergeLiveFundingTelemetry(json, stateRef.current);
       if (mergedState._readyDiagnostics) {
         console.log("[NeuralRate] automation ready diagnostics:", mergedState._readyDiagnostics, "automationReady:", mergedState.automationReady, "policySyncStatus:", mergedState.policySyncStatus);
+        if ((mergedState as unknown as Record<string, unknown>)._policyDriftDetails) {
+          console.warn("[NeuralRate] policy drift details:", (mergedState as unknown as Record<string, unknown>)._policyDriftDetails);
+        }
       }
       stateRef.current = mergedState;
       setState(mergedState);
@@ -925,6 +928,17 @@ export const useNeuralRateUser = ({
     setError(null);
     try {
       await enableRuntimeFromPlan();
+
+      // After runtime is enabled, check if the on-chain policy needs (re-)publishing
+      const midRefresh = await refresh(ownerEoa);
+      if (midRefresh && !midRefresh.automationReady) {
+        const syncStatus = midRefresh.policySyncStatus;
+        if (syncStatus === "drifted" || syncStatus === "pending_publish") {
+          console.log("[NeuralRate] policy sync status is", syncStatus, "— re-publishing on-chain policy…");
+          await publishDraftPolicy();
+        }
+      }
+
       const refreshed = await refresh(ownerEoa);
       const paymasterReady = refreshed?.runtimeState?.paymasterReady === true || refreshed?.runtimeState?.paymasterConfigured === true;
       if (refreshed?.automationReady) {
