@@ -457,7 +457,8 @@ function AppContent() {
           onBootstrap={handleBootstrap}
           onFundingIntent={neuralRateUser.createFundingIntent}
           onAcknowledgeOwnership={handleAcknowledgeOwnership}
-          onEnableAutomation={neuralRateUser.enableAutomation}
+          onPublishPolicy={neuralRateUser.publishPolicy}
+          onFinalizeGrant={neuralRateUser.finalizeGrant}
           onCompleteRuntimeSetup={neuralRateUser.completeRuntimeSetup}
           onQueueDemoStrategy={neuralRateUser.queueDemoStrategy}
           controlWalletLabel={controlWalletLabel}
@@ -470,6 +471,8 @@ function AppContent() {
           isCorrectChain={isCorrectChain}
           onConnect={connect}
           onSwitchChain={switchToMantle}
+          runtimeProgressStep={neuralRateUser.runtimeProgressStep}
+          runtimeProgressStatus={neuralRateUser.runtimeProgressStatus}
         />
       )}
     </div>

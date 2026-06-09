@@ -29,7 +29,8 @@ const defaultProps = {
   onBootstrap: vi.fn(() => Promise.resolve({})),
   onFundingIntent: vi.fn(() => Promise.resolve()),
   onAcknowledgeOwnership: vi.fn(() => Promise.resolve()),
-  onEnableAutomation: vi.fn(() => Promise.resolve()),
+  onPublishPolicy: vi.fn(() => Promise.resolve()),
+  onFinalizeGrant: vi.fn(() => Promise.resolve()),
   onCompleteRuntimeSetup: vi.fn(() => Promise.resolve()),
   onQueueDemoStrategy: vi.fn(() => Promise.resolve()),
   controlWalletLabel: 'Smart Account',
@@ -42,6 +43,8 @@ const defaultProps = {
   isCorrectChain: true,
   onConnect: vi.fn(() => Promise.resolve()),
   onSwitchChain: vi.fn(() => Promise.resolve()),
+  runtimeProgressStep: null,
+  runtimeProgressStatus: null,
 };
 
 describe('OnboardingWizard', () => {
@@ -185,5 +188,62 @@ describe('OnboardingWizard', () => {
     });
 
     expect(onFundingIntentMock).toHaveBeenCalledWith(1000);
+  });
+
+  it('renders Step 6 (Enable Vault Automation) sub-steps and triggers callbacks', async () => {
+    const onPublishPolicyMock = vi.fn(() => Promise.resolve());
+    const onFinalizeGrantMock = vi.fn(() => Promise.resolve());
+
+    const mockState: AutomationState = {
+      ...defaultProps.state!,
+      vault: {
+        vault_id: 'vault-123',
+        user_id: 'user-1',
+        owner_eoa: '0x123',
+        vault_address: '0xVaultAddress',
+        vault_kind: 'default',
+        vault_provider: 'safe',
+        agent_scope_wallet: '0xAgent',
+        chain_id: 5000,
+        status: 'active',
+        funding_status: 'not-created',
+        automation_status: 'inactive',
+        balance_usd: '0',
+        deposit_address: '0xDepositAddress',
+        last_funding_intent: { amountUsd: 1000 },
+        ownership_acknowledged_at: '2026-06-09T00:00:00Z',
+      },
+    };
+
+    render(
+      <OnboardingWizard
+        {...defaultProps}
+        state={mockState}
+        hasFundingIntent={true}
+        onPublishPolicy={onPublishPolicyMock}
+        onFinalizeGrant={onFinalizeGrantMock}
+      />
+    );
+
+    expect(screen.getByText('Enable Vault Automation')).toBeInTheDocument();
+    expect(screen.getByText('Confirmation 1 of 2')).toBeInTheDocument();
+    expect(screen.getByText('1. Publish Execution Policy')).toBeInTheDocument();
+
+    const publishButton = screen.getByRole('button', { name: 'Publish Policy Rules' });
+    await act(async () => {
+      fireEvent.click(publishButton);
+    });
+
+    expect(onPublishPolicyMock).toHaveBeenCalled();
+
+    expect(screen.getByText('Confirmation 2 of 2')).toBeInTheDocument();
+    expect(screen.getByText('2. Authorize Agent Grant')).toBeInTheDocument();
+
+    const signButton = screen.getByRole('button', { name: 'Sign Agent Authorization' });
+    await act(async () => {
+      fireEvent.click(signButton);
+    });
+
+    expect(onFinalizeGrantMock).toHaveBeenCalled();
   });
 });

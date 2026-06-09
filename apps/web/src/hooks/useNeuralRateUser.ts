@@ -218,6 +218,8 @@ export const useNeuralRateUser = ({
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mcpAccessBundle, setMcpAccessBundle] = useState<McpAccessBundle | null>(null);
+  const [runtimeProgressStep, setRuntimeProgressStep] = useState<string | null>(null);
+  const [runtimeProgressStatus, setRuntimeProgressStatus] = useState<'signing' | 'confirming' | 'done' | 'failed' | null>(null);
   const liveFundingDetectedRef = useRef(false);
   const stateRef = useRef<AutomationState | null>(null);
 
@@ -761,6 +763,12 @@ export const useNeuralRateUser = ({
         SAFE_7579_ADAPTER_ADDRESS &&
         DELEGATE_VALIDATOR_ADDRESS
       );
+      
+      const onProgress = (stepKey: string, status: 'signing' | 'confirming' | 'done' | 'failed') => {
+        setRuntimeProgressStep(stepKey);
+        setRuntimeProgressStatus(status);
+      };
+
       if (aaReady && prepared.actions.some((action) =>
         ["install_safe7579", "configure_delegate_validator", "enable_execution_guard", "enable_fallback_handler"].includes(action.key)
       )) {
@@ -770,7 +778,9 @@ export const useNeuralRateUser = ({
             getEthereumProvider,
             signMessage,
           },
-          VAULT_MODULE_ADDRESS
+          VAULT_MODULE_ADDRESS,
+          undefined,
+          onProgress
         );
         if (runtimeResult.deploymentTxHash) txHashes.deploy_safe = runtimeResult.deploymentTxHash;
         if (runtimeResult.moduleTxHash) txHashes.enable_vault_module = runtimeResult.moduleTxHash;
@@ -783,7 +793,7 @@ export const useNeuralRateUser = ({
         const moduleResult = await ensureVaultModuleEnabled(ownerEoa, {
           getEthereumProvider,
           signMessage,
-        }, VAULT_MODULE_ADDRESS);
+        }, VAULT_MODULE_ADDRESS, undefined, onProgress);
         if (moduleResult.deploymentTxHash) txHashes.deploy_safe = moduleResult.deploymentTxHash;
         if (moduleResult.moduleTxHash) txHashes.enable_vault_module = moduleResult.moduleTxHash;
       }
@@ -968,6 +978,8 @@ export const useNeuralRateUser = ({
 
     setBusy(true);
     setError(null);
+    setRuntimeProgressStep(null);
+    setRuntimeProgressStatus(null);
     try {
       await enableRuntimeFromPlan();
 
@@ -1128,6 +1140,60 @@ export const useNeuralRateUser = ({
     }
   };
 
+  const publishPolicy = async () => {
+    if (!ownerEoa) {
+      throw new Error("Connect a wallet before publishing policy.");
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await publishDraftPolicy();
+      await refresh(ownerEoa);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to publish policy rules.";
+      setError(message);
+      throw new Error(message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const finalizeGrant = async () => {
+    if (!ownerEoa) {
+      throw new Error("Connect a wallet before finalizing the automation grant.");
+    }
+    const current = state ?? (await refresh(ownerEoa));
+    setBusy(true);
+    setError(null);
+    try {
+      const finalizedGrant = await finalizeAutomationGrant(current);
+      const issuedBundle = buildMcpAccessBundle({
+        workerOrigin: WORKER_ORIGIN,
+        ownerEoa: finalizedGrant.ownerEoa,
+        userId: finalizedGrant.userId,
+        vaultId: finalizedGrant.vaultId,
+        vaultAddress: finalizedGrant.vaultAddress,
+        agentSubject: finalizedGrant.agentSubject,
+        policyVersion: finalizedGrant.policyVersion,
+        sessionId: finalizedGrant.sessionId,
+        grantId: finalizedGrant.grantId,
+        allowedDomains: finalizedGrant.allowedDomains,
+        expiresAt: finalizedGrant.grantExpiresAt,
+        sessionToken: finalizedGrant.sessionToken,
+      });
+      setMcpAccessBundle(issuedBundle);
+      storeMcpAccessBundle(issuedBundle);
+
+      await refresh(ownerEoa);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to finalize the automation grant.";
+      setError(message);
+      throw new Error(message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return {
     state: ownerEoa ? state : null,
     loading,
@@ -1135,6 +1201,8 @@ export const useNeuralRateUser = ({
     notice,
     error,
     mcpAccessBundle,
+    runtimeProgressStep,
+    runtimeProgressStatus,
     setNotice,
     setError,
     refresh,
@@ -1147,5 +1215,7 @@ export const useNeuralRateUser = ({
     completeRuntimeSetup,
     revokeAutomation,
     queueDemoStrategy,
+    publishPolicy,
+    finalizeGrant,
   };
 };

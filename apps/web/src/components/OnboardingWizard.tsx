@@ -17,7 +17,8 @@ interface OnboardingWizardProps {
   onBootstrap: () => Promise<unknown>;
   onFundingIntent: (amountUsd: number) => Promise<void>;
   onAcknowledgeOwnership: () => Promise<void>;
-  onEnableAutomation: () => Promise<void>;
+  onPublishPolicy: () => Promise<void>;
+  onFinalizeGrant: () => Promise<void>;
   onCompleteRuntimeSetup: () => Promise<void>;
   onQueueDemoStrategy: () => Promise<void>;
   controlWalletLabel: string;
@@ -30,6 +31,8 @@ interface OnboardingWizardProps {
   isCorrectChain: boolean;
   onConnect: () => Promise<void>;
   onSwitchChain: () => Promise<void>;
+  runtimeProgressStep: string | null;
+  runtimeProgressStatus: 'signing' | 'confirming' | 'done' | 'failed' | null;
 }
 
 const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
@@ -41,7 +44,8 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   onBootstrap,
   onFundingIntent,
   onAcknowledgeOwnership,
-  onEnableAutomation,
+  onPublishPolicy,
+  onFinalizeGrant,
   onCompleteRuntimeSetup,
   onQueueDemoStrategy,
   controlWalletLabel,
@@ -54,18 +58,19 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   isCorrectChain,
   onConnect,
   onSwitchChain,
+  runtimeProgressStep,
+  runtimeProgressStatus,
 }) => {
   const [fundingAmount, setFundingAmount] = useState(1000);
   const [confirmedOwnership, setConfirmedOwnership] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [authSubstep, setAuthSubstep] = useState<1 | 2>(1);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  if (!isOpen || !mounted) return null;
 
   const vault = state?.vault;
   const activeGrant = state?.activeGrant;
@@ -93,6 +98,12 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   } else {
     currentStep = 8;
   }
+
+  useEffect(() => {
+    setAuthSubstep(1);
+  }, [currentStep]);
+
+  if (!isOpen || !mounted) return null;
 
   const steps = [
     { num: 1, label: "Connect" },
@@ -143,12 +154,22 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     }
   };
 
-  const handleEnableAutomation = async () => {
+  const handlePublishPolicy = async () => {
     setActionError(null);
     try {
-      await onEnableAutomation();
+      await onPublishPolicy();
+      setAuthSubstep(2);
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to authorize automation grant.");
+      setActionError(err instanceof Error ? err.message : "Failed to publish policy rules.");
+    }
+  };
+
+  const handleFinalizeGrant = async () => {
+    setActionError(null);
+    try {
+      await onFinalizeGrant();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to finalize automation grant.");
     }
   };
 
@@ -173,6 +194,11 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
   // Safe modules checklist
   const runtimeChecklist = [
+    {
+      key: "deploy_safe",
+      label: "Deploy smart account vault",
+      done: Boolean(state?.runtimeState?.safeDeployed),
+    },
     {
       key: "vault_module",
       label: "Enable vault module",
@@ -586,33 +612,116 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
           {currentStep === 6 && (
             <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: "1rem" }}>
-              <div style={{ display: "flex", justifyContent: "center", marginBottom: "0.5rem" }}>
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: "0.2rem" }}>
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-lime)" strokeWidth="1.5">
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
                 </svg>
               </div>
               <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700 }}>Enable Vault Automation</h3>
-              <p style={{ margin: 0, fontSize: "0.88rem", color: "var(--text-secondary)", lineHeight: 1.6 }}>
-                Issue a scoped automation grant from your control wallet to authorize the operator agent to execute strategy reallocations within your configured policy limits.
-              </p>
-              <div style={{ marginTop: "0.8rem" }}>
-                <button
-                  onClick={handleEnableAutomation}
-                  disabled={busy}
-                  style={{
-                    background: "var(--color-lime)",
-                    border: "none",
-                    color: "#06110a",
-                    padding: "0.7rem 1.5rem",
-                    borderRadius: "8px",
-                    fontWeight: 700,
-                    fontSize: "0.88rem",
-                    cursor: busy ? "not-allowed" : "pointer",
-                  }}
-                >
-                  {busy ? "Enabling..." : "Enable Vault Automation"}
-                </button>
+              
+              {/* Sub-step indicator */}
+              <div style={{ fontSize: "0.82rem", color: "var(--color-lime)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                Confirmation {authSubstep} of 2
               </div>
+
+              {authSubstep === 1 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem" }}>
+                  <div
+                    style={{
+                      border: "1px solid rgba(223, 246, 81, 0.18)",
+                      background: "rgba(223, 246, 81, 0.02)",
+                      borderRadius: "10px",
+                      padding: "1rem",
+                      textAlign: "left",
+                    }}
+                  >
+                    <div style={{ fontSize: "0.85rem", color: "var(--text-primary)", fontWeight: 700, marginBottom: "0.3rem" }}>
+                      1. Publish Execution Policy
+                    </div>
+                    <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
+                      You are authorizing: Publishing the daily and total transaction limits on-chain to the Mantle Sepolia network. This secures your vault by restricting the operator agent from exceeding your defined parameters.
+                    </div>
+                    <div style={{ fontSize: "0.74rem", color: "var(--color-warning)", marginTop: "0.4rem", fontWeight: 600 }}>
+                      Requires: Wallet transaction signature (Mantle gas fee).
+                    </div>
+                  </div>
+                  <div style={{ marginTop: "0.5rem" }}>
+                    <button
+                      onClick={handlePublishPolicy}
+                      disabled={busy}
+                      style={{
+                        background: "var(--color-lime)",
+                        border: "none",
+                        color: "#06110a",
+                        padding: "0.7rem 1.5rem",
+                        borderRadius: "8px",
+                        fontWeight: 700,
+                        fontSize: "0.88rem",
+                        cursor: busy ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      {busy ? "Publishing..." : "Publish Policy Rules"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {authSubstep === 2 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem" }}>
+                  <div
+                    style={{
+                      border: "1px solid rgba(223, 246, 81, 0.18)",
+                      background: "rgba(223, 246, 81, 0.02)",
+                      borderRadius: "10px",
+                      padding: "1rem",
+                      textAlign: "left",
+                    }}
+                  >
+                    <div style={{ fontSize: "0.85rem", color: "var(--text-primary)", fontWeight: 700, marginBottom: "0.3rem" }}>
+                      2. Authorize Agent Grant
+                    </div>
+                    <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
+                      You are authorizing: Granting cryptographic permission for the operator agent to execute strategy reallocations within the limits of your published policy.
+                    </div>
+                    <div style={{ fontSize: "0.74rem", color: "var(--color-lime)", marginTop: "0.4rem", fontWeight: 600 }}>
+                      Requires: Cryptographic message signature (Free).
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: "0.5rem", justifyContent: "center", marginTop: "0.5rem" }}>
+                    <button
+                      onClick={() => setAuthSubstep(1)}
+                      disabled={busy}
+                      style={{
+                        background: "transparent",
+                        border: "1px solid var(--border-subtle)",
+                        color: "var(--text-secondary)",
+                        padding: "0.7rem 1.2rem",
+                        borderRadius: "8px",
+                        fontSize: "0.88rem",
+                        cursor: busy ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={handleFinalizeGrant}
+                      disabled={busy}
+                      style={{
+                        background: "var(--color-lime)",
+                        border: "none",
+                        color: "#06110a",
+                        padding: "0.7rem 1.5rem",
+                        borderRadius: "8px",
+                        fontWeight: 700,
+                        fontSize: "0.88rem",
+                        cursor: busy ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      {busy ? "Signing..." : "Sign Agent Authorization"}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -635,20 +744,64 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                   padding: "0.85rem",
                 }}
               >
-                {runtimeChecklist.map((step) => (
-                  <div
-                    key={step.key}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      fontSize: "0.78rem",
-                      color: step.done ? "var(--color-lime)" : "var(--text-secondary)",
-                    }}
-                  >
-                    <span>{step.label}</span>
-                    <span style={{ fontWeight: 700 }}>{step.done ? "Done ✓" : "Pending"}</span>
-                  </div>
-                ))}
+                <style>{`
+                  @keyframes wizardSpin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                  }
+                `}</style>
+                {runtimeChecklist.map((step) => {
+                  const isCurrent = runtimeProgressStep === step.key;
+                  let statusText = step.done ? "Done ✓" : "Pending";
+                  let statusColor = step.done ? "var(--color-lime)" : "var(--text-secondary)";
+                  
+                  if (isCurrent && !step.done) {
+                    if (runtimeProgressStatus === 'signing') {
+                      statusText = "Sign in Wallet...";
+                      statusColor = "var(--color-warning)";
+                    } else if (runtimeProgressStatus === 'confirming') {
+                      statusText = "Confirming Transaction...";
+                      statusColor = "var(--color-lime)";
+                    } else if (runtimeProgressStatus === 'failed') {
+                      statusText = "Failed ✗";
+                      statusColor = "var(--color-danger)";
+                    }
+                  }
+
+                  const showSpinner = isCurrent && !step.done && (runtimeProgressStatus === 'signing' || runtimeProgressStatus === 'confirming');
+
+                  return (
+                    <div
+                      key={step.key}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        fontSize: "0.78rem",
+                        color: statusColor,
+                        alignItems: "center",
+                        padding: "0.2rem 0",
+                      }}
+                    >
+                      <span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        {showSpinner && (
+                          <span
+                            style={{
+                              display: "inline-block",
+                              width: "10px",
+                              height: "10px",
+                              border: "2px solid currentColor",
+                              borderTopColor: "transparent",
+                              borderRadius: "50%",
+                              animation: "wizardSpin 1s linear infinite",
+                            }}
+                          />
+                        )}
+                        {step.label}
+                      </span>
+                      <span style={{ fontWeight: 700 }}>{statusText}</span>
+                    </div>
+                  );
+                })}
               </div>
 
               <div style={{ display: "flex", justifyContent: "center", marginTop: "0.5rem" }}>

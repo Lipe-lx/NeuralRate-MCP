@@ -251,10 +251,13 @@ const openSafeByAddress = async (ownerAddress: string, provider: EIP1193Provider
 const executeSafeTransactions = async (
   safe: Awaited<ReturnType<typeof openSafeByAddress>>,
   provider: EIP1193Provider,
-  transactions: MetaTransactionData[]
+  transactions: MetaTransactionData[],
+  onProgress?: (status: 'signing' | 'confirming') => void
 ) => {
   const safeTx = await retryOnUnknownBlock(() => safe.createTransaction({ transactions }));
+  onProgress?.('signing');
   const result = await retryOnUnknownBlock(() => safe.executeTransaction(safeTx));
+  onProgress?.('confirming');
   await waitForTransactionReceipt(provider, result.hash);
   return result.hash;
 };
@@ -397,18 +400,35 @@ export async function ensureVaultModuleEnabled(
   ownerAddress: string,
   wallet: WalletAccess,
   moduleAddress: string,
-  saltNonce?: string
+  saltNonce?: string,
+  onProgress?: (stepKey: string, status: 'signing' | 'confirming' | 'done' | 'failed') => void
 ): Promise<VaultModuleResult> {
   const provider = withReadRpcFallback(await wallet.getEthereumProvider());
-  const deployment = await deployUserSafeVault(ownerAddress, wallet, saltNonce);
 
-  if (deployment.txHash) {
-    await waitForTransactionReceipt(provider, deployment.txHash);
+  const predicted = await resolveUserSafeVault(ownerAddress, wallet, saltNonce);
+  if (!predicted.isDeployed) {
+    onProgress?.('deploy_safe', 'signing');
+  } else {
+    onProgress?.('deploy_safe', 'done');
+  }
+
+  let deployment;
+  try {
+    deployment = await deployUserSafeVault(ownerAddress, wallet, saltNonce);
+    if (deployment.txHash) {
+      onProgress?.('deploy_safe', 'confirming');
+      await waitForTransactionReceipt(provider, deployment.txHash);
+      onProgress?.('deploy_safe', 'done');
+    }
+  } catch (error) {
+    onProgress?.('deploy_safe', 'failed');
+    throw error;
   }
 
   const safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
   const alreadyEnabled = await retryOnUnknownBlock(() => safe.isModuleEnabled(moduleAddress));
   if (alreadyEnabled) {
+    onProgress?.('vault_module', 'done');
     return {
       safeAddress: deployment.safeAddress,
       deploymentTxHash: deployment.txHash,
@@ -417,9 +437,18 @@ export async function ensureVaultModuleEnabled(
     };
   }
 
-  const enableModuleTx = await retryOnUnknownBlock(() => safe.createEnableModuleTx(moduleAddress));
-  const result = await retryOnUnknownBlock(() => safe.executeTransaction(enableModuleTx));
-  await waitForTransactionReceipt(provider, result.hash);
+  onProgress?.('vault_module', 'signing');
+  let result;
+  try {
+    const enableModuleTx = await retryOnUnknownBlock(() => safe.createEnableModuleTx(moduleAddress));
+    result = await retryOnUnknownBlock(() => safe.executeTransaction(enableModuleTx));
+    onProgress?.('vault_module', 'confirming');
+    await waitForTransactionReceipt(provider, result.hash);
+    onProgress?.('vault_module', 'done');
+  } catch (error) {
+    onProgress?.('vault_module', 'failed');
+    throw error;
+  }
 
   return {
     safeAddress: deployment.safeAddress,
@@ -433,7 +462,8 @@ export async function ensureAutonomousVaultRuntime(
   ownerAddress: string,
   wallet: WalletAccess,
   moduleAddress: string,
-  saltNonce?: string
+  saltNonce?: string,
+  onProgress?: (stepKey: string, status: 'signing' | 'confirming' | 'done' | 'failed') => void
 ): Promise<AutonomousRuntimeResult> {
   if (!SAFE_7579_ADAPTER_ADDRESS || !DELEGATE_VALIDATOR_ADDRESS) {
     throw new Error('Configure Safe7579 adapter and delegate validator addresses before enabling AA runtime.');
@@ -443,21 +473,49 @@ export async function ensureAutonomousVaultRuntime(
   }
 
   const provider = withReadRpcFallback(await wallet.getEthereumProvider());
-  const deployment = await deployUserSafeVault(ownerAddress, wallet, saltNonce);
 
-  if (deployment.txHash) {
-    await waitForTransactionReceipt(provider, deployment.txHash);
+  // 1. deploy_safe
+  const predicted = await resolveUserSafeVault(ownerAddress, wallet, saltNonce);
+  if (!predicted.isDeployed) {
+    onProgress?.('deploy_safe', 'signing');
+  } else {
+    onProgress?.('deploy_safe', 'done');
+  }
+
+  let deployment;
+  try {
+    deployment = await deployUserSafeVault(ownerAddress, wallet, saltNonce);
+    if (deployment.txHash) {
+      onProgress?.('deploy_safe', 'confirming');
+      await waitForTransactionReceipt(provider, deployment.txHash);
+      onProgress?.('deploy_safe', 'done');
+    }
+  } catch (error) {
+    onProgress?.('deploy_safe', 'failed');
+    throw error;
   }
 
   let safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
   let moduleTxHash: string | null = null;
+
+  // 2. vault_module
   const vaultModuleAlreadyEnabled = await retryOnUnknownBlock(() => safe.isModuleEnabled(moduleAddress));
   if (!vaultModuleAlreadyEnabled) {
-    const enableModuleTx = await retryOnUnknownBlock(() => safe.createEnableModuleTx(moduleAddress));
-    const result = await retryOnUnknownBlock(() => safe.executeTransaction(enableModuleTx));
-    await waitForTransactionReceipt(provider, result.hash);
-    moduleTxHash = result.hash;
-    safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
+    onProgress?.('vault_module', 'signing');
+    try {
+      const enableModuleTx = await retryOnUnknownBlock(() => safe.createEnableModuleTx(moduleAddress));
+      const result = await retryOnUnknownBlock(() => safe.executeTransaction(enableModuleTx));
+      onProgress?.('vault_module', 'confirming');
+      await waitForTransactionReceipt(provider, result.hash);
+      moduleTxHash = result.hash;
+      safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
+      onProgress?.('vault_module', 'done');
+    } catch (error) {
+      onProgress?.('vault_module', 'failed');
+      throw error;
+    }
+  } else {
+    onProgress?.('vault_module', 'done');
   }
 
   let moduleGuardTxHash: string | null = null;
@@ -473,98 +531,160 @@ export async function ensureAutonomousVaultRuntime(
     moduleAddress
   );
 
+  // 3. safe7579
   if (!safe7579Enabled) {
-    const enableSafe7579ModuleTx = await retryOnUnknownBlock(() => safe.createEnableModuleTx(SAFE_7579_ADAPTER_ADDRESS));
-    const enableSafe7579ModuleResult = await retryOnUnknownBlock(() => safe.executeTransaction(enableSafe7579ModuleTx));
-    await waitForTransactionReceipt(provider, enableSafe7579ModuleResult.hash);
-    safe7579InstallTxHash = enableSafe7579ModuleResult.hash;
-    safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
-
+    onProgress?.('safe7579', 'signing');
+    try {
+      const enableSafe7579ModuleTx = await retryOnUnknownBlock(() => safe.createEnableModuleTx(SAFE_7579_ADAPTER_ADDRESS));
+      const enableSafe7579ModuleResult = await retryOnUnknownBlock(() => safe.executeTransaction(enableSafe7579ModuleTx));
+      onProgress?.('safe7579', 'confirming');
+      await waitForTransactionReceipt(provider, enableSafe7579ModuleResult.hash);
+      safe7579InstallTxHash = enableSafe7579ModuleResult.hash;
+      safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
+      onProgress?.('safe7579', 'done');
+    } catch (error) {
+      onProgress?.('safe7579', 'failed');
+      throw error;
+    }
+  } else {
+    onProgress?.('safe7579', 'done');
   }
 
+  // 4. fallback
   const fallbackHandler = (await retryOnUnknownBlock(() => safe.getFallbackHandler())).toLowerCase();
   if (fallbackHandler !== SAFE_7579_ADAPTER_ADDRESS.toLowerCase()) {
-    const enableFallbackTx = await retryOnUnknownBlock(() =>
-      safe.createEnableFallbackHandlerTx(SAFE_7579_ADAPTER_ADDRESS)
-    );
-    const result = await retryOnUnknownBlock(() => safe.executeTransaction(enableFallbackTx));
-    await waitForTransactionReceipt(provider, result.hash);
-    fallbackTxHash = result.hash;
-    safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
+    onProgress?.('fallback', 'signing');
+    try {
+      const enableFallbackTx = await retryOnUnknownBlock(() =>
+        safe.createEnableFallbackHandlerTx(SAFE_7579_ADAPTER_ADDRESS)
+      );
+      const result = await retryOnUnknownBlock(() => safe.executeTransaction(enableFallbackTx));
+      onProgress?.('fallback', 'confirming');
+      await waitForTransactionReceipt(provider, result.hash);
+      fallbackTxHash = result.hash;
+      safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
+      onProgress?.('fallback', 'done');
+    } catch (error) {
+      onProgress?.('fallback', 'failed');
+      throw error;
+    }
+  } else {
+    onProgress?.('fallback', 'done');
   }
 
   try {
-    await executeSafeTransactions(safe, provider, [
-      buildSafe7579SelfCall(
-        deployment.safeAddress,
-        encodeFunctionData({
-          abi: safe7579AdapterAbi,
-          functionName: 'initializeAccount',
-          args: [
-            [],
-            {
-              registry: ZERO_ADDRESS as `0x${string}`,
-              attesters: [] as `0x${string}`[],
-              threshold: 0,
-            },
-          ],
-        })
-      ),
-    ]);
+    onProgress?.('safe7579', 'signing');
+    await executeSafeTransactions(
+      safe,
+      provider,
+      [
+        buildSafe7579SelfCall(
+          deployment.safeAddress,
+          encodeFunctionData({
+            abi: safe7579AdapterAbi,
+            functionName: 'initializeAccount',
+            args: [
+              [],
+              {
+                registry: ZERO_ADDRESS as `0x${string}`,
+                attesters: [] as `0x${string}`[],
+                threshold: 0,
+              },
+            ],
+          })
+        ),
+      ],
+      (status) => onProgress?.('safe7579', status)
+    );
     safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
+    onProgress?.('safe7579', 'done');
   } catch (error) {
     safe7579InitError = describeError(error) || 'Safe7579 initializeAccount reverted.';
+    onProgress?.('safe7579', 'done');
   }
 
   const installedDelegate = await retryOnUnknownBlock(() =>
     getInstalledDelegate(provider, deployment.safeAddress, DELEGATE_VALIDATOR_ADDRESS)
   );
+  
+  // 5. delegate
   if (installedDelegate === ZERO_ADDRESS) {
-    validatorInstallTxHash = await executeSafeTransactions(safe, provider, [
-      buildSafe7579SelfCall(
-        deployment.safeAddress,
-        encodeFunctionData({
-          abi: safe7579AdapterAbi,
-          functionName: 'installModule',
-          args: [
-            MODULE_TYPE_VALIDATOR,
-            DELEGATE_VALIDATOR_ADDRESS as `0x${string}`,
-            delegateValidatorInitData,
-          ],
-        })
-      ),
-    ]);
-    safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
+    onProgress?.('delegate', 'signing');
+    try {
+      validatorInstallTxHash = await executeSafeTransactions(
+        safe,
+        provider,
+        [
+          buildSafe7579SelfCall(
+            deployment.safeAddress,
+            encodeFunctionData({
+              abi: safe7579AdapterAbi,
+              functionName: 'installModule',
+              args: [
+                MODULE_TYPE_VALIDATOR,
+                DELEGATE_VALIDATOR_ADDRESS as `0x${string}`,
+                delegateValidatorInitData,
+              ],
+            })
+          ),
+        ],
+        (status) => onProgress?.('delegate', status)
+      );
+      safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
+      onProgress?.('delegate', 'done');
+    } catch (error) {
+      onProgress?.('delegate', 'failed');
+      throw error;
+    }
   } else if (installedDelegate !== NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS.toLowerCase()) {
-    validatorRotateTxHash = await executeSafeTransactions(safe, provider, [
-      {
-        to: DELEGATE_VALIDATOR_ADDRESS,
-        value: '0',
-        data: encodeFunctionData({
-          abi: delegateValidatorAbi,
-          functionName: 'setDelegate',
-          args: [NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS as `0x${string}`],
-        }),
-      },
-    ]);
-    safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
+    onProgress?.('delegate', 'signing');
+    try {
+      validatorRotateTxHash = await executeSafeTransactions(
+        safe,
+        provider,
+        [
+          {
+            to: DELEGATE_VALIDATOR_ADDRESS,
+            value: '0',
+            data: encodeFunctionData({
+              abi: delegateValidatorAbi,
+              functionName: 'setDelegate',
+              args: [NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS as `0x${string}`],
+            }),
+          },
+        ],
+        (status) => onProgress?.('delegate', status)
+      );
+      safe = await openSafeByAddress(ownerAddress, provider, deployment.safeAddress);
+      onProgress?.('delegate', 'done');
+    } catch (error) {
+      onProgress?.('delegate', 'failed');
+      throw error;
+    }
+  } else {
+    onProgress?.('delegate', 'done');
   }
 
   if (safe7579InitError && !validatorInstallTxHash && installedDelegate === ZERO_ADDRESS) {
     throw new Error(`Failed to initialize Safe7579 adapter for the existing Safe. ${safe7579InitError}`);
   }
 
+  // 6. guard
   if (NEURALRATE_EXECUTION_GUARD_CONTRACT) {
     const currentModuleGuard = (await retryOnUnknownBlock(() => safe.getModuleGuard())).toLowerCase();
     if (currentModuleGuard !== NEURALRATE_EXECUTION_GUARD_CONTRACT.toLowerCase()) {
+      onProgress?.('guard', 'signing');
       try {
         const enableModuleGuardTx = await retryOnUnknownBlock(() =>
           safe.createEnableModuleGuardTx(NEURALRATE_EXECUTION_GUARD_CONTRACT)
         );
         const result = await retryOnUnknownBlock(() => safe.executeTransaction(enableModuleGuardTx));
+        onProgress?.('guard', 'confirming');
         await waitForTransactionReceipt(provider, result.hash);
         moduleGuardTxHash = result.hash;
+        onProgress?.('guard', 'done');
       } catch (error) {
+        onProgress?.('guard', 'failed');
         const detail = describeError(error);
         throw new Error(
           `Failed to enable execution guard after runtime prerequisites were installed.${
@@ -572,6 +692,8 @@ export async function ensureAutonomousVaultRuntime(
           }`
         );
       }
+    } else {
+      onProgress?.('guard', 'done');
     }
   }
 
