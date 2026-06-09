@@ -87,10 +87,11 @@ const formatUsd = (value: number) =>
     maximumFractionDigits: value >= 100 ? 0 : 2,
   }).format(value);
 
+const decisionsCache: Record<string, DecisionRecord[]> = {};
+
 const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) => {
   const wallet = useWalletContext();
   const [amountUsd, setAmountUsd] = useState(10000);
-  const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [queueing, setQueueing] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -101,16 +102,29 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
   const hasConfig = Boolean(state?.config);
   const isRecommendOnlyPath = !hasVault;
 
-  const fetchHistory = async () => {
+  const storedBundle = useMemo(() => ownerEoa ? loadStoredMcpAccessBundle(ownerEoa) : null, [ownerEoa]);
+  const hasSession = Boolean(storedBundle?.sessionToken);
+
+  const [decisions, setDecisions] = useState<DecisionRecord[]>(() => {
+    if (ownerEoa) {
+      return decisionsCache[ownerEoa.toLowerCase()] ?? [];
+    }
+    return [];
+  });
+
+  const fetchHistory = async (force = false) => {
     if (!ownerEoa) {
       setDecisions([]);
+      return;
+    }
+
+    if (!hasSession && !force) {
       return;
     }
 
     setLoading(true);
     setError(null);
     try {
-      const storedBundle = loadStoredMcpAccessBundle(ownerEoa);
       let json: { success: boolean; decisions: DecisionRecord[] };
       try {
         json = await authorizedGetJsonFetch<{ success: boolean; decisions: DecisionRecord[] }>({
@@ -132,6 +146,7 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
         });
       }
       setDecisions(json.decisions);
+      decisionsCache[ownerEoa.toLowerCase()] = json.decisions;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to load benchmark history.";
       setError(message);
@@ -141,8 +156,17 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
   };
 
   useEffect(() => {
-    void fetchHistory();
-  }, [ownerEoa, wallet.signMessage]);
+    const cached = ownerEoa ? decisionsCache[ownerEoa.toLowerCase()] : null;
+    if (cached) {
+      setDecisions(cached);
+    } else {
+      setDecisions([]);
+    }
+
+    if (hasSession) {
+      void fetchHistory(false);
+    }
+  }, [ownerEoa, hasSession]);
 
   useEffect(() => {
     if (state?.config?.max_automation_usd) {
@@ -242,7 +266,7 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
           ? "Decision generated. It fits the user vault limits and can be queued for autonomous benchmarking."
           : "Decision generated. It remains advisory until you loosen the current action limits."
       );
-      await fetchHistory();
+      await fetchHistory(true);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to generate decision.";
       setError(message);
@@ -303,7 +327,7 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
           : `Benchmark job ${truncate(json.benchmarkJob.benchmark_job_id)} recorded, but execution is unavailable for the current signer mode.`
       );
       await onRefreshAutomation();
-      await fetchHistory();
+      await fetchHistory(true);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to queue benchmark.";
       setError(message);
@@ -418,8 +442,26 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
                 The most recent benchmark records stay pinned on the right.
               </div>
             </div>
-            <div style={{ fontSize: "0.74rem", color: "var(--text-secondary)" }}>
-              {decisions.length} record{decisions.length === 1 ? "" : "s"}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <span style={{ fontSize: "0.74rem", color: "var(--text-secondary)" }}>
+                {decisions.length} record{decisions.length === 1 ? "" : "s"}
+              </span>
+              <button
+                onClick={() => void fetchHistory(true)}
+                disabled={loading}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "var(--color-lime)",
+                  cursor: loading ? "not-allowed" : "pointer",
+                  fontSize: "0.74rem",
+                  padding: "0.2rem 0.4rem",
+                  borderRadius: "4px",
+                  textDecoration: "underline",
+                }}
+              >
+                {loading ? "Syncing..." : hasSession ? "Sync" : "Sync (Sign)"}
+              </button>
             </div>
           </div>
 
@@ -522,10 +564,28 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
             })}
 
             {!loading && decisions.length === 0 && (
-              <div className="decision-ledger-empty">
-                {hasVault
-                  ? "No personalized decisions yet. Save settings and generate the first benchmark decision."
-                  : "No recommendations yet. Generate your first decision now, then bootstrap a vault when you're ready for automation."}
+              <div className="decision-ledger-empty" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+                <div>
+                  {hasVault
+                    ? "No personalized decisions yet. Save settings and generate the first benchmark decision."
+                    : "No recommendations yet. Generate your first decision now, then bootstrap a vault when you're ready for automation."}
+                </div>
+                {!hasSession && (
+                  <button
+                    onClick={() => void fetchHistory(true)}
+                    style={{
+                      border: "1px solid var(--border-subtle)",
+                      background: "rgba(255,255,255,0.04)",
+                      color: "var(--text-primary)",
+                      padding: "0.5rem 1rem",
+                      borderRadius: "8px",
+                      cursor: "pointer",
+                      fontSize: "0.8rem",
+                    }}
+                  >
+                    Sync History from Server
+                  </button>
+                )}
               </div>
             )}
           </div>
