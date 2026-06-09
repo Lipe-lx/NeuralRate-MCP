@@ -4,7 +4,7 @@
   "contractName": "NeuralRateExecutionGuard",
   "address": "0x666Bc822156824F40F2b70aAaAcBfe87467D79A5",
   "txHash": "0x984bc0f8daf9e59496aef8156e827011c6d96297a72b57d8e7e5c6fe9ec73f31",
-  "policyRegistry": "0xc4580b5831f36eCc3E4865e635c970C75DD9869C",
+  "policyRegistry": "0x86cD4f8c2528E71a473ED342aa73B8a00de906a4",
   "trustedModule": "0xf7061501a464e893636a5BF8eB4ab7Ba2819154D",
   "trustedSafeModule": "0x7ec994fD2F774Fb8AAe472C349ED3E64E0A15FEa",
   "updatedAt": "2026-06-08T21:35:07.300Z"

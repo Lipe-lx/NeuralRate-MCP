@@ -10,7 +10,7 @@ NeuralRate centers its automation trust model on five Solidity surfaces in the r
 
 - file: `contracts/contracts/NeuralRatePolicyRegistry.sol`
 - role: active on-chain policy registry per owner vault
-- live Sepolia registry deployment: [`0xc4580b5831f36eCc3E4865e635c970C75DD9869C`](https://sepolia.mantlescan.xyz/address/0xc4580b5831f36eCc3E4865e635c970C75DD9869C)
+- live Sepolia registry deployment: [`0x86cD4f8c2528E71a473ED342aa73B8a00de906a4`](https://sepolia.mantlescan.xyz/address/0x86cD4f8c2528E71a473ED342aa73B8a00de906a4)
 
 What it does:
 

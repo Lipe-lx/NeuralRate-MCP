@@ -2,7 +2,7 @@
   "network": "mantleSepolia",
   "chainId": 5003,
   "contractName": "NeuralRatePolicyRegistry",
-  "address": "0xc4580b5831f36eCc3E4865e635c970C75DD9869C",
-  "txHash": "0xc47881f2b1c40d74e0ed6be474de2d35ef5e96454308c10e86ea0f1f1339c0ae",
-  "updatedAt": "2026-05-27T05:59:52.049Z"
+  "address": "0x86cD4f8c2528E71a473ED342aa73B8a00de906a4",
+  "txHash": "0xe3d485f680dad824ce4bca957f2f86b69b04372f7330fa7eb67682d4e09700b6",
+  "updatedAt": "2026-06-09T21:52:18.957Z"
 }

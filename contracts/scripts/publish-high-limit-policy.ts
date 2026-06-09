@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 
 async function main() {
-  const registryAddress = "0xc4580b5831f36eCc3E4865e635c970C75DD9869C";
+  const registryAddress = "0x86cD4f8c2528E71a473ED342aa73B8a00de906a4";
   const vaultAddress = "0x9ddbbb5f9a3cc1c0e744d20ba6b0fa50fb22a3ff";
   const delegateAddress = "0xc57130F28f3d670cA75AD9a78784966B767E55e3";
 
@@ -10,9 +10,10 @@ async function main() {
 
   const registry = await ethers.getContractAt("NeuralRatePolicyRegistry", registryAddress);
   
-  const now = Math.floor(Date.now() / 1000);
-  const validAfter = now - 3600; // 1 hour ago
-  const validUntil = now + 3600 * 24 * 30; // 30 days from now
+  const latestBlock = await ethers.provider.getBlock("latest");
+  const latestTimestamp = latestBlock ? latestBlock.timestamp : Math.floor(Date.now() / 1000);
+  const validAfter = latestTimestamp - 3600; // 1 hour ago
+  const validUntil = latestTimestamp + 3600 * 24 * 30; // 30 days from now
 
   // Large limits to support wei comparisons: 10^24 base units
   const maxPerUse = ethers.parseUnits("1000000", 18); // 1M
