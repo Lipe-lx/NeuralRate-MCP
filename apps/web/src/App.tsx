@@ -8,12 +8,14 @@ import VaultPanel from './components/VaultPanel';
 import VaultTelemetryPanel from './components/VaultTelemetryPanel';
 import AgentSettingsPanel from './components/AgentSettingsPanel';
 import WalletOwnershipModal from './components/WalletOwnershipModal';
+import OnboardingWizard from './components/OnboardingWizard';
 import VerifyPanel from './components/VerifyPanel';
 import HomePanel from './components/HomePanel';
 import { useApi } from './hooks/useApi';
 import { WalletProvider } from './context/WalletContext';
 import { useWalletContext } from './context/WalletContext';
 import { useNeuralRateUser } from './hooks/useNeuralRateUser';
+import { hasRuntimeNativeDeposit } from './lib/userState';
 import { API_BASE_URL, ENV_PROFILE } from './config';
 
 export interface Pool {
@@ -73,6 +75,8 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState<AppTab>(() => (window.location.pathname === '/verify' ? 'verify' : 'terminal'));
   const [activeVaultTab, setActiveVaultTab] = useState<'vault' | 'telemetry' | 'settings' | 'history'>('vault');
   const [isOwnershipModalOpen, setIsOwnershipModalOpen] = useState(false);
+  const [isOnboardingWizardOpen, setIsOnboardingWizardOpen] = useState(false);
+  const [wizardDismissed, setWizardDismissed] = useState(false);
   const wallet = useWalletContext();
   const { address, isConnected, isCorrectChain, connect, switchToMantle } = wallet;
   const neuralRateUser = useNeuralRateUser({
@@ -86,6 +90,39 @@ function AppContent() {
     getEthereumProvider: wallet.getEthereumProvider,
     signMessage: wallet.signMessage,
   });
+
+  const hasOnchainDeposit = hasRuntimeNativeDeposit(neuralRateUser.state);
+  const vault = neuralRateUser.state?.vault;
+  const hasFundingIntent = hasOnchainDeposit || Boolean(
+    vault?.last_funding_intent &&
+    (parseFloat(String(vault.last_funding_intent.amountUsd || 0)) > 0)
+  );
+
+  useEffect(() => {
+    if (
+      activeTab === 'vault' &&
+      activeVaultTab === 'vault' &&
+      isConnected &&
+      isCorrectChain &&
+      neuralRateUser.state &&
+      !neuralRateUser.state.vault &&
+      !wizardDismissed &&
+      !neuralRateUser.busy
+    ) {
+      setIsOnboardingWizardOpen(true);
+    } else {
+      setIsOnboardingWizardOpen(false);
+    }
+  }, [
+    activeTab,
+    activeVaultTab,
+    isConnected,
+    isCorrectChain,
+    neuralRateUser.state,
+    neuralRateUser.state?.vault,
+    wizardDismissed,
+    neuralRateUser.busy,
+  ]);
 
   useEffect(() => {
     const onPop = () => {
@@ -393,6 +430,22 @@ function AppContent() {
           onExportEmbeddedWallet={wallet.exportEmbeddedWallet}
           onSetEmbeddedWalletRecovery={wallet.setEmbeddedWalletRecovery}
           onAcknowledge={handleAcknowledgeOwnership}
+        />
+      )}
+
+      {isOnboardingWizardOpen && (
+        <OnboardingWizard
+          isOpen={isOnboardingWizardOpen}
+          onClose={() => {
+            setIsOnboardingWizardOpen(false);
+            setWizardDismissed(true);
+          }}
+          busy={neuralRateUser.busy}
+          vault={neuralRateUser.state?.vault ?? null}
+          hasFundingIntent={hasFundingIntent}
+          onBootstrap={handleBootstrap}
+          onFundingIntent={neuralRateUser.createFundingIntent}
+          controlWalletLabel={controlWalletLabel}
         />
       )}
     </div>

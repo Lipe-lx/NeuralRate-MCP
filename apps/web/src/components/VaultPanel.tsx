@@ -132,6 +132,8 @@ const VaultPanel: React.FC<Props> = ({
   onRefreshState,
 }) => {
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [showMcpAdvanced, setShowMcpAdvanced] = useState(false);
+  const [showVaultAdvanced, setShowVaultAdvanced] = useState(false);
   const vault = state?.vault;
   const storedBundle = React.useMemo(() => state?.ownerEoa ? loadStoredMcpAccessBundle(state.ownerEoa) : null, [state?.ownerEoa]);
   const hasSession = Boolean(storedBundle?.sessionToken);
@@ -377,22 +379,6 @@ const VaultPanel: React.FC<Props> = ({
 
           <div className="vault-detail-grid">
             <div style={rowStyle}>
-              <span>Onboarding</span>
-              {renderCopyValue("onboarding", ONBOARDING_PROVIDER, ONBOARDING_PROVIDER)}
-            </div>
-            <div style={rowStyle}>
-              <span>Vault Strategy</span>
-              {renderCopyValue("vault_strategy", VAULT_PROVIDER_STRATEGY, VAULT_PROVIDER_STRATEGY)}
-            </div>
-            <div style={rowStyle}>
-              <span>Managed Signer</span>
-              {renderCopyValue("managed_signer", MANAGED_SIGNER_PROVIDER, MANAGED_SIGNER_PROVIDER)}
-            </div>
-            <div style={rowStyle}>
-              <span>Vault ID</span>
-              {renderCopyValue("vault_id", vault?.vault_id, truncate(vault?.vault_id))}
-            </div>
-            <div style={rowStyle}>
               <span>Vault Address</span>
               {renderCopyValue(
                 "vault_address",
@@ -413,25 +399,10 @@ const VaultPanel: React.FC<Props> = ({
               {renderCopyValue("automation_status", automationStatus, automationStatus)}
             </div>
             <div style={rowStyle}>
-              <span>Signed Consent</span>
-              {renderCopyValue("signed_consent", consentRecordedAt ? "Recorded" : "Pending", consentRecordedAt ? "Recorded" : "Pending", {
-                accent: Boolean(consentRecordedAt),
-              })}
-            </div>
-            <div style={rowStyle}>
               <span>Automation Ready</span>
               {renderCopyValue("automation_ready", state?.automationReady ? "Ready" : "Pending", state?.automationReady ? "Ready" : "Pending", {
                 accent: Boolean(state?.automationReady),
               })}
-            </div>
-            <div style={rowStyle}>
-              <span>Onchain Policy</span>
-              {renderCopyValue(
-                "onchain_policy",
-                onchainPolicy?.policyId,
-                onchainPolicy ? truncate(onchainPolicy.policyId) : "Not published",
-                { accent: Boolean(onchainPolicy) },
-              )}
             </div>
             <div style={rowStyle}>
               <span>AA Runtime</span>
@@ -442,6 +413,63 @@ const VaultPanel: React.FC<Props> = ({
                 { accent: Boolean(state?.automationReady) },
               )}
             </div>
+
+            <div style={{ gridColumn: "span 2", marginTop: "0.2rem" }}>
+              <button
+                type="button"
+                onClick={() => setShowVaultAdvanced(!showVaultAdvanced)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "var(--color-lime)",
+                  cursor: "pointer",
+                  fontSize: "0.74rem",
+                  padding: "0.2rem 0",
+                  textDecoration: "underline",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.25rem",
+                }}
+              >
+                {showVaultAdvanced ? "Hide technical details ▲" : "Show technical details ▼"}
+              </button>
+            </div>
+
+            {showVaultAdvanced && (
+              <>
+                <div style={rowStyle}>
+                  <span>Onboarding</span>
+                  {renderCopyValue("onboarding", ONBOARDING_PROVIDER, ONBOARDING_PROVIDER)}
+                </div>
+                <div style={rowStyle}>
+                  <span>Vault Strategy</span>
+                  {renderCopyValue("vault_strategy", VAULT_PROVIDER_STRATEGY, VAULT_PROVIDER_STRATEGY)}
+                </div>
+                <div style={rowStyle}>
+                  <span>Managed Signer</span>
+                  {renderCopyValue("managed_signer", MANAGED_SIGNER_PROVIDER, MANAGED_SIGNER_PROVIDER)}
+                </div>
+                <div style={rowStyle}>
+                  <span>Vault ID</span>
+                  {renderCopyValue("vault_id", vault?.vault_id, truncate(vault?.vault_id))}
+                </div>
+                <div style={rowStyle}>
+                  <span>Signed Consent</span>
+                  {renderCopyValue("signed_consent", consentRecordedAt ? "Recorded" : "Pending", consentRecordedAt ? "Recorded" : "Pending", {
+                    accent: Boolean(consentRecordedAt),
+                  })}
+                </div>
+                <div style={rowStyle}>
+                  <span>Onchain Policy</span>
+                  {renderCopyValue(
+                    "onchain_policy",
+                    onchainPolicy?.policyId,
+                    onchainPolicy ? truncate(onchainPolicy.policyId) : "Not published",
+                    { accent: Boolean(onchainPolicy) },
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           <div style={{ fontSize: "0.74rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
@@ -520,62 +548,21 @@ const VaultPanel: React.FC<Props> = ({
                   disabled={busy || !hasAutomation}
                 />
               </div>
+
               {mcpAccessBundle ? (
                 <>
                   <div className="vault-detail-grid">
                     <div style={rowStyle}>
-                      <span>Execution MCP</span>
-                      {renderCopyValue(
-                        "mcp_execution_http",
-                        mcpExecutionCatalog?.httpUrl,
-                        mcpExecutionCatalog?.httpUrl ? truncate(mcpExecutionCatalog.httpUrl) : "Unavailable",
-                        { accent: Boolean(mcpExecutionCatalog?.allowed) },
-                      )}
-                    </div>
-                    <div style={rowStyle}>
-                      <span>Execution Query</span>
-                      {renderCopyValue(
-                        "mcp_execution_query",
-                        mcpExecutionCatalog?.queryHttpUrl,
-                        mcpExecutionCatalog?.queryHttpUrl ? truncate(mcpExecutionCatalog.queryHttpUrl) : "Unavailable",
-                        { accent: Boolean(mcpExecutionCatalog?.allowed) },
-                      )}
-                    </div>
-                    <div style={rowStyle}>
-                      <span>Config MCP</span>
-                      {renderCopyValue(
-                        "mcp_config_http",
-                        mcpConfigCatalog?.httpUrl,
-                        mcpConfigCatalog?.httpUrl ? truncate(mcpConfigCatalog.httpUrl) : "Unavailable",
-                        { accent: Boolean(mcpConfigCatalog?.allowed) },
-                      )}
-                    </div>
-                    <div style={rowStyle}>
-                      <span>Token Expires</span>
-                      {renderCopyValue(
-                        "mcp_expires_at",
-                        mcpAccessBundle.expiresAt,
-                        new Date(mcpAccessBundle.expiresAt).toLocaleString(),
-                        { accent: true },
-                      )}
+                      <span>Endpoint URL</span>
+                      {renderCopyValue("mcp_endpoint", mcpAccessBundle.recommendedTransport.url, truncate(mcpAccessBundle.recommendedTransport.url))}
                     </div>
                     <div style={rowStyle}>
                       <span>Session Token</span>
-                      {renderCopyValue("mcp_session_token", mcpAccessBundle.sessionToken, truncate(mcpAccessBundle.sessionToken), {
-                        accent: true,
-                      })}
-                    </div>
-                    <div style={rowStyle}>
-                      <span>Header</span>
-                      {renderCopyValue(
-                        "mcp_header",
-                        `${mcpAccessBundle.headerName}: ${mcpAccessBundle.sessionToken}`,
-                        mcpAccessBundle.headerName,
-                        { accent: true },
-                      )}
+                      {renderCopyValue("mcp_token", mcpAccessBundle.sessionToken, truncate(mcpAccessBundle.sessionToken))}
                     </div>
                   </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.65rem" }}>
+
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginTop: "0.2rem" }}>
                     <ActionButton
                       label={copiedField === "mcp_agent_payload" ? "Copied Agent Payload" : "Copy Agent Payload"}
                       onClick={() => handleCopy(mcpBundlePayload, "mcp_agent_payload")}
@@ -590,6 +577,58 @@ const VaultPanel: React.FC<Props> = ({
                   <div style={{ fontSize: "0.74rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
                     To let the agent operate, send the `Execution MCP` endpoint plus the `x-neuralrate-session-token` header, or use the query URL if your client cannot set headers.
                   </div>
+
+                  <div style={{ marginTop: "0.3rem" }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowMcpAdvanced(!showMcpAdvanced)}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        color: "var(--color-lime)",
+                        cursor: "pointer",
+                        fontSize: "0.74rem",
+                        padding: "0.2rem 0",
+                        textDecoration: "underline",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.25rem",
+                      }}
+                    >
+                      {showMcpAdvanced ? "Hide advanced connection details ▲" : "Show advanced connection details ▼"}
+                    </button>
+                  </div>
+
+                  {showMcpAdvanced && (
+                    <div className="vault-detail-grid" style={{ marginTop: "0.4rem", paddingTop: "0.4rem", borderTop: "1px dashed var(--border-subtle)", animation: "fadeIn 0.2s ease-out" }}>
+                      <div style={rowStyle}>
+                        <span>MCP Type</span>
+                        {renderCopyValue("mcp_type", mcpAccessBundle.recommendedTransport.type, mcpAccessBundle.recommendedTransport.type)}
+                      </div>
+                      <div style={rowStyle}>
+                        <span>Token Header</span>
+                        {renderCopyValue("mcp_header_name", "x-neuralrate-session-token", "x-neuralrate-session-token")}
+                      </div>
+                      <div style={rowStyle}>
+                        <span>Allowed Domains</span>
+                        {renderCopyValue(
+                          "mcp_domains",
+                          mcpAccessBundle.allowedDomains.join(", "),
+                          mcpAccessBundle.allowedDomains.length ? mcpAccessBundle.allowedDomains.join(", ") : "Any",
+                        )}
+                      </div>
+                      <div style={rowStyle}>
+                        <span>Expires At</span>
+                        {renderCopyValue("mcp_expires", mcpAccessBundle.expiresAt, new Date(mcpAccessBundle.expiresAt).toLocaleDateString())}
+                      </div>
+                      {mcpConfigCatalog?.httpUrl && (
+                        <div style={rowStyle}>
+                          <span>Config Endpoint</span>
+                          {renderCopyValue("mcp_config_endpoint", mcpConfigCatalog.httpUrl, truncate(mcpConfigCatalog.httpUrl))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               ) : (
                 <div style={{ fontSize: "0.74rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
@@ -620,43 +659,47 @@ const VaultPanel: React.FC<Props> = ({
                 Next unblock: {nextStep.blockedBy}
               </div>
             )}
-            <div style={{ display: "grid", gap: "0.5rem" }}>
-              {onboardingSteps.map((step, index) => (
-                <div
-                  key={step.key}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "24px 1fr",
-                    gap: "0.55rem",
-                    alignItems: "start",
-                    opacity: step.done ? 1 : 0.9,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: "20px",
-                      height: "20px",
-                      borderRadius: "999px",
-                      display: "grid",
-                      placeItems: "center",
-                      fontSize: "0.7rem",
-                      fontWeight: 700,
-                      background: step.done ? "rgba(223, 246, 81, 0.16)" : "rgba(255,255,255,0.06)",
-                      color: step.done ? "var(--color-lime)" : "var(--text-secondary)",
-                      border: step.done ? "1px solid rgba(223, 246, 81, 0.35)" : "1px solid var(--border-subtle)",
-                    }}
-                  >
-                    {step.done ? "✓" : index + 1}
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
-                    <div style={{ fontSize: "0.76rem", color: "var(--text-primary)", fontWeight: 600 }}>{step.label}</div>
-                    {!step.done && step.blockedBy && (
-                      <div style={{ fontSize: "0.71rem", color: "var(--text-secondary)", lineHeight: 1.4 }}>{step.blockedBy}</div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+             <div style={{ display: "grid", gap: "0.5rem" }}>
+               {nextStep ? (
+                 <div
+                   key={nextStep.key}
+                   style={{
+                     display: "grid",
+                     gridTemplateColumns: "24px 1fr",
+                     gap: "0.55rem",
+                     alignItems: "start",
+                     opacity: 1,
+                   }}
+                 >
+                   <div
+                     style={{
+                       width: "20px",
+                       height: "20px",
+                       borderRadius: "999px",
+                       display: "grid",
+                       placeItems: "center",
+                       fontSize: "0.7rem",
+                       fontWeight: 700,
+                       background: "rgba(255, 255, 255, 0.06)",
+                       color: "var(--text-secondary)",
+                       border: "1px solid var(--border-subtle)",
+                     }}
+                   >
+                     {onboardingSteps.indexOf(nextStep) + 1}
+                   </div>
+                   <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
+                     <div style={{ fontSize: "0.76rem", color: "var(--text-primary)", fontWeight: 600 }}>{nextStep.label}</div>
+                     {nextStep.blockedBy && (
+                       <div style={{ fontSize: "0.71rem", color: "var(--text-secondary)", lineHeight: 1.4 }}>{nextStep.blockedBy}</div>
+                     )}
+                   </div>
+                 </div>
+               ) : (
+                 <div style={{ fontSize: "0.78rem", color: "var(--color-lime)", fontWeight: 600 }}>
+                   ✓ All onboarding steps completed! Vault automation is active.
+                 </div>
+               )}
+             </div>
           </div>
 
           {vault && !ownershipAcknowledged && (

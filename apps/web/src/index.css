@@ -738,7 +738,7 @@ input[type="checkbox"] {
 
 .vault-detail-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.5rem 0.85rem;
   padding: 0.7rem 0 0.8rem;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
@@ -2892,3 +2892,14 @@ main select option {
   text-transform: uppercase;
   padding: 0.5rem;
 }
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleUp {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
