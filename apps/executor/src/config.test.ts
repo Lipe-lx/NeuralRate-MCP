@@ -41,3 +41,31 @@ test("executor rejects invalid paymaster context JSON", () => {
     /NEURALRATE_PAYMASTER_CONTEXT_JSON must be valid JSON/
   );
 });
+
+test("executor rejects invalid TURNKEY_ORGANIZATION_ID format", () => {
+  assert.throws(
+    () => createExecutorConfig(baseEnv({
+      TURNKEY_ORGANIZATION_ID: "not-a-uuid",
+    })),
+    /TURNKEY_ORGANIZATION_ID must be a valid UUID/
+  );
+});
+
+test("executor rejects invalid TURNKEY_API_PUBLIC_KEY format", () => {
+  assert.throws(
+    () => createExecutorConfig(baseEnv({
+      TURNKEY_API_PUBLIC_KEY: "too-short",
+    })),
+    /TURNKEY_API_PUBLIC_KEY must be a 66-character hex string/
+  );
+});
+
+test("executor rejects invalid TURNKEY_API_PRIVATE_KEY format", () => {
+  assert.throws(
+    () => createExecutorConfig(baseEnv({
+      TURNKEY_API_PRIVATE_KEY: "not-64-chars-long",
+    })),
+    /TURNKEY_API_PRIVATE_KEY must be a 64-character hex string/
+  );
+});
+

@@ -1,0 +1,71 @@
+{
+  "chain": {
+    "name": "Mantle Sepolia",
+    "chainId": 5003,
+    "rpcUrl": "https://rpc.sepolia.mantle.xyz",
+    "explorerBaseUrl": "https://sepolia.mantlescan.xyz"
+  },
+  "identities": {
+    "ownerEoa": "0x54FCb49Cd7281140e17721f65f00e49a809400Bc",
+    "agentTurnkeyEoa": "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
+    "safeVaultAddress": "0x9ddbbb5f9a3cc1c0e744d20ba6b0fa50fb22a3ff",
+    "decisionRegistryAddress": "0xC0C836A220D006398cdE4D5caf529196E63f81A8"
+  },
+  "executionSummary": {
+    "step1_first_attempt": {
+      "type": "MCP benchmark queue",
+      "tool": "queue_benchmark",
+      "decisionId": "demo_decision_1780973798893",
+      "status": "failed",
+      "failureReason": "Turnkey agent signer EOA had 0 MNT balance (Out of Gas)."
+    },
+    "step2_gas_funding": {
+      "type": "On-chain transfer",
+      "from": "0x54FCb49Cd7281140e17721f65f00e49a809400Bc",
+      "to": "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
+      "amount": "2.0 MNT",
+      "txHash": "0x725a2562872bd98bc97db748c29a5320b9878b20cdcf649f6d9e50649db6b8fe",
+      "block": 39714709
+    },
+    "step3_second_attempt": {
+      "type": "MCP benchmark queue",
+      "tool": "queue_benchmark",
+      "decisionId": "demo_decision_1780974129751",
+      "status": "failed",
+      "failureReason": "Turnkey signing failed due to missing organization ID (upstream service provider issue)."
+    },
+    "step4_direct_onchain_anchoring_bypass": {
+      "type": "Solidity contract call (Owner Bypass)",
+      "targetContract": "0xC0C836A220D006398cdE4D5caf529196E63f81A8",
+      "txHashes": {
+        "setReceiptWriterToOwner": "0x028b2f0447b515cd1f626ee00c9c4726db7f96b089167585147f9b3b4cb3f458",
+        "createDecisionReceipt": "0x14dd140f5b343c629bd7aebc5b659f45207d78d19e8a39990c3b191133de6fbd",
+        "restoreReceiptWriterToTurnkey": "0x210974081453b6e2471d48c99491cfab11ba180f7e7011e7bb4fb4d4cc35bee1"
+      },
+      "receipt": {
+        "receiptId": "1",
+        "ownerEoa": "0x54FCb49Cd7281140e17721f65f00e49a809400Bc",
+        "vaultAddress": "0x9dDbbb5f9a3cC1C0e744D20Ba6b0fa50fb22a3FF",
+        "delegate": "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
+        "externalDecisionId": "demo_decision_direct_1780974246729",
+        "policyVersion": "vault-v1",
+        "strategyKey": "mnt-native-transfer",
+        "snapshotHash": "0x194f5450d527aa775a836de57b41d447bb57d70aaac0b5fe8cf04320ac90230a",
+        "snapshotCID": "local-demo-snapshot",
+        "predictedApyBps": 500,
+        "settlementHorizonHours": 24
+      }
+    },
+    "step5_successful_turnkey_mcp_flow": {
+      "type": "MCP benchmark queue with correct turnkey credentials",
+      "tool": "queue_benchmark",
+      "decisionId": "demo_decision_1780976206938",
+      "status": "confirmed",
+      "txHash": "0xa9852374dee441c9153220dccec299e03f262076febe776a1de18f9654827d44",
+      "blockNumber": 39715772,
+      "from": "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
+      "to": "0xC0C836A220D006398cdE4D5caf529196E63f81A8",
+      "gasUsed": 365763
+    }
+  }
+}

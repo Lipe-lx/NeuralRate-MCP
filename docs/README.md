@@ -48,5 +48,6 @@ This directory contains the current documentation split into two groups:
 - [neuralrate-mcp-consolidated.md](neuralrate-mcp-consolidated.md)
 - [e2e-live-audit-2026-05-27.md](e2e-live-audit-2026-05-27.md)
 - [e2e-mcp-live-audit-2026-05-27.md](e2e-mcp-live-audit-2026-05-27.md)
+- [mcp-live-audit-2026-06-09/README.md](mcp-live-audit-2026-06-09/README.md)
 
 These files are preserved for planning history and audit context only.

@@ -101,6 +101,21 @@ export const createExecutorConfig = (env: ExecutorEnvBindings): ExecutorConfig =
     : null;
   const explicitPaymaster = optional(env, "NEURALRATE_PAYMASTER_RPC_URL");
 
+  const turnkeyOrganizationId = optional(env, "TURNKEY_ORGANIZATION_ID");
+  if (turnkeyOrganizationId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(turnkeyOrganizationId)) {
+    throw new Error("TURNKEY_ORGANIZATION_ID must be a valid UUID.");
+  }
+
+  const turnkeyApiPublicKey = optional(env, "TURNKEY_API_PUBLIC_KEY");
+  if (turnkeyApiPublicKey && !/^[0-9a-f]{66}$/i.test(turnkeyApiPublicKey)) {
+    throw new Error("TURNKEY_API_PUBLIC_KEY must be a 66-character hex string.");
+  }
+
+  const turnkeyApiPrivateKey = optional(env, "TURNKEY_API_PRIVATE_KEY");
+  if (turnkeyApiPrivateKey && !/^[0-9a-f]{64}$/i.test(turnkeyApiPrivateKey)) {
+    throw new Error("TURNKEY_API_PRIVATE_KEY must be a 64-character hex string.");
+  }
+
   return {
     envProfile: optional(env, "NEURALRATE_ENV_PROFILE", "demo") ?? "demo",
     chainId: runtimeChainId,
@@ -134,9 +149,9 @@ export const createExecutorConfig = (env: ExecutorEnvBindings): ExecutorConfig =
     managedSignerUrl: optional(env, "NEURALRATE_MANAGED_SIGNER_URL"),
     managedSignerToken: optional(env, "NEURALRATE_MANAGED_SIGNER_TOKEN"),
     turnkeyApiBaseUrl: required(env, "TURNKEY_API_BASE_URL", "https://api.turnkey.com"),
-    turnkeyOrganizationId: optional(env, "TURNKEY_ORGANIZATION_ID"),
-    turnkeyApiPublicKey: optional(env, "TURNKEY_API_PUBLIC_KEY"),
-    turnkeyApiPrivateKey: optional(env, "TURNKEY_API_PRIVATE_KEY"),
+    turnkeyOrganizationId,
+    turnkeyApiPublicKey,
+    turnkeyApiPrivateKey,
     turnkeyWalletAccountAddress: optional(
       env,
       "TURNKEY_WALLET_ACCOUNT_ADDRESS",
