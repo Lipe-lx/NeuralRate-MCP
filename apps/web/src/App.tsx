@@ -97,17 +97,26 @@ function AppContent() {
     vault?.last_funding_intent &&
     (parseFloat(String(vault.last_funding_intent.amountUsd || 0)) > 0)
   );
+  const hasAutomation = Boolean(neuralRateUser.state?.activeGrant && neuralRateUser.state.activeGrant.status === 'active');
+
+  const isPending = useMemo(() => {
+    if (!isConnected) return true;
+    if (!isCorrectChain) return true;
+    if (!neuralRateUser.state) return true;
+    const isVaultCreated = Boolean(vault);
+    const isOwnershipConfirmed = Boolean(vault?.ownership_acknowledged_at);
+    const isGrantActive = hasAutomation;
+    const automationReady = Boolean(neuralRateUser.state.automationReady);
+
+    return !isVaultCreated || !isOwnershipConfirmed || !hasFundingIntent || !isGrantActive || !automationReady;
+  }, [isConnected, isCorrectChain, neuralRateUser.state, vault, hasFundingIntent, hasAutomation, neuralRateUser.state?.automationReady]);
 
   useEffect(() => {
     if (
       activeTab === 'vault' &&
       activeVaultTab === 'vault' &&
-      isConnected &&
-      isCorrectChain &&
-      neuralRateUser.state &&
-      !neuralRateUser.state.vault &&
-      !wizardDismissed &&
-      !neuralRateUser.busy
+      isPending &&
+      !wizardDismissed
     ) {
       setIsOnboardingWizardOpen(true);
     } else {
@@ -116,13 +125,13 @@ function AppContent() {
   }, [
     activeTab,
     activeVaultTab,
-    isConnected,
-    isCorrectChain,
-    neuralRateUser.state,
-    neuralRateUser.state?.vault,
+    isPending,
     wizardDismissed,
-    neuralRateUser.busy,
   ]);
+
+  useEffect(() => {
+    setWizardDismissed(false);
+  }, [address]);
 
   useEffect(() => {
     const onPop = () => {
@@ -204,7 +213,9 @@ function AppContent() {
   const handleBootstrap = async () => {
     const nextState = await neuralRateUser.bootstrap();
     if (nextState?.vault?.vault_address && !nextState.vault.ownership_acknowledged_at) {
-      setIsOwnershipModalOpen(true);
+      if (wizardDismissed) {
+        setIsOwnershipModalOpen(true);
+      }
     }
     return nextState;
   };
@@ -441,11 +452,24 @@ function AppContent() {
             setWizardDismissed(true);
           }}
           busy={neuralRateUser.busy}
-          vault={neuralRateUser.state?.vault ?? null}
+          state={neuralRateUser.state}
           hasFundingIntent={hasFundingIntent}
           onBootstrap={handleBootstrap}
           onFundingIntent={neuralRateUser.createFundingIntent}
+          onAcknowledgeOwnership={handleAcknowledgeOwnership}
+          onEnableAutomation={neuralRateUser.enableAutomation}
+          onCompleteRuntimeSetup={neuralRateUser.completeRuntimeSetup}
+          onQueueDemoStrategy={neuralRateUser.queueDemoStrategy}
           controlWalletLabel={controlWalletLabel}
+          controlWalletAddress={controlWalletAddress}
+          canExportEmbeddedWallet={wallet.canExportEmbeddedWallet}
+          embeddedWalletRecoveryMethod={wallet.embeddedWalletRecoveryMethod}
+          onExportEmbeddedWallet={wallet.exportEmbeddedWallet}
+          onSetEmbeddedWalletRecovery={wallet.setEmbeddedWalletRecovery}
+          isConnected={isConnected}
+          isCorrectChain={isCorrectChain}
+          onConnect={connect}
+          onSwitchChain={switchToMantle}
         />
       )}
     </div>
