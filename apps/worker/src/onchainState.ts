@@ -187,27 +187,31 @@ export const deriveAutomationReady = (
   activeOnchainPolicy: Record<string, unknown> | null,
   policySyncStatus: "not_published" | "in_sync" | "drifted" | "pending_publish" | "pending_revoke",
   nowMs = Date.now()
-) => {
+): { ready: boolean; diagnostics: Record<string, boolean> } => {
   const activeGrant = (state.activeGrant as Record<string, unknown> | null) ?? null;
   const activeMcpSession = (state.activeMcpSession as Record<string, unknown> | null) ?? null;
   const vault = (state.vault as Record<string, unknown> | null) ?? null;
   const config = (state.config as Record<string, unknown> | null) ?? null;
 
-  return Boolean(
-    vault?.vault_id &&
-    config?.user_id &&
-    isActiveScopedDomain(activeGrant, "execution") &&
-    isActiveScopedDomain(activeMcpSession, "execution") &&
-    activeOnchainPolicy &&
-    policySyncStatus === "in_sync" &&
-    isPolicyActiveNow(activeOnchainPolicy, nowMs) &&
-    runtimeState?.safeDeployed === true &&
-    runtimeState?.vaultModuleEnabled === true &&
-    runtimeState?.safe7579Enabled === true &&
-    runtimeState?.fallbackHandlerReady === true &&
-    runtimeState?.moduleGuardReady === true &&
-    runtimeState?.delegateReady === true
-  );
+  const diagnostics: Record<string, boolean> = {
+    hasVaultId: Boolean(vault?.vault_id),
+    hasConfigUserId: Boolean(config?.user_id),
+    grantActiveScopedExecution: isActiveScopedDomain(activeGrant, "execution"),
+    mcpSessionActiveScopedExecution: isActiveScopedDomain(activeMcpSession, "execution"),
+    hasActiveOnchainPolicy: Boolean(activeOnchainPolicy),
+    policySyncInSync: policySyncStatus === "in_sync",
+    policyActiveNow: isPolicyActiveNow(activeOnchainPolicy, nowMs),
+    safeDeployed: runtimeState?.safeDeployed === true,
+    vaultModuleEnabled: runtimeState?.vaultModuleEnabled === true,
+    safe7579Enabled: runtimeState?.safe7579Enabled === true,
+    fallbackHandlerReady: runtimeState?.fallbackHandlerReady === true,
+    moduleGuardReady: runtimeState?.moduleGuardReady === true,
+    delegateReady: runtimeState?.delegateReady === true,
+  };
+
+  const ready = Object.values(diagnostics).every(Boolean);
+
+  return { ready, diagnostics };
 };
 
 const erc20BalanceAbi = [
@@ -770,11 +774,12 @@ export async function withOnchainPolicyState<T extends Record<string, unknown>>(
     policySyncStatus = inSync ? "in_sync" : "drifted";
   }
 
-  const automationReady = deriveAutomationReady(state, runtimeState, activeOnchainPolicy, policySyncStatus);
+  const { ready: automationReady, diagnostics: _readyDiagnostics } = deriveAutomationReady(state, runtimeState, activeOnchainPolicy, policySyncStatus);
 
   return {
     ...state,
     automationReady,
+    _readyDiagnostics,
     draftPolicy,
     activeOnchainPolicy,
     policySyncStatus,

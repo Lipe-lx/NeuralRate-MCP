@@ -269,6 +269,7 @@ export interface AutomationState {
     entryPointAddress: string | null;
     authorityModel: string;
   } | null;
+  _readyDiagnostics?: Record<string, boolean> | null;
 }
 
 const parsePositiveWei = (value: string | null | undefined) => {

@@ -228,6 +228,9 @@ export const useNeuralRateUser = ({
         });
       }
       const mergedState = mergeLiveFundingTelemetry(json, stateRef.current);
+      if (mergedState._readyDiagnostics) {
+        console.log("[NeuralRate] automation ready diagnostics:", mergedState._readyDiagnostics, "automationReady:", mergedState.automationReady, "policySyncStatus:", mergedState.policySyncStatus);
+      }
       stateRef.current = mergedState;
       setState(mergedState);
       return mergedState;

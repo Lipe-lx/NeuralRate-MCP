@@ -117,23 +117,23 @@ test("deriveAutomationReady requires active execution scope, synced policy, and 
   const nowMs = Date.parse("2026-06-05T19:00:00.000Z");
 
   assert.equal(
-    deriveAutomationReady(baseState, runtimeState, onchainPolicy, "in_sync", nowMs),
+    deriveAutomationReady(baseState, runtimeState, onchainPolicy, "in_sync", nowMs).ready,
     true,
   );
   assert.equal(
-    deriveAutomationReady(baseState, { ...runtimeState, vaultModuleEnabled: false }, onchainPolicy, "in_sync", nowMs),
+    deriveAutomationReady(baseState, { ...runtimeState, vaultModuleEnabled: false }, onchainPolicy, "in_sync", nowMs).ready,
     false,
   );
   assert.equal(
-    deriveAutomationReady(baseState, { ...runtimeState, trustedModuleReady: false }, onchainPolicy, "in_sync", nowMs),
+    deriveAutomationReady(baseState, { ...runtimeState, trustedModuleReady: false }, onchainPolicy, "in_sync", nowMs).ready,
     true,
   );
   assert.equal(
-    deriveAutomationReady(baseState, { ...runtimeState, delegateGasReady: false }, onchainPolicy, "in_sync", nowMs),
+    deriveAutomationReady(baseState, { ...runtimeState, delegateGasReady: false }, onchainPolicy, "in_sync", nowMs).ready,
     true,
   );
   assert.equal(
-    deriveAutomationReady(baseState, runtimeState, onchainPolicy, "pending_publish", nowMs),
+    deriveAutomationReady(baseState, runtimeState, onchainPolicy, "pending_publish", nowMs).ready,
     false,
   );
   assert.equal(
@@ -146,7 +146,7 @@ test("deriveAutomationReady requires active execution scope, synced policy, and 
       onchainPolicy,
       "in_sync",
       nowMs,
-    ),
+    ).ready,
     false,
   );
 });
