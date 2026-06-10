@@ -2,7 +2,7 @@ import { ethers } from "hardhat";
 
 async function main() {
   const validatorAddress = "0x0A03F7763d53757183aD86C393eEfF6D8177e4cE";
-  const vaultAddress = "0xd9afd65e5361d9a098e0fe30b914883f7c82f743";
+  const vaultAddress = "0x9dDbbb5f9a3cC1C0e744D20Ba6b0fa50fb22a3FF";
 
   const validator = await ethers.getContractAt("NeuralRateDelegateValidator", validatorAddress);
   console.log("Fetching config for vault:", vaultAddress);

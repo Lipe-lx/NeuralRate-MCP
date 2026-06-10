@@ -1,3 +1,5 @@
+import deploymentsJson from '../public/verify/deployments.json';
+
 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 const defaultLocalOrigin = 'http://localhost:8787';
 const defaultPublicWorkerOrigin = 'https://neuralrate-worker.neuralrate.workers.dev';
@@ -102,9 +104,9 @@ export const MANTLE_CHAIN_ID = Number.isFinite(publicMantleChainId) ? publicMant
 export const MANTLE_CHAIN_NAME = publicMantleChainName || defaultMantleChainName;
 export const MANTLE_NETWORK_KEY = publicMantleNetworkKey || defaultMantleNetworkKey;
 export const ENV_PROFILE = publicEnvProfile || defaultEnvProfile;
-export const NEURALRATE_BENCHMARK_CONTRACT = publicBenchmarkContract || defaultBenchmarkContract;
-export const NEURALRATE_POLICY_REGISTRY_CONTRACT = normalizeAddress(publicPolicyRegistryContract);
-export const NEURALRATE_EXECUTION_GUARD_CONTRACT = normalizeAddress(publicExecutionGuardContract);
+export const NEURALRATE_BENCHMARK_CONTRACT = publicBenchmarkContract || deploymentsJson.summary?.benchmark?.address || defaultBenchmarkContract;
+export const NEURALRATE_POLICY_REGISTRY_CONTRACT = normalizeAddress(publicPolicyRegistryContract) || deploymentsJson.summary?.policyRegistry?.address || '';
+export const NEURALRATE_EXECUTION_GUARD_CONTRACT = normalizeAddress(publicExecutionGuardContract) || deploymentsJson.summary?.executionGuard?.address || '';
 export const ERC8004_AGENT_ID = publicErc8004AgentId || defaultErc8004AgentId;
 export const ERC8004_IDENTITY_REGISTRY = publicErc8004IdentityRegistry || defaultErc8004IdentityRegistry;
 export const BICONOMY_API_KEY = publicBiconomyApiKey || '';
@@ -115,10 +117,10 @@ export const SESSION_POLICY_VERSION = publicSessionPolicyVersion || defaultSessi
 export const VAULT_PROVIDER_STRATEGY = publicVaultProviderStrategy || defaultVaultProviderStrategy;
 export const ONBOARDING_PROVIDER = publicOnboardingProvider || defaultOnboardingProvider;
 export const MANAGED_SIGNER_PROVIDER = publicManagedSignerProvider || defaultManagedSignerProvider;
-export const SAFE_4337_MODULE_ADDRESS = normalizeAddress(publicSafe4337ModuleAddress);
-export const SAFE_7579_ADAPTER_ADDRESS = normalizeAddress(publicSafe7579AdapterAddress);
-export const SAFE_7579_LAUNCHPAD_ADDRESS = normalizeAddress(publicSafe7579LaunchpadAddress);
-export const DELEGATE_VALIDATOR_ADDRESS = normalizeAddress(publicDelegateValidatorAddress);
+export const SAFE_4337_MODULE_ADDRESS = normalizeAddress(publicSafe4337ModuleAddress) || deploymentsJson.deployments?.['mantle-sepolia-safe4337-module.json']?.address || '';
+export const SAFE_7579_ADAPTER_ADDRESS = normalizeAddress(publicSafe7579AdapterAddress) || deploymentsJson.deployments?.['mantle-sepolia-safe7579-adapter.json']?.address || '';
+export const SAFE_7579_LAUNCHPAD_ADDRESS = normalizeAddress(publicSafe7579LaunchpadAddress) || deploymentsJson.deployments?.['mantle-sepolia-safe7579-launchpad.json']?.address || '';
+export const DELEGATE_VALIDATOR_ADDRESS = normalizeAddress(publicDelegateValidatorAddress) || deploymentsJson.deployments?.['mantle-sepolia-delegate-validator.json']?.address || '';
 export const AA_ENTRYPOINT_ADDRESS = normalizeAddress(public4337EntryPointAddress) || '0x0000000071727De22E5E9d8BAf0edAc6f37da032';
 export const PRIVY_APP_ID = publicPrivyAppId || '';
 export const PRIVY_CLIENT_ID = publicPrivyClientId || '';
@@ -126,5 +128,5 @@ export const PRIVY_ENABLED = Boolean(PRIVY_APP_ID);
 export const SAFE_SALT_NONCE = publicSafeSaltNonce || '49';
 export const DEMO_STRATEGY_KEY = publicDemoStrategyKey || 'mnt-native-transfer';
 export const DEMO_TARGET_ASSET = publicDemoTargetAsset || 'MNT';
-export const VAULT_MODULE_ADDRESS = normalizeAddress(publicVaultModuleAddress);
+export const VAULT_MODULE_ADDRESS = normalizeAddress(publicVaultModuleAddress) || deploymentsJson.summary?.vaultModule?.address || '';
 export const VAULT_MODULE_ENABLED = Boolean(VAULT_MODULE_ADDRESS);
