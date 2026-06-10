@@ -2,7 +2,7 @@ import { ethers } from "hardhat";
 
 async function main() {
   const registryAddress = "0x86cD4f8c2528E71a473ED342aa73B8a00de906a4";
-  const vaultAddress = "0x9ddbbb5f9a3cc1c0e744d20ba6b0fa50fb22a3ff";
+  const vaultAddress = "0xd9afd65e5361d9a098e0fe30b914883f7c82f743";
 
   const registry = await ethers.getContractAt("INeuralRatePolicyRegistry", registryAddress);
   
