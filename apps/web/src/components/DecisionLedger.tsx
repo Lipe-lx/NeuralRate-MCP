@@ -67,6 +67,10 @@ const statusStyles: Record<string, { label: string; background: string; color: s
 };
 
 const truncate = (value: string) => (value.length > 14 ? `${value.slice(0, 8)}...${value.slice(-6)}` : value);
+const formatFailureReason = (value: string) => {
+  const firstLine = value.split("\n").find((line) => line.trim().length > 0)?.trim() ?? value;
+  return firstLine.length > 260 ? `${firstLine.slice(0, 257)}...` : firstLine;
+};
 
 const parseJson = <T,>(value: string | null, fallback: T): T => {
   if (!value) {
@@ -541,6 +545,11 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
                     <div style={{ fontSize: "0.76rem", color: job?.failure_reason ? "var(--color-warning)" : "var(--text-secondary)" }}>
                       {job ? `Job ${truncate(job.benchmark_job_id)} • ${job.status}` : "Not queued for autonomous benchmarking yet."}
                     </div>
+                    {job?.failure_reason && (
+                      <div style={{ flexBasis: "100%", fontSize: "0.72rem", color: "var(--color-warning)", lineHeight: 1.45 }}>
+                        {formatFailureReason(job.failure_reason)}
+                      </div>
+                    )}
                     <button
                       onClick={() => {
                         void queueBenchmark(decision);

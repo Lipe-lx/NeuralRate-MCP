@@ -1,6 +1,7 @@
 import { encodeFunctionData, getContract, keccak256, stringToHex, type Address, type Hex } from "viem";
 import type { ManagedSigner } from "./managedSigner.js";
 import { getExecutorRuntime } from "./runtime.js";
+import { compactExecutorError } from "./errors.js";
 
 const policyRegistryAbi = [
   {
@@ -231,11 +232,15 @@ export async function ensureAnchoredSnapshot(args: {
     ],
   });
 
-  await args.signer.signAndSendTransaction({
-    to: config.policyRegistryContract,
-    data: calldata,
-    chainId: config.chainId,
-  });
+  try {
+    await args.signer.signAndSendTransaction({
+      to: config.policyRegistryContract,
+      data: calldata,
+      chainId: config.chainId,
+    });
+  } catch (error) {
+    throw new Error(compactExecutorError(error, "Snapshot anchoring failed"));
+  }
 
   return { anchored: true, snapshotHash: normalizedHash };
 }

@@ -10,6 +10,7 @@ import { canUseAARuntime, getAARuntimeStatus, hasAAPaymaster, sendAAVaultUserOpe
 import { safeJsonStringify } from "./json.js";
 import { buildAnchorSnapshotCalldata, ensureAnchoredSnapshot, getActivePolicy } from "./onchainPolicy.js";
 import { getExecutorRuntime, initializeExecutorRuntime, initializeLocalExecutorRuntime } from "./runtime.js";
+import { compactExecutorError } from "./errors.js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -516,13 +517,14 @@ const server = createServer(async (request, response) => {
           });
         } catch (error) {
           console.error("Benchmark execution failed:", error);
+          const failureReason = compactExecutorError(error, "Benchmark execution failed");
           await dataApi.updateBenchmarkJob(benchmarkJobId, {
             decisionId: body.decisionId,
             ownerEoa: scoped.ownerEoa,
             sessionId: body.sessionId ?? null,
             agentSmartWallet: config.agentSmartWallet,
             status: "failed",
-            failureReason: error instanceof Error ? error.message : String(error),
+            failureReason,
             userId: scoped.userId,
             vaultId: scoped.vaultId,
             policyVersion: scoped.policyVersion,
