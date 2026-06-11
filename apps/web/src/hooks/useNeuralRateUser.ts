@@ -28,7 +28,7 @@ import {
   storeMcpAccessBundle,
   type McpAccessBundle,
 } from "../lib/mcpAccess";
-import { authorizedGetJsonFetch, signedGetJsonFetch, signedJsonFetch } from "../lib/auth";
+import { authorizedGetJsonFetch, authorizedJsonFetch, signedGetJsonFetch, signedJsonFetch } from "../lib/auth";
 import { buildLocalSnapshotHash, sendPreparedTransaction, type PreparedTxRequest } from "../lib/policyRegistry";
 import { mergeLiveFundingTelemetry, shouldAutoRefreshState, type AutomationState } from "../lib/userState";
 
@@ -68,6 +68,7 @@ type AutomationGrantChallenge = {
 };
 
 type PreparedPolicyPublish = {
+  policySyncStatus?: string;
   expectedPolicy: {
     ownerEoa: string;
     vaultAddress: string;
@@ -221,6 +222,11 @@ export const useNeuralRateUser = ({
   const [runtimeProgressStatus, setRuntimeProgressStatus] = useState<'signing' | 'confirming' | 'done' | 'failed' | null>(null);
   const liveFundingDetectedRef = useRef(false);
   const stateRef = useRef<AutomationState | null>(null);
+
+  const getActiveSessionToken = (targetOwner = ownerEoa) =>
+    targetOwner
+      ? loadStoredMcpAccessBundle(targetOwner)?.sessionToken ?? mcpAccessBundle?.sessionToken ?? null
+      : mcpAccessBundle?.sessionToken ?? null;
 
   const refresh = useCallback(async (targetOwner = ownerEoa) => {
     if (!targetOwner) {
@@ -596,18 +602,27 @@ export const useNeuralRateUser = ({
     }
   };
 
-  const publishDraftPolicy = async () => {
+  const publishDraftPolicy = async (sessionToken = getActiveSessionToken()) => {
     if (!ownerEoa) {
       throw new Error("Connect a wallet before publishing policy.");
     }
 
-    const prepared = await signedJsonFetch<PreparedPolicyPublish>({
+    const prepared = await authorizedJsonFetch<PreparedPolicyPublish>({
       ownerEoa,
       signMessage,
       url: `${API_BASE_URL}/automation/policy/prepare-publish`,
       method: "POST",
       body: { ownerEoa },
+      sessionToken,
     });
+
+    if (prepared.policySyncStatus === "in_sync") {
+      return {
+        success: true,
+        skipped: true,
+        policySyncStatus: prepared.policySyncStatus,
+      };
+    }
 
     const submitPublishedPolicy = async (txHash?: string | null) => {
       let lastError: unknown;
@@ -619,7 +634,7 @@ export const useNeuralRateUser = ({
         }
 
         try {
-          return await signedJsonFetch({
+          return await authorizedJsonFetch({
             ownerEoa,
             signMessage,
             url: `${API_BASE_URL}/automation/policy/submit-publish`,
@@ -629,6 +644,7 @@ export const useNeuralRateUser = ({
               txHash,
               expectedPolicy: prepared.expectedPolicy,
             },
+            sessionToken,
           });
         } catch (error) {
           lastError = error;
@@ -742,17 +758,18 @@ export const useNeuralRateUser = ({
     }
   };
 
-  const enableRuntimeFromPlan = async () => {
+  const enableRuntimeFromPlan = async (sessionToken = getActiveSessionToken()) => {
     if (!ownerEoa) {
       throw new Error("Connect a wallet before enabling the runtime.");
     }
 
-    const prepared = await signedJsonFetch<PreparedRuntimePlan>({
+    const prepared = await authorizedJsonFetch<PreparedRuntimePlan>({
       ownerEoa,
       signMessage,
       url: `${API_BASE_URL}/automation/runtime/prepare-enable`,
       method: "POST",
       body: { ownerEoa },
+      sessionToken,
     });
 
     const txHashes: Record<string, string> = {};
@@ -785,7 +802,7 @@ export const useNeuralRateUser = ({
       if (runtimeResult.fallbackTxHash) txHashes.enable_fallback_handler = runtimeResult.fallbackTxHash;
     }
 
-    return signedJsonFetch({
+    return authorizedJsonFetch({
       ownerEoa,
       signMessage,
       url: `${API_BASE_URL}/automation/runtime/submit-enable`,
@@ -794,6 +811,7 @@ export const useNeuralRateUser = ({
         ownerEoa,
         txHashes,
       },
+      sessionToken,
     });
   };
 
@@ -852,8 +870,9 @@ export const useNeuralRateUser = ({
     setError(null);
     let issuedBundle: McpAccessBundle | null = null;
     try {
+      const existingToken = getActiveSessionToken(ownerEoa);
       if (current.activeGrant?.status === "active" && !current.automationReady) {
-        await enableRuntimeFromPlan();
+        await enableRuntimeFromPlan(existingToken);
         const recovered = await refresh(ownerEoa);
         if (recovered?.automationReady) {
           setNotice("Automation runtime verified on-chain. Agent execution is ready.");
@@ -863,7 +882,6 @@ export const useNeuralRateUser = ({
         return;
       }
 
-      await publishDraftPolicy();
       const finalizedGrant = await finalizeAutomationGrant(current);
       issuedBundle = buildMcpAccessBundle({
         workerOrigin: WORKER_ORIGIN,
@@ -882,8 +900,10 @@ export const useNeuralRateUser = ({
       setMcpAccessBundle(issuedBundle);
       storeMcpAccessBundle(issuedBundle);
 
+      await publishDraftPolicy(issuedBundle.sessionToken);
+
       if (VAULT_MODULE_ENABLED) {
-        await enableRuntimeFromPlan();
+        await enableRuntimeFromPlan(issuedBundle.sessionToken);
       }
 
       const refreshed = await refresh(ownerEoa);
@@ -963,7 +983,8 @@ export const useNeuralRateUser = ({
     setRuntimeProgressStep(null);
     setRuntimeProgressStatus(null);
     try {
-      await enableRuntimeFromPlan();
+      const sessionToken = getActiveSessionToken(ownerEoa);
+      await enableRuntimeFromPlan(sessionToken);
 
       // After runtime is enabled, check if the on-chain policy needs (re-)publishing
       const midRefresh = await refresh(ownerEoa);
@@ -971,7 +992,7 @@ export const useNeuralRateUser = ({
         const syncStatus = midRefresh.policySyncStatus;
         if (syncStatus === "drifted" || syncStatus === "pending_publish") {
           console.log("[NeuralRate] policy sync status is", syncStatus, "— re-publishing on-chain policy…");
-          await publishDraftPolicy();
+          await publishDraftPolicy(sessionToken);
         }
       }
 

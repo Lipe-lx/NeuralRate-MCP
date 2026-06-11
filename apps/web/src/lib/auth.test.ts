@@ -14,6 +14,7 @@ const originalFetch = globalThis.fetch;
 test.describe("auth utilities", () => {
   let fetchCalls: Array<{ url: string; options?: RequestInit }> = [];
   let authorizedGetJsonFetch: any;
+  let authorizedJsonFetch: any;
 
   beforeEach(async () => {
     fetchCalls = [];
@@ -45,6 +46,7 @@ test.describe("auth utilities", () => {
     if (!authorizedGetJsonFetch) {
       const module = await import("./auth");
       authorizedGetJsonFetch = module.authorizedGetJsonFetch;
+      authorizedJsonFetch = module.authorizedJsonFetch;
     }
   });
 
@@ -98,5 +100,29 @@ test.describe("auth utilities", () => {
     assert.equal(fetchCalls[1].url, "https://api.test/benchmark/history");
     assert.equal(fetchCalls[1].options?.headers?.["x-neuralrate-auth-signature"], "mock_signature");
     assert.equal(fetchCalls[1].options?.headers?.["x-neuralrate-auth-nonce"], "test_nonce");
+  });
+
+  test("authorizedJsonFetch uses session token for POST without signing message", async () => {
+    let signMessageCalled = false;
+    const mockSignMessage = async (_msg: string) => {
+      signMessageCalled = true;
+      return "mock_signature";
+    };
+
+    const res = await authorizedJsonFetch({
+      ownerEoa: "0xowner",
+      signMessage: mockSignMessage,
+      url: "https://api.test/automation/runtime/prepare-enable",
+      method: "POST",
+      body: { ownerEoa: "0xowner" },
+      sessionToken: "session_123"
+    });
+
+    assert.deepEqual(res, { success: true, decisions: [] });
+    assert.equal(signMessageCalled, false, "Should not request wallet signature when sessionToken is active");
+    assert.equal(fetchCalls.length, 1);
+    assert.equal(fetchCalls[0].url, "https://api.test/automation/runtime/prepare-enable");
+    assert.equal(fetchCalls[0].options?.headers?.["x-neuralrate-session-token"], "session_123");
+    assert.deepEqual(JSON.parse(String(fetchCalls[0].options?.body)), { ownerEoa: "0xowner" });
   });
 });

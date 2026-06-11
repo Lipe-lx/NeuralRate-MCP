@@ -1924,24 +1924,14 @@ export default {
 
         if (url.pathname === "/api/automation/policy/prepare-publish" && request.method === "POST") {
           const body = await readJsonBody<Record<string, unknown>>(request);
-          const ownerEoa = resolveMutationOwner(body);
-          if (!ownerEoa) {
-            return new Response(JSON.stringify({ error: "ownerEoa is required" }), { status: 400, headers: corsHeaders });
-          }
-          await assertMutationAuthorized(request, env, body, ownerEoa);
-          const scoped = await resolveOwnerControlAccess(automation, ownerEoa);
+          const scoped = await resolveAutomationAccess(request, env, automation, body, "config");
           const result = await preparePolicyPublish(automation, env, scoped);
           return new Response(JSON.stringify(result), { headers: corsHeaders });
         }
 
         if (url.pathname === "/api/automation/policy/submit-publish" && request.method === "POST") {
           const body = await readJsonBody<Record<string, unknown>>(request);
-          const ownerEoa = resolveMutationOwner(body);
-          if (!ownerEoa) {
-            return new Response(JSON.stringify({ error: "ownerEoa is required" }), { status: 400, headers: corsHeaders });
-          }
-          await assertMutationAuthorized(request, env, body, ownerEoa);
-          const scoped = await resolveOwnerControlAccess(automation, ownerEoa);
+          const scoped = await resolveAutomationAccess(request, env, automation, body, "config");
           const result = await submitPolicyPublish(
             automation,
             env,
@@ -1988,24 +1978,14 @@ export default {
 
         if (url.pathname === "/api/automation/runtime/prepare-enable" && request.method === "POST") {
           const body = await readJsonBody<Record<string, unknown>>(request);
-          const ownerEoa = resolveMutationOwner(body);
-          if (!ownerEoa) {
-            return new Response(JSON.stringify({ error: "ownerEoa is required" }), { status: 400, headers: corsHeaders });
-          }
-          await assertMutationAuthorized(request, env, body, ownerEoa);
-          const scoped = await resolveOwnerControlAccess(automation, ownerEoa);
+          const scoped = await resolveAutomationAccess(request, env, automation, body, "config");
           const result = await prepareVaultRuntimeEnable(automation, env, scoped);
           return new Response(JSON.stringify(result), { headers: corsHeaders });
         }
 
         if (url.pathname === "/api/automation/runtime/submit-enable" && request.method === "POST") {
           const body = await readJsonBody<Record<string, unknown>>(request);
-          const ownerEoa = resolveMutationOwner(body);
-          if (!ownerEoa) {
-            return new Response(JSON.stringify({ error: "ownerEoa is required" }), { status: 400, headers: corsHeaders });
-          }
-          await assertMutationAuthorized(request, env, body, ownerEoa);
-          const scoped = await resolveOwnerControlAccess(automation, ownerEoa);
+          const scoped = await resolveAutomationAccess(request, env, automation, body, "config");
           const result = await submitVaultRuntimeEnable(
             automation,
             env,

@@ -72,6 +72,28 @@ export async function signedJsonFetch<T>(args: {
   });
 }
 
+export async function authorizedJsonFetch<T>(args: {
+  ownerEoa: string;
+  signMessage: SignMessage;
+  url: string;
+  method: "POST" | "PATCH";
+  body: Record<string, unknown>;
+  sessionToken?: string | null;
+}) {
+  if (args.sessionToken) {
+    return fetchJson<T>(args.url, {
+      method: args.method,
+      headers: {
+        "Content-Type": "application/json",
+        "x-neuralrate-session-token": args.sessionToken,
+      },
+      body: JSON.stringify(args.body),
+    });
+  }
+
+  return signedJsonFetch<T>(args);
+}
+
 export async function signedGetJsonFetch<T>(args: {
   ownerEoa: string;
   signMessage: SignMessage;

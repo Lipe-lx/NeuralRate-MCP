@@ -5,7 +5,10 @@
   "address": "0x666Bc822156824F40F2b70aAaAcBfe87467D79A5",
   "txHash": "0x984bc0f8daf9e59496aef8156e827011c6d96297a72b57d8e7e5c6fe9ec73f31",
   "policyRegistry": "0x86cD4f8c2528E71a473ED342aa73B8a00de906a4",
-  "trustedModule": "0xf7061501a464e893636a5BF8eB4ab7Ba2819154D",
+  "trustedModule": "0xACBB78DAB5D1404C9eeC1E90BCe569cD1acc91bF",
   "trustedSafeModule": "0x7ec994fD2F774Fb8AAe472C349ED3E64E0A15FEa",
-  "updatedAt": "2026-06-08T21:35:07.300Z"
+  "updatedAt": "2026-06-11T03:56:52.110Z",
+  "lastConfigTxHashes": {
+    "setTrustedModule": "0xa184079bd6e0f30b99fd9229673be5e74d19e2af4b65a4c45e09b9cf9f4cca5a"
+  }
 }
