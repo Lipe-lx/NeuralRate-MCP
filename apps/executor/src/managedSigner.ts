@@ -1,5 +1,5 @@
 import { createAccount } from "@turnkey/viem";
-import { createWalletClient, http, type Address, type Hex, defineChain } from "viem";
+import { createPublicClient, createWalletClient, http, type Address, type Hex, defineChain } from "viem";
 import { Turnkey } from "@turnkey/sdk-server";
 
 export type ManagedSignerCapabilities = {
@@ -92,8 +92,20 @@ type TurnkeyManagedSignerArgs = {
   rpcUrl?: string;
 };
 
+export const isNonceTooLowError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  return /nonce too low|nonce provided .* lower than the current nonce/i.test(message);
+};
+
+export const extractNextNonceFromError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  const match = message.match(/next nonce\s+(\d+)/i);
+  return match?.[1] ? Number.parseInt(match[1], 10) : null;
+};
+
 export class TurnkeyManagedSigner implements ManagedSigner {
   private turnkeyClient: Turnkey;
+  private nonceCursor = new Map<string, number>();
 
   constructor(private args: TurnkeyManagedSignerArgs) {
     this.turnkeyClient = new Turnkey({
@@ -128,6 +140,22 @@ export class TurnkeyManagedSigner implements ManagedSigner {
     });
   }
 
+  private async allocateNonce(args: {
+    publicClient: ReturnType<typeof createPublicClient>;
+    address: Address;
+    chainId: number;
+  }) {
+    const pendingNonce = await args.publicClient.getTransactionCount({
+      address: args.address,
+      blockTag: "pending",
+    });
+    const key = `${args.chainId}:${args.address.toLowerCase()}`;
+    const cachedNonce = this.nonceCursor.get(key);
+    const nonce = Math.max(pendingNonce, cachedNonce ?? pendingNonce);
+    this.nonceCursor.set(key, nonce + 1);
+    return { key, nonce, pendingNonce };
+  }
+
   async signAndSendTransaction(tx: {
     to: string;
     data: string;
@@ -149,16 +177,50 @@ export class TurnkeyManagedSigner implements ManagedSigner {
       chain: runtimeChain,
       transport: http(this.args.rpcUrl || "https://rpc.sepolia.mantle.xyz"),
     });
-
-    const txHash = await walletClient.sendTransaction({
+    const publicClient = createPublicClient({
       chain: runtimeChain,
-      to: tx.to as Address,
-      data: tx.data as Hex,
-      value: tx.value,
-      account
+      transport: http(this.args.rpcUrl || "https://rpc.sepolia.mantle.xyz"),
+    });
+    const address = this.args.walletAccountAddress as Address;
+    const allocated = await this.allocateNonce({
+      publicClient,
+      address,
+      chainId: tx.chainId,
     });
 
-    return txHash;
+    const sendWithNonce = (nonce: number) =>
+      walletClient.sendTransaction({
+        chain: runtimeChain,
+        to: tx.to as Address,
+        data: tx.data as Hex,
+        value: tx.value,
+        nonce,
+        account,
+      });
+
+    try {
+      return await sendWithNonce(allocated.nonce);
+    } catch (error) {
+      if (!isNonceTooLowError(error)) {
+        this.nonceCursor.delete(allocated.key);
+        throw error;
+      }
+
+      const pendingNonce = await publicClient.getTransactionCount({
+        address,
+        blockTag: "pending",
+      });
+      const nextNonce = extractNextNonceFromError(error);
+      const retryNonce = Math.max(pendingNonce, nextNonce ?? pendingNonce, allocated.nonce + 1);
+      this.nonceCursor.set(allocated.key, retryNonce + 1);
+
+      try {
+        return await sendWithNonce(retryNonce);
+      } catch (retryError) {
+        this.nonceCursor.delete(allocated.key);
+        throw retryError;
+      }
+    }
   }
 
   async signHash(hash: Hex): Promise<Hex> {
