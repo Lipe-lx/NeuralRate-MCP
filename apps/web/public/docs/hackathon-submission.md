@@ -11,11 +11,11 @@ NeuralRate MCP is a Mantle Sepolia worker and MCP server that anchors per-user v
 ## What the Demo Actually Shows
 
 1. The user connects a wallet on Mantle Sepolia.
-2. The web app bootstraps a dedicated user vault through the worker.
-3. The user acknowledges vault ownership context in the UI.
-4. The user signs a canonical automation grant.
-5. The worker stores the grant and creates a short-lived MCP scoped session.
-6. The web app enables the Safe module on the user vault and publishes the active policy on-chain.
+2. The web app bootstraps a dedicated user vault through the worker and includes the ownership review in that signed mutation.
+3. The user runs one guided authorization action that publishes the on-chain policy, signs the canonical automation grant, and activates the Safe7579/ERC-4337 runtime.
+4. The worker stores the grant and creates a short-lived MCP scoped session.
+5. Safe runtime setup uses the canonical AA path; admin module changes are batched when setup is required.
+6. Funding is optional and is reflected from live on-chain balance telemetry.
 7. A decision can be logged locally and queued for an on-chain receipt.
 8. The executor anchors the referenced snapshot and writes the receipt transaction on-chain.
 9. The default live execution demo queues a real `MNT` transfer through the Safe module.

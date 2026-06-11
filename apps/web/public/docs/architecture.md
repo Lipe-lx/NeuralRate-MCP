@@ -120,10 +120,9 @@ The worker is now mostly a control plane and indexing layer.
 
 ### Executor
 
-The executor is the dispatch layer. It can execute transactions using two runtime modes:
+The executor is the dispatch layer. Governed vault automation uses the Safe7579/ERC-4337 runtime only: it builds an ERC-4337 `UserOperation` calling `execute` on the Safe, targeting the vault module or policy registry, signed by the managed signer and validated on-chain by `NeuralRateDelegateValidator.sol`.
 
-- **Safe7579/ERC-4337 Runtime**: Recommended mode. It builds an ERC-4337 `UserOperation` calling `execute` on the Safe, targetting the vault module or policy registry, signed by the managed signer and validated on-chain by `NeuralRateDelegateValidator.sol`.
-- **Legacy Signer Runtime**: Fallback mode. Submits standard transactions directly to `NeuralRateVaultModule.sol` from the authorized executor address.
+There is no legacy direct-signer fallback for user onboarding or vault automation. If AA runtime prerequisites are missing, execution must fail as configuration or funding-not-ready rather than silently switching authority models.
 
 Core responsibilities:
 - runs as a private Cloudflare Worker with `workers_dev = false`
@@ -142,8 +141,8 @@ The web app remains the owner-operated panel.
 
 - connects the user wallet on Mantle Sepolia
 - bootstraps user and vault state through the worker
-- gathers nonce signatures and grant signatures
-- publishes the active policy on-chain when settings change
+- gathers only the owner signatures required for bootstrap, policy publication, and scoped grant authorization
+- publishes the active policy on-chain when automation is enabled or settings change
 - revokes the active policy on-chain when automation is disabled
 - shows settings, vault state, grants, sessions, jobs, and benchmark history
 - queues benchmark and execution actions through the worker
@@ -183,7 +182,15 @@ This means catalog exposure is reduced before the model sees the tool list.
 2. The web app publishes the same active policy directly on-chain through `NeuralRatePolicyRegistry`.
 3. The policy records delegate, caps, allowlists, validity windows, and snapshot requirements.
 
-### 5. Decision Receipt Flow
+### 5. Minimal Onboarding Runtime Flow
+
+1. The owner bootstraps a dedicated Safe vault and confirms wallet ownership in the same signed mutation.
+2. The owner uses one guided authorization action to publish policy, sign the scoped MCP grant, and activate the runtime.
+3. Runtime activation uses the Safe7579/ERC-4337 path only. Safe admin changes are batched into a single Safe transaction whenever the Safe already exists.
+4. Platform-owned execution guard trust settings are deployment prerequisites. They are not exposed as user onboarding steps.
+5. Funding is optional and can happen before or after activation; the app derives funding state from live on-chain balance reads.
+
+### 6. Decision Receipt Flow
 
 1. A decision is logged locally in D1.
 2. The worker queues a benchmark-style receipt job.

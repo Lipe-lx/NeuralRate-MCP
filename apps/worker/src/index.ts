@@ -1577,6 +1577,7 @@ export default {
             vaultStatus: typeof body.vaultStatus === "string" ? body.vaultStatus : undefined,
             safeDeploymentStatus: typeof body.safeDeploymentStatus === "string" ? body.safeDeploymentStatus : undefined,
             safeSaltNonce: typeof body.safeSaltNonce === "string" ? body.safeSaltNonce : undefined,
+            ownershipAcknowledgedAt: typeof body.ownershipAcknowledgedAt === "string" ? body.ownershipAcknowledgedAt : undefined,
             chainId: typeof body.chainId === "number" ? body.chainId : undefined,
           });
 
@@ -1829,7 +1830,6 @@ export default {
             return new Response(JSON.stringify({ error: "ownerEoa is required" }), { status: 400, headers: corsHeaders });
           }
 
-          await assertMutationAuthorized(request, env, body, ownerEoa);
           const challenge = await createAutomationGrantChallenge(automation, {
             ownerEoa,
             agentSubject:

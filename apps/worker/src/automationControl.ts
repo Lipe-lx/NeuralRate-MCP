@@ -259,9 +259,6 @@ const assertVaultReadyForGrant = (state: Awaited<ReturnType<AutomationStore["get
   if (!state.vault?.vault_id || !state.vault.vault_address) {
     throw new Error("Bootstrap the dedicated vault before issuing an automation grant.");
   }
-  if (!state.vault.ownership_acknowledged_at) {
-    throw new Error("Acknowledge wallet ownership before issuing an automation grant.");
-  }
   if (!state.userId || !state.config) {
     throw new Error("User profile and agent policy must exist before issuing an automation grant.");
   }
@@ -338,6 +335,13 @@ export async function issueAutomationGrant(
 
   const state = await store.getAutomationState(challenge.ownerEoa);
   assertVaultReadyForGrant(state);
+  if (!state.vault?.ownership_acknowledged_at) {
+    await store.acknowledgeVaultOwnership({
+      ownerEoa: challenge.ownerEoa,
+      userId: challenge.userId,
+      vaultId: challenge.vaultId,
+    });
+  }
 
   const grantId = makeId("grant");
   const sessionId = makeId("mcp_session");
@@ -909,6 +913,19 @@ export async function prepareVaultRuntimeEnable(
     Boolean(env.NEURALRATE_SAFE_7579_ADAPTER_ADDRESS) &&
     Boolean(env.NEURALRATE_DELEGATE_VALIDATOR_ADDRESS);
 
+  if (!env.NEURALRATE_VAULT_MODULE_ADDRESS || !needsSafe7579 || !env.NEURALRATE_EXECUTION_GUARD_CONTRACT) {
+    throw new Error("Safe7579/ERC-4337 runtime is required for onboarding. Configure the vault module, Safe7579 adapter, delegate validator, and execution guard before enabling automation.");
+  }
+  if (env.NEURALRATE_EXECUTION_GUARD_CONTRACT && runtime?.trustedModuleReady === false) {
+    throw new Error("Execution guard is not configured to trust the NeuralRate vault module. Fix the deployment configuration before onboarding users.");
+  }
+  if (
+    env.NEURALRATE_PAYMASTER_ENABLED?.trim().toLowerCase() === "true" &&
+    runtime?.trustedSafeModuleReady === false
+  ) {
+    throw new Error("Execution guard is not configured to trust the Safe7579 adapter required for sponsored ERC-4337 execution.");
+  }
+
   const actions = [
     !runtime?.safeDeployed
       ? {
@@ -956,24 +973,6 @@ export async function prepareVaultRuntimeEnable(
           label: "Enable execution guard",
           required: true,
           mode: "wallet_tx",
-        }
-      : null,
-    env.NEURALRATE_EXECUTION_GUARD_CONTRACT && !runtime?.trustedModuleReady
-      ? {
-          key: "configure_execution_guard_trusted_module",
-          label: "Trust vault module",
-          required: true,
-          mode: "wallet_tx",
-        }
-      : null,
-    env.NEURALRATE_EXECUTION_GUARD_CONTRACT &&
-    env.NEURALRATE_PAYMASTER_ENABLED?.trim().toLowerCase() === "true" &&
-    !runtime?.trustedSafeModuleReady
-      ? {
-          key: "configure_execution_guard_trusted_safe_module",
-          label: "Trust Safe7579 adapter",
-          required: true,
-          mode: "platform_tx",
         }
       : null,
   ].filter(Boolean);

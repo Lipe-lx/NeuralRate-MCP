@@ -19,7 +19,6 @@ import {
 import {
   disableVaultModule,
   ensureAutonomousVaultRuntime,
-  ensureVaultModuleEnabled,
   resolveUserSafeVault,
 } from "../lib/automation";
 import {
@@ -448,7 +447,7 @@ export const useNeuralRateUser = ({
     state?.runtimeState?.nativeBalanceFormatted,
   ]);
 
-  const bootstrap = async () => {
+  const bootstrap = async (options?: { ownershipAcknowledgedAt?: string | null }) => {
     if (!ownerEoa) {
       throw new Error("Connect a wallet before bootstrapping the user vault.");
     }
@@ -484,12 +483,13 @@ export const useNeuralRateUser = ({
           vaultKind: "dedicated-safe-vault",
           vaultStatus: vaultAddress ? "predicted" : "provisioning",
           safeDeploymentStatus: vaultAddress ? "predicted" : "pending",
+          ownershipAcknowledgedAt: options?.ownershipAcknowledgedAt ?? null,
           chainId: MANTLE_CHAIN_ID,
         },
       });
 
       setState(response.state);
-      setNotice("Dedicated user Safe vault created. Fund it before enabling automation.");
+      setNotice("Dedicated user Safe vault created. You can deposit later from Vault or Telemetry.");
       return response.state;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to bootstrap user vault.";
@@ -661,20 +661,18 @@ export const useNeuralRateUser = ({
     }
 
     const agentSubject = `erc8004:${ERC8004_AGENT_ID}`;
-    const challengeResponse = await signedJsonFetch<{
+    const challengeResponse = await fetchJson<{
       success: boolean;
       challenge: AutomationGrantChallenge;
-    }>({
-      ownerEoa,
-      signMessage,
-      url: `${API_BASE_URL}/automation/grants/prepare`,
+    }>(`${API_BASE_URL}/automation/grants/prepare`, {
       method: "POST",
-      body: {
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
         ownerEoa,
         agentSubject,
         allowedDomains: [...DEFAULT_AUTOMATION_DOMAINS],
         policyVersion: current.config?.policy_version ?? SESSION_POLICY_VERSION,
-      },
+      }),
     });
 
     const grantSignature = await signMessage(challengeResponse.challenge.message);
@@ -758,45 +756,33 @@ export const useNeuralRateUser = ({
     });
 
     const txHashes: Record<string, string> = {};
-    if (prepared.actions.length > 0 && VAULT_MODULE_ENABLED) {
-      const aaReady = Boolean(
-        SAFE_7579_ADAPTER_ADDRESS &&
-        DELEGATE_VALIDATOR_ADDRESS
-      );
-      
+    if (prepared.actions.length > 0) {
+      if (!VAULT_MODULE_ENABLED || !VAULT_MODULE_ADDRESS || !SAFE_7579_ADAPTER_ADDRESS || !DELEGATE_VALIDATOR_ADDRESS || !NEURALRATE_EXECUTION_GUARD_CONTRACT) {
+        throw new Error("NeuralRate onboarding requires the Safe7579/ERC-4337 runtime, vault module, delegate validator, and execution guard to be configured. Legacy signer/module fallback is disabled.");
+      }
+
       const onProgress = (stepKey: string, status: 'signing' | 'confirming' | 'done' | 'failed') => {
         setRuntimeProgressStep(stepKey);
         setRuntimeProgressStatus(status);
       };
 
-      if (aaReady && prepared.actions.some((action) =>
-        ["install_safe7579", "configure_delegate_validator", "enable_execution_guard", "enable_fallback_handler"].includes(action.key)
-      )) {
-        const runtimeResult = await ensureAutonomousVaultRuntime(
-          ownerEoa,
-          {
-            getEthereumProvider,
-            signMessage,
-          },
-          VAULT_MODULE_ADDRESS,
-          undefined,
-          onProgress
-        );
-        if (runtimeResult.deploymentTxHash) txHashes.deploy_safe = runtimeResult.deploymentTxHash;
-        if (runtimeResult.moduleTxHash) txHashes.enable_vault_module = runtimeResult.moduleTxHash;
-        if (runtimeResult.safe7579InstallTxHash) txHashes.install_safe7579 = runtimeResult.safe7579InstallTxHash;
-        if (runtimeResult.validatorInstallTxHash) txHashes.configure_delegate_validator = runtimeResult.validatorInstallTxHash;
-        if (runtimeResult.validatorRotateTxHash) txHashes.rotate_delegate_validator = runtimeResult.validatorRotateTxHash;
-        if (runtimeResult.moduleGuardTxHash) txHashes.enable_execution_guard = runtimeResult.moduleGuardTxHash;
-        if (runtimeResult.fallbackTxHash) txHashes.enable_fallback_handler = runtimeResult.fallbackTxHash;
-      } else if (prepared.actions.some((action) => ["deploy_safe", "enable_vault_module"].includes(action.key))) {
-        const moduleResult = await ensureVaultModuleEnabled(ownerEoa, {
+      const runtimeResult = await ensureAutonomousVaultRuntime(
+        ownerEoa,
+        {
           getEthereumProvider,
           signMessage,
-        }, VAULT_MODULE_ADDRESS, undefined, onProgress);
-        if (moduleResult.deploymentTxHash) txHashes.deploy_safe = moduleResult.deploymentTxHash;
-        if (moduleResult.moduleTxHash) txHashes.enable_vault_module = moduleResult.moduleTxHash;
-      }
+        },
+        VAULT_MODULE_ADDRESS,
+        undefined,
+        onProgress
+      );
+      if (runtimeResult.deploymentTxHash) txHashes.deploy_safe = runtimeResult.deploymentTxHash;
+      if (runtimeResult.moduleTxHash) txHashes.enable_vault_module = runtimeResult.moduleTxHash;
+      if (runtimeResult.safe7579InstallTxHash) txHashes.install_safe7579 = runtimeResult.safe7579InstallTxHash;
+      if (runtimeResult.validatorInstallTxHash) txHashes.configure_delegate_validator = runtimeResult.validatorInstallTxHash;
+      if (runtimeResult.validatorRotateTxHash) txHashes.rotate_delegate_validator = runtimeResult.validatorRotateTxHash;
+      if (runtimeResult.moduleGuardTxHash) txHashes.enable_execution_guard = runtimeResult.moduleGuardTxHash;
+      if (runtimeResult.fallbackTxHash) txHashes.enable_fallback_handler = runtimeResult.fallbackTxHash;
     }
 
     return signedJsonFetch({
@@ -875,10 +861,6 @@ export const useNeuralRateUser = ({
           setNotice("Automation grant is active, but runtime setup is still pending. Finish the runtime checklist before asking the agent to operate.");
         }
         return;
-      }
-
-      if (!current.vault.ownership_acknowledged_at) {
-        throw new Error("Acknowledge vault ownership before issuing an automation grant.");
       }
 
       await publishDraftPolicy();

@@ -15,7 +15,6 @@ import { useApi } from './hooks/useApi';
 import { WalletProvider } from './context/WalletContext';
 import { useWalletContext } from './context/WalletContext';
 import { useNeuralRateUser } from './hooks/useNeuralRateUser';
-import { hasRuntimeNativeDeposit } from './lib/userState';
 import { API_BASE_URL, ENV_PROFILE } from './config';
 
 export interface Pool {
@@ -91,12 +90,7 @@ function AppContent() {
     signMessage: wallet.signMessage,
   });
 
-  const hasOnchainDeposit = hasRuntimeNativeDeposit(neuralRateUser.state);
   const vault = neuralRateUser.state?.vault;
-  const hasFundingIntent = hasOnchainDeposit || Boolean(
-    vault?.last_funding_intent &&
-    (parseFloat(String(vault.last_funding_intent.amountUsd || 0)) > 0)
-  );
   const hasAutomation = Boolean(neuralRateUser.state?.activeGrant && neuralRateUser.state.activeGrant.status === 'active');
 
   const isPending = useMemo(() => {
@@ -104,12 +98,11 @@ function AppContent() {
     if (!isCorrectChain) return true;
     if (!neuralRateUser.state) return true;
     const isVaultCreated = Boolean(vault);
-    const isOwnershipConfirmed = Boolean(vault?.ownership_acknowledged_at);
     const isGrantActive = hasAutomation;
     const automationReady = Boolean(neuralRateUser.state.automationReady);
 
-    return !isVaultCreated || !isOwnershipConfirmed || !hasFundingIntent || !isGrantActive || !automationReady;
-  }, [isConnected, isCorrectChain, neuralRateUser.state, vault, hasFundingIntent, hasAutomation, neuralRateUser.state?.automationReady]);
+    return !isVaultCreated || !isGrantActive || !automationReady;
+  }, [isConnected, isCorrectChain, neuralRateUser.state, vault, hasAutomation, neuralRateUser.state?.automationReady]);
 
   useEffect(() => {
     if (
@@ -210,8 +203,8 @@ function AppContent() {
       ? 'Control Wallet'
       : 'Control Wallet';
 
-  const handleBootstrap = async () => {
-    const nextState = await neuralRateUser.bootstrap();
+  const handleBootstrap = async (options?: { ownershipAcknowledgedAt?: string | null }) => {
+    const nextState = await neuralRateUser.bootstrap(options);
     if (nextState?.vault?.vault_address && !nextState.vault.ownership_acknowledged_at) {
       if (wizardDismissed) {
         setIsOwnershipModalOpen(true);
@@ -453,20 +446,10 @@ function AppContent() {
           }}
           busy={neuralRateUser.busy}
           state={neuralRateUser.state}
-          hasFundingIntent={hasFundingIntent}
           onBootstrap={handleBootstrap}
-          onFundingIntent={neuralRateUser.createFundingIntent}
-          onAcknowledgeOwnership={handleAcknowledgeOwnership}
-          onPublishPolicy={neuralRateUser.publishPolicy}
-          onFinalizeGrant={neuralRateUser.finalizeGrant}
+          onEnableAutomation={neuralRateUser.enableAutomation}
           onCompleteRuntimeSetup={neuralRateUser.completeRuntimeSetup}
           onQueueDemoStrategy={neuralRateUser.queueDemoStrategy}
-          controlWalletLabel={controlWalletLabel}
-          controlWalletAddress={controlWalletAddress}
-          canExportEmbeddedWallet={wallet.canExportEmbeddedWallet}
-          embeddedWalletRecoveryMethod={wallet.embeddedWalletRecoveryMethod}
-          onExportEmbeddedWallet={wallet.exportEmbeddedWallet}
-          onSetEmbeddedWalletRecovery={wallet.setEmbeddedWalletRecovery}
           isConnected={isConnected}
           isCorrectChain={isCorrectChain}
           onConnect={connect}

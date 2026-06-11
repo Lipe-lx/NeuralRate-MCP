@@ -13,20 +13,10 @@ interface OnboardingWizardProps {
   onClose: () => void;
   busy: boolean;
   state: AutomationState | null;
-  hasFundingIntent: boolean;
-  onBootstrap: () => Promise<unknown>;
-  onFundingIntent: (amountUsd: number) => Promise<void>;
-  onAcknowledgeOwnership: () => Promise<void>;
-  onPublishPolicy: () => Promise<void>;
-  onFinalizeGrant: () => Promise<void>;
+  onBootstrap: (options?: { ownershipAcknowledgedAt?: string | null }) => Promise<unknown>;
+  onEnableAutomation: () => Promise<void>;
   onCompleteRuntimeSetup: () => Promise<void>;
   onQueueDemoStrategy: () => Promise<void>;
-  controlWalletLabel: string;
-  controlWalletAddress: string | null;
-  canExportEmbeddedWallet: boolean;
-  embeddedWalletRecoveryMethod: string | null;
-  onExportEmbeddedWallet: () => Promise<void>;
-  onSetEmbeddedWalletRecovery: () => Promise<void>;
   isConnected: boolean;
   isCorrectChain: boolean;
   onConnect: () => Promise<void>;
@@ -40,20 +30,10 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   onClose,
   busy,
   state,
-  hasFundingIntent,
   onBootstrap,
-  onFundingIntent,
-  onAcknowledgeOwnership,
-  onPublishPolicy,
-  onFinalizeGrant,
+  onEnableAutomation,
   onCompleteRuntimeSetup,
   onQueueDemoStrategy,
-  controlWalletLabel,
-  controlWalletAddress,
-  canExportEmbeddedWallet,
-  embeddedWalletRecoveryMethod,
-  onExportEmbeddedWallet,
-  onSetEmbeddedWalletRecovery,
   isConnected,
   isCorrectChain,
   onConnect,
@@ -61,11 +41,8 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   runtimeProgressStep,
   runtimeProgressStatus,
 }) => {
-  const [fundingAmount, setFundingAmount] = useState(1000);
   const [confirmedOwnership, setConfirmedOwnership] = useState(false);
-  const [copiedField, setCopiedField] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [authSubstep, setAuthSubstep] = useState<1 | 2>(1);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -75,101 +52,48 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const vault = state?.vault;
   const activeGrant = state?.activeGrant;
   const isVaultCreated = Boolean(vault);
-  const isOwnershipConfirmed = Boolean(vault?.ownership_acknowledged_at);
   const isGrantActive = Boolean(activeGrant && activeGrant.status === "active");
   const automationReady = Boolean(state?.automationReady);
 
-  // Dynamic step mapping (8 steps)
+  // Dynamic step mapping: keep only the actions that materially unlock automation.
   let currentStep = 1;
-  if (!isConnected) {
+  if (!isConnected || !isCorrectChain) {
     currentStep = 1;
-  } else if (!isCorrectChain) {
-    currentStep = 2;
   } else if (!isVaultCreated) {
-    currentStep = 3;
-  } else if (!isOwnershipConfirmed) {
-    currentStep = 4;
-  } else if (!hasFundingIntent) {
-    currentStep = 5;
+    currentStep = 2;
   } else if (!isGrantActive) {
-    currentStep = 6;
+    currentStep = 3;
   } else if (!automationReady) {
-    currentStep = 7;
+    currentStep = 4;
   } else {
-    currentStep = 8;
+    currentStep = 5;
   }
-
-  useEffect(() => {
-    setAuthSubstep(1);
-  }, [currentStep]);
 
   if (!isOpen || !mounted) return null;
 
   const steps = [
-    { num: 1, label: "Connect" },
-    { num: 2, label: "Network" },
-    { num: 3, label: "Welcome" },
-    { num: 4, label: "Secure" },
-    { num: 5, label: "Fund" },
-    { num: 6, label: "Authorize" },
-    { num: 7, label: "Activate" },
-    { num: 8, label: "Launch" },
+    { num: 1, label: "Access" },
+    { num: 2, label: "Vault" },
+    { num: 3, label: "Authorize" },
+    { num: 4, label: "Activate" },
+    { num: 5, label: "Launch" },
   ];
-
-  const handleCopy = async (value: string | null | undefined, field: string) => {
-    if (!value) return;
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopiedField(field);
-      setTimeout(() => setCopiedField(null), 1600);
-    } catch {
-      // Best effort only
-    }
-  };
 
   const handleCreateVault = async () => {
     setActionError(null);
     try {
-      await onBootstrap();
+      await onBootstrap({ ownershipAcknowledgedAt: confirmedOwnership ? new Date().toISOString() : null });
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Failed to deploy smart account.");
     }
   };
 
-  const handleConfirmOwnership = async () => {
+  const handleEnableAutomation = async () => {
     setActionError(null);
     try {
-      await onAcknowledgeOwnership();
+      await onEnableAutomation();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to record ownership acknowledgment.");
-    }
-  };
-
-  const handleSetFunding = async () => {
-    setActionError(null);
-    try {
-      await onFundingIntent(fundingAmount);
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to register funding intent.");
-    }
-  };
-
-  const handlePublishPolicy = async () => {
-    setActionError(null);
-    try {
-      await onPublishPolicy();
-      setAuthSubstep(2);
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to publish policy rules.");
-    }
-  };
-
-  const handleFinalizeGrant = async () => {
-    setActionError(null);
-    try {
-      await onFinalizeGrant();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to finalize automation grant.");
+      setActionError(err instanceof Error ? err.message : "Failed to authorize automation.");
     }
   };
 
@@ -359,7 +283,7 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
         {/* Step Body */}
         <div style={{ minHeight: "240px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-          {currentStep === 1 && (
+          {currentStep === 1 && !isConnected && (
             <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: "1rem" }}>
               <div style={{ display: "flex", justifyContent: "center", marginBottom: "0.5rem" }}>
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-lime)" strokeWidth="1.5">
@@ -394,7 +318,7 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
             </div>
           )}
 
-          {currentStep === 2 && (
+          {currentStep === 1 && isConnected && !isCorrectChain && (
             <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: "1rem" }}>
               <div style={{ display: "flex", justifyContent: "center", marginBottom: "0.5rem" }}>
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-lime)" strokeWidth="1.5">
@@ -427,7 +351,7 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
             </div>
           )}
 
-          {currentStep === 3 && (
+          {currentStep === 2 && (
             <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: "1rem" }}>
               <div style={{ display: "flex", justifyContent: "center", marginBottom: "0.5rem" }}>
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-lime)" strokeWidth="1.5">
@@ -439,79 +363,6 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               <p style={{ margin: 0, fontSize: "0.88rem", color: "var(--text-secondary)", lineHeight: 1.6 }}>
                 We need to bootstrap a dedicated, secure smart account (Safe) for you. This vault isolates your funds and applies custom on-chain controls.
               </p>
-              <div style={{ marginTop: "1rem" }}>
-                <button
-                  onClick={handleCreateVault}
-                  disabled={busy}
-                  style={{
-                    background: "var(--color-lime)",
-                    border: "none",
-                    color: "#06110a",
-                    padding: "0.75rem 1.75rem",
-                    borderRadius: "10px",
-                    fontWeight: 700,
-                    cursor: busy ? "not-allowed" : "pointer",
-                    opacity: busy ? 0.75 : 1,
-                    fontSize: "0.9rem",
-                  }}
-                >
-                  {busy ? "Deploying Vault..." : "Create User Vault"}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {currentStep === 4 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700, textAlign: "center" }}>
-                Review & Confirm Ownership
-              </h3>
-              <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--text-secondary)", lineHeight: 1.5, textAlign: "center" }}>
-                Deposited funds live inside the smart contract vault address shown below. The vault is owned and controlled by your control wallet.
-              </p>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginTop: "0.5rem" }}>
-                <div style={{ border: "1px solid var(--border-subtle)", borderRadius: "10px", padding: "0.8rem", background: "rgba(255,255,255,0.01)" }}>
-                  <div style={{ fontSize: "0.68rem", color: "var(--text-secondary)", textTransform: "uppercase" }}>Vault Address</div>
-                  <div style={{ fontFamily: "monospace", fontSize: "0.78rem", wordBreak: "break-all", margin: "0.3rem 0" }}>{vault?.vault_address}</div>
-                  <button
-                    onClick={() => handleCopy(vault?.vault_address, "vault")}
-                    style={{ background: "transparent", border: "1px solid var(--border-subtle)", color: copiedField === "vault" ? "var(--color-lime)" : "var(--text-secondary)", padding: "0.2rem 0.5rem", borderRadius: "4px", fontSize: "0.7rem", cursor: "pointer" }}
-                  >
-                    {copiedField === "vault" ? "Copied" : "Copy"}
-                  </button>
-                </div>
-                <div style={{ border: "1px solid var(--border-subtle)", borderRadius: "10px", padding: "0.8rem", background: "rgba(255,255,255,0.01)" }}>
-                  <div style={{ fontSize: "0.68rem", color: "var(--text-secondary)", textTransform: "uppercase" }}>{controlWalletLabel}</div>
-                  <div style={{ fontFamily: "monospace", fontSize: "0.78rem", wordBreak: "break-all", margin: "0.3rem 0" }}>{controlWalletAddress}</div>
-                  <button
-                    onClick={() => handleCopy(controlWalletAddress, "control")}
-                    style={{ background: "transparent", border: "1px solid var(--border-subtle)", color: copiedField === "control" ? "var(--color-lime)" : "var(--text-secondary)", padding: "0.2rem 0.5rem", borderRadius: "4px", fontSize: "0.7rem", cursor: "pointer" }}
-                  >
-                    {copiedField === "control" ? "Copied" : "Copy"}
-                  </button>
-                </div>
-              </div>
-
-              {canExportEmbeddedWallet && (
-                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: "center", marginTop: "0.2rem" }}>
-                  <button
-                    onClick={onExportEmbeddedWallet}
-                    style={{ border: "none", background: "rgba(255, 255, 255, 0.08)", color: "var(--text-primary)", padding: "0.5rem 0.8rem", borderRadius: "6px", fontSize: "0.76rem", fontWeight: 700, cursor: "pointer" }}
-                  >
-                    Export Control Wallet
-                  </button>
-                  {embeddedWalletRecoveryMethod === "privy" && (
-                    <button
-                      onClick={onSetEmbeddedWalletRecovery}
-                      style={{ border: "1px solid var(--border-subtle)", background: "transparent", color: "var(--text-secondary)", padding: "0.5rem 0.8rem", borderRadius: "6px", fontSize: "0.76rem", cursor: "pointer" }}
-                    >
-                      Configure Recovery
-                    </button>
-                  )}
-                </div>
-              )}
-
               <label
                 style={{
                   display: "flex",
@@ -521,7 +372,7 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                   borderRadius: "10px",
                   padding: "0.75rem",
                   cursor: "pointer",
-                  marginTop: "0.4rem",
+                  textAlign: "left",
                 }}
               >
                 <input
@@ -531,86 +382,32 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                   style={{ marginTop: "0.15rem" }}
                 />
                 <span style={{ fontSize: "0.78rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
-                  I confirm that I hold the control wallet EOA and understand that I administer this smart vault.
+                  I control this wallet and understand that it administers the Safe vault. Deposits remain in the vault; funding can be done later.
                 </span>
               </label>
-
-              <div style={{ display: "flex", justifyContent: "center", marginTop: "0.5rem" }}>
+              <div style={{ marginTop: "1rem" }}>
                 <button
-                  onClick={handleConfirmOwnership}
-                  disabled={!confirmedOwnership || busy}
+                  onClick={handleCreateVault}
+                  disabled={busy || !confirmedOwnership}
                   style={{
                     background: "var(--color-lime)",
                     border: "none",
                     color: "#06110a",
-                    padding: "0.65rem 1.5rem",
-                    borderRadius: "8px",
+                    padding: "0.75rem 1.75rem",
+                    borderRadius: "10px",
                     fontWeight: 700,
-                    cursor: !confirmedOwnership || busy ? "not-allowed" : "pointer",
-                    opacity: !confirmedOwnership || busy ? 0.6 : 1,
-                    fontSize: "0.85rem",
+                    cursor: busy || !confirmedOwnership ? "not-allowed" : "pointer",
+                    opacity: busy || !confirmedOwnership ? 0.6 : 1,
+                    fontSize: "0.9rem",
                   }}
                 >
-                  {busy ? "Signing..." : "Acknowledge Ownership & Unlock"}
+                  {busy ? "Deploying Vault..." : "Create User Vault"}
                 </button>
               </div>
             </div>
           )}
 
-          {currentStep === 5 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "1rem", textAlign: "center" }}>
-              <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700 }}>Set Funding Intent</h3>
-              <p style={{ margin: 0, fontSize: "0.88rem", color: "var(--text-secondary)", lineHeight: 1.6 }}>
-                Declare how much capital you intend to allocate to this vault. This guides the automated allocator without moving funds automatically.
-              </p>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem", alignItems: "center", marginTop: "0.5rem" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <span style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--color-lime)" }}>$</span>
-                  <input
-                    type="number"
-                    value={fundingAmount}
-                    onChange={(e) => setFundingAmount(Math.max(1, parseInt(e.target.value) || 0))}
-                    disabled={busy || hasFundingIntent}
-                    style={{
-                      background: "rgba(255,255,255,0.04)",
-                      border: "1px solid var(--border-subtle)",
-                      borderRadius: "8px",
-                      color: "var(--text-primary)",
-                      padding: "0.5rem 0.8rem",
-                      fontSize: "1.25rem",
-                      width: "120px",
-                      textAlign: "center",
-                      fontWeight: 700,
-                    }}
-                  />
-                </div>
-                {hasFundingIntent ? (
-                  <div style={{ color: "var(--color-lime)", fontSize: "0.9rem", fontWeight: 600 }}>
-                    ✓ Funding intent registered!
-                  </div>
-                ) : (
-                  <button
-                    onClick={handleSetFunding}
-                    disabled={busy}
-                    style={{
-                      background: "transparent",
-                      border: "1px solid var(--color-lime)",
-                      color: "var(--color-lime)",
-                      padding: "0.6rem 1.5rem",
-                      borderRadius: "8px",
-                      fontWeight: 700,
-                      cursor: busy ? "not-allowed" : "pointer",
-                      fontSize: "0.85rem",
-                    }}
-                  >
-                    {busy ? "Registering..." : "Confirm Funding Intent"}
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {currentStep === 6 && (
+          {currentStep === 3 && (
             <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: "1rem" }}>
               <div style={{ display: "flex", justifyContent: "center", marginBottom: "0.2rem" }}>
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-lime)" strokeWidth="1.5">
@@ -619,13 +416,11 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               </div>
               <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700 }}>Enable Vault Automation</h3>
               
-              {/* Sub-step indicator */}
               <div style={{ fontSize: "0.82rem", color: "var(--color-lime)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                Confirmation {authSubstep} of 2
+                One guided approval flow
               </div>
 
-              {authSubstep === 1 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem" }}>
                   <div
                     style={{
                       border: "1px solid rgba(223, 246, 81, 0.18)",
@@ -636,18 +431,18 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                     }}
                   >
                     <div style={{ fontSize: "0.85rem", color: "var(--text-primary)", fontWeight: 700, marginBottom: "0.3rem" }}>
-                      1. Publish Execution Policy
+                      Agent authorization package
                     </div>
                     <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
-                      You are authorizing: Publishing the daily and total transaction limits on-chain to the Mantle Sepolia network. This secures your vault by restricting the operator agent from exceeding your defined parameters.
+                      NeuralRate will publish your execution limits, sign a scoped MCP grant, and then try to activate the Safe runtime. The agent only receives access to this vault and to the policy limits shown in settings.
                     </div>
                     <div style={{ fontSize: "0.74rem", color: "var(--color-warning)", marginTop: "0.4rem", fontWeight: 600 }}>
-                      Requires: Wallet transaction signature (Mantle gas fee).
+                      Requires: one policy transaction, one grant signature, and one batched Safe runtime transaction when setup is required.
                     </div>
                   </div>
                   <div style={{ marginTop: "0.5rem" }}>
                     <button
-                      onClick={handlePublishPolicy}
+                      onClick={handleEnableAutomation}
                       disabled={busy}
                       style={{
                         background: "var(--color-lime)",
@@ -660,72 +455,15 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                         cursor: busy ? "not-allowed" : "pointer",
                       }}
                     >
-                      {busy ? "Publishing..." : "Publish Policy Rules"}
+                      {busy ? "Authorizing..." : "Authorize Agent"}
                     </button>
                   </div>
-                </div>
-              )}
+              </div>
 
-              {authSubstep === 2 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem" }}>
-                  <div
-                    style={{
-                      border: "1px solid rgba(223, 246, 81, 0.18)",
-                      background: "rgba(223, 246, 81, 0.02)",
-                      borderRadius: "10px",
-                      padding: "1rem",
-                      textAlign: "left",
-                    }}
-                  >
-                    <div style={{ fontSize: "0.85rem", color: "var(--text-primary)", fontWeight: 700, marginBottom: "0.3rem" }}>
-                      2. Authorize Agent Grant
-                    </div>
-                    <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
-                      You are authorizing: Granting cryptographic permission for the operator agent to execute strategy reallocations within the limits of your published policy.
-                    </div>
-                    <div style={{ fontSize: "0.74rem", color: "var(--color-lime)", marginTop: "0.4rem", fontWeight: 600 }}>
-                      Requires: Cryptographic message signature (Free).
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: "0.5rem", justifyContent: "center", marginTop: "0.5rem" }}>
-                    <button
-                      onClick={() => setAuthSubstep(1)}
-                      disabled={busy}
-                      style={{
-                        background: "transparent",
-                        border: "1px solid var(--border-subtle)",
-                        color: "var(--text-secondary)",
-                        padding: "0.7rem 1.2rem",
-                        borderRadius: "8px",
-                        fontSize: "0.88rem",
-                        cursor: busy ? "not-allowed" : "pointer",
-                      }}
-                    >
-                      Back
-                    </button>
-                    <button
-                      onClick={handleFinalizeGrant}
-                      disabled={busy}
-                      style={{
-                        background: "var(--color-lime)",
-                        border: "none",
-                        color: "#06110a",
-                        padding: "0.7rem 1.5rem",
-                        borderRadius: "8px",
-                        fontWeight: 700,
-                        fontSize: "0.88rem",
-                        cursor: busy ? "not-allowed" : "pointer",
-                      }}
-                    >
-                      {busy ? "Signing..." : "Sign Agent Authorization"}
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
-          {currentStep === 7 && (
+          {currentStep === 4 && (
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700, textAlign: "center" }}>
                 Activate Safe Module Runtime
@@ -825,7 +563,7 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
             </div>
           )}
 
-          {currentStep === 8 && (
+          {currentStep === 5 && (
             <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: "1rem" }}>
               <div style={{ display: "flex", justifyContent: "center", marginBottom: "0.5rem" }}>
                 <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--color-lime)" strokeWidth="1.5">

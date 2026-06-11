@@ -24,6 +24,7 @@ export type UserBootstrapInput = {
   vaultStatus?: string | null;
   safeDeploymentStatus?: string | null;
   safeSaltNonce?: string | null;
+  ownershipAcknowledgedAt?: string | null;
   chainId?: number;
 };
 
@@ -391,6 +392,7 @@ export class AutomationStore {
       fundingStatus: normalizedVaultAddress ? "needs_funding" : "setup_required",
       automationStatus: "not_enabled",
       depositAddress: normalizedVaultAddress,
+      ownershipAcknowledgedAt: input.ownershipAcknowledgedAt ?? undefined,
     });
 
     const existingConfig = await this.getAgentConfig(normalizedOwner);

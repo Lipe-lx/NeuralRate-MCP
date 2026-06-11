@@ -34,19 +34,6 @@ type Props = {
   onRefreshState: () => Promise<unknown>;
 };
 
-const parseNumeric = (value: string | number | null | undefined) => {
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? value : 0;
-  }
-
-  if (typeof value === "string") {
-    const parsed = Number.parseFloat(value.replace(/,/g, ""));
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-
-  return 0;
-};
-
 const humanize = (value: string | null | undefined) =>
   value
     ? value
@@ -141,13 +128,7 @@ const VaultPanel: React.FC<Props> = ({
   const activeGrant = state?.activeGrant;
   const activeMcpSession = state?.activeMcpSession;
   const ownershipAcknowledged = Boolean(vault?.ownership_acknowledged_at);
-  const isActionGated = Boolean(vault) && !ownershipAcknowledged;
   const hasOnchainDeposit = hasRuntimeNativeDeposit(state);
-  const hasFundingIntent = hasOnchainDeposit || parseNumeric(
-    typeof vault?.last_funding_intent?.amountUsd === "number" || typeof vault?.last_funding_intent?.amountUsd === "string"
-      ? vault.last_funding_intent.amountUsd
-      : 0,
-  ) > 0;
   const automationStatus = humanize(
     activeGrant?.status ??
     activeMcpSession?.status ??
@@ -196,7 +177,6 @@ const VaultPanel: React.FC<Props> = ({
         ? `Partial ${completedRuntimeSteps}/${runtimeStepCount}`
         : "Pending"
       : "Not enabled";
-  const hasDemoQueued = (state?.automationJobs ?? []).length > 0;
   const mcpExecutionCatalog = mcpAccessBundle?.catalogs.execution ?? null;
   const mcpConfigCatalog = mcpAccessBundle?.catalogs.config ?? null;
   const mcpBundlePayload = mcpAccessBundle
@@ -229,34 +209,16 @@ const VaultPanel: React.FC<Props> = ({
       blockedBy: !vault ? "Bootstrap your dedicated user vault." : null,
     },
     {
-      key: "fund",
-      label: "Set funding intent",
-      done: hasFundingIntent,
-      blockedBy: vault && !hasFundingIntent ? "Register an initial funding intent (e.g. $1,000)." : null,
-    },
-    {
-      key: "ownership",
-      label: "Confirm ownership",
-      done: ownershipAcknowledged,
-      blockedBy: vault && !ownershipAcknowledged ? "Review wallet ownership before grants and execution." : null,
-    },
-    {
       key: "grant",
       label: "Issue grant",
       done: hasAutomation,
-      blockedBy: ownershipAcknowledged && !hasAutomation ? "Issue a scoped automation grant from your control wallet." : null,
+      blockedBy: vault && !hasAutomation ? "Issue a scoped automation grant from your control wallet." : null,
     },
     {
       key: "runtime",
       label: "Activate runtime",
       done: Boolean(state?.automationReady),
       blockedBy: hasAutomation && !state?.automationReady ? "Finish the Safe runtime checklist so the agent can actually execute." : null,
-    },
-    {
-      key: "strategy",
-      label: "Run first strategy",
-      done: hasDemoQueued,
-      blockedBy: hasAutomation && !hasDemoQueued ? `Queue ${DEMO_TARGET_ASSET} demo to validate end-to-end execution.` : null,
     },
   ];
   const completedSteps = onboardingSteps.filter((step) => step.done).length;
@@ -715,10 +677,10 @@ const VaultPanel: React.FC<Props> = ({
               }}
             >
               <div style={{ fontSize: "0.8rem", color: "var(--text-primary)", fontWeight: 700 }}>
-                Review vault ownership before funding or enabling automation
+                Optional wallet ownership review
               </div>
               <div style={{ fontSize: "0.74rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
-                This Safe vault can already receive funds, but funding and automation stay locked until you confirm you understand how the control wallet and export flow work.
+                This Safe vault can already receive funds and be authorized. Reopen the handoff anytime to review the control wallet and export flow.
               </div>
               <div>
                 <ActionButton label="Review Wallet Ownership" onClick={onReviewOwnership} />
@@ -744,13 +706,13 @@ const VaultPanel: React.FC<Props> = ({
               <ActionButton label={busy ? "Bootstrapping..." : "Create User Vault"} tone="primary" onClick={onBootstrap} disabled={busy} />
             ) : (
               <>
-                <ActionButton label="Funding Intent" onClick={() => onFundingIntent(1000)} disabled={busy || isActionGated} />
+                <ActionButton label="Funding Intent" onClick={() => onFundingIntent(1000)} disabled={busy} />
                 {!activeGrant || activeGrant.status === "revoked" ? (
                   <ActionButton
                     label={busy ? "Enabling..." : "Enable Automation"}
                     tone="primary"
                     onClick={onEnableAutomation}
-                    disabled={busy || !vault.vault_address || isActionGated}
+                    disabled={busy || !vault.vault_address}
                   />
                 ) : runtimePending ? (
                   <>
@@ -779,7 +741,7 @@ const VaultPanel: React.FC<Props> = ({
             )}
           </div>
 
-          {vault && ownershipAcknowledged && (
+          {vault && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: "0.65rem" }}>
               <ActionButton
                 label="Review Wallet Ownership"
@@ -795,7 +757,7 @@ const VaultPanel: React.FC<Props> = ({
             </div>
           )}
 
-          {!activeGrant && vault && ownershipAcknowledged && (
+          {!activeGrant && vault && (
             <div style={{ fontSize: "0.76rem", color: "var(--color-warning)", lineHeight: 1.5 }}>
               Automation remains manual-only until this wallet issues a vault-scoped MCP grant.
             </div>

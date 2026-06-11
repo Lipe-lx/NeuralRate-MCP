@@ -7,14 +7,14 @@ import {
   shouldUseAARuntimeForStrategy,
 } from "./executionRouting.js";
 
-test("VaultModule strategies stay on the legacy signer path without a paymaster", () => {
+test("VaultModule strategies stay on the canonical AA path without a paymaster", () => {
   assert.equal(isVaultModuleStrategy("mnt-native-transfer"), true);
   assert.equal(isVaultModuleStrategy("usdy-vault-transfer"), true);
   assert.equal(shouldUseAARuntimeForStrategy({
     runtimeCanUseAA: true,
     strategyKey: "mnt-native-transfer",
     paymasterConfigured: false,
-  }), false);
+  }), true);
 });
 
 test("VaultModule strategies use Safe7579 AA when a paymaster is configured", () => {
@@ -25,13 +25,13 @@ test("VaultModule strategies use Safe7579 AA when a paymaster is configured", ()
   }), true);
 });
 
-test("VaultModule execution plans require a paymaster for Safe7579 AA wrapping", () => {
+test("VaultModule execution plans use AA whenever the runtime supports it", () => {
   assert.equal(isVaultModuleProtocol("neuralrate-vault-module"), true);
   assert.equal(shouldUseAARuntimeForPlan({
     runtimeCanUseAA: true,
     protocolId: "neuralrate-vault-module",
     paymasterConfigured: false,
-  }), false);
+  }), true);
   assert.equal(shouldUseAARuntimeForPlan({
     runtimeCanUseAA: true,
     protocolId: "neuralrate-vault-module",

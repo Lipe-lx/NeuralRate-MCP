@@ -15,22 +15,26 @@ The frontend lives in `apps/web` and is a Vite React application. It is a panel 
 
 The frontend should call the worker, not the executor.
 
-## Manual Automation Flow
+## Minimal Automation Onboarding
 
-The current web flow combines worker-side grant/session state with Safe-side module enablement:
+The onboarding flow is intentionally short and treats Safe7579/ERC-4337 as the canonical runtime:
 
-1. request a nonce for owner-authenticated mutations when needed
-2. request a grant challenge from the worker
-3. sign the canonical automation grant
-4. issue the grant through the worker and receive the mutation-session context
-5. resolve or deploy the user Safe
-6. enable `NeuralRateVaultModule` on the Safe
-7. sign the separate `NeuralRate Vault Automation Consent` message used for `automation_sessions`
+1. connect the wallet and switch to Mantle Sepolia
+2. bootstrap the user profile and predicted Safe vault, with the ownership review included in the same owner-authenticated mutation
+3. authorize automation through one guided action:
+   - publish the active on-chain execution policy
+   - sign the canonical automation grant
+   - activate the Safe7579/ERC-4337 runtime with batched Safe admin calls when runtime setup is required
+4. launch or hand the scoped MCP session token to an agent
 
 These are distinct backend records:
 
 - `automation_grants` and `mcp_mutation_sessions`
 - `automation_sessions`
+
+Funding intent is not a blocking onboarding step. The vault can receive funds whenever the user chooses, and live funding telemetry should be derived from on-chain reads rather than required as an extra signed mutation in the activation path.
+
+Legacy direct-signer or module-only runtime fallback is not a supported onboarding success path. If Safe7579, the delegate validator, the vault module, the execution guard, or required guard trust settings are missing, onboarding should fail as a release/configuration error.
 
 ## Network Defaults
 
@@ -76,7 +80,7 @@ It shows:
 It also lets the user:
 
 - bootstrap the vault
-- acknowledge wallet ownership
+- review wallet ownership and export/recovery options
 - enable automation
 - revoke automation
 - queue the default demo strategy
