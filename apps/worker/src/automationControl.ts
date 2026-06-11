@@ -78,6 +78,41 @@ export type ExpectedPublishedPolicy = {
   allowedSelectors: string[];
 };
 
+export type PolicyPublishNextAction = {
+  type: "none" | "publish_policy";
+  label: string;
+  required: boolean;
+  ownerSignatureRequired: boolean;
+  tools: string[];
+  message: string;
+};
+
+export const buildPolicyPublishNextAction = (
+  policySyncStatus: "not_published" | "in_sync" | "drifted" | "pending_publish" | "pending_revoke" | string | null | undefined
+): PolicyPublishNextAction => {
+  if (policySyncStatus === "drifted" || policySyncStatus === "pending_publish" || policySyncStatus === "not_published") {
+    return {
+      type: "publish_policy",
+      label: "publish_policy",
+      required: true,
+      ownerSignatureRequired: true,
+      tools: ["prepare_policy_publish", "submit_policy_publish"],
+      message: "Policy draft saved. Call prepare_policy_publish, have the owner sign the transaction, then call submit_policy_publish with the tx hash and expectedPolicy.",
+    };
+  }
+
+  return {
+    type: "none",
+    label: policySyncStatus === "pending_revoke" ? "pending_revoke" : "policy_in_sync",
+    required: false,
+    ownerSignatureRequired: false,
+    tools: [],
+    message: policySyncStatus === "pending_revoke"
+      ? "A policy revoke is pending; do not publish a new policy until revoke completes or is cancelled."
+      : "Draft policy already matches the active on-chain policy.",
+  };
+};
+
 const policyRegistryAbi = [
   {
     type: "function",
@@ -181,6 +216,26 @@ const buildCanonicalExecutionSurface = (env: ExecutorEnv) => {
 const asRecord = (value: unknown) =>
   value && typeof value === "object" ? value as Record<string, unknown> : null;
 
+const firstPolicyNumber = (draft: Record<string, unknown>, keys: string[], fallback: number) => {
+  for (const key of keys) {
+    const value = draft[key];
+    if (value !== undefined && value !== null) {
+      return asNumber(value, fallback);
+    }
+  }
+  return fallback;
+};
+
+const firstPolicyValue = (draft: Record<string, unknown>, keys: string[], fallback: unknown) => {
+  for (const key of keys) {
+    const value = draft[key];
+    if (value !== undefined && value !== null) {
+      return value;
+    }
+  }
+  return fallback;
+};
+
 const buildExpectedPublishedPolicy = (
   access: ScopedAutomationAccess,
   env: ExecutorEnv,
@@ -207,16 +262,16 @@ const buildExpectedPublishedPolicy = (
     ownerEoa: access.ownerEoa.toLowerCase(),
     vaultAddress: vaultAddress.toLowerCase(),
     delegate: env.NEURALRATE_AGENT_SESSION_SIGNER_ADDRESS.toLowerCase(),
-    maxPerUse: Math.max(0, Math.trunc(asNumber(draft["max_action_usd"], 1000))),
-    maxDaily: Math.max(0, Math.trunc(asNumber(draft["max_daily_usd"], 2500))),
-    maxTotal: Math.max(0, Math.trunc(asNumber(draft["max_automation_usd"], 10000))),
+    maxPerUse: Math.max(0, Math.trunc(firstPolicyNumber(draft, ["maxPerUse", "max_action_usd"], 1000))),
+    maxDaily: Math.max(0, Math.trunc(firstPolicyNumber(draft, ["maxDaily", "max_daily_usd"], 2500))),
+    maxTotal: Math.max(0, Math.trunc(firstPolicyNumber(draft, ["maxTotal", "max_automation_usd"], 10000))),
     validAfter,
     validUntil,
-    maxSlippageBps: Math.max(0, Math.trunc(asNumber(draft["max_slippage_bps"], 50))),
+    maxSlippageBps: Math.max(0, Math.trunc(firstPolicyNumber(draft, ["maxSlippageBps", "max_slippage_bps"], 50))),
     requireSnapshot: true,
-    policyVersion: String(draft["policy_version"] ?? access.policyVersion ?? "vault-v1"),
-    allowedAssets: normalizeStringList(draft["allowed_assets"], "upper"),
-    allowedProtocols: normalizeStringList(draft["allowed_protocols"], "upper"),
+    policyVersion: String(firstPolicyValue(draft, ["policyVersion", "policy_version"], access.policyVersion ?? "vault-v1")),
+    allowedAssets: normalizeStringList(firstPolicyValue(draft, ["allowedAssets", "allowed_assets"], []), "upper"),
+    allowedProtocols: normalizeStringList(firstPolicyValue(draft, ["allowedProtocols", "allowed_protocols"], []), "upper"),
     allowedTargets: executionSurface.allowedTargets,
     allowedSelectors: executionSurface.allowedSelectors,
   };

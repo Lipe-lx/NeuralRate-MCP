@@ -5,11 +5,19 @@ import {
   restrictionPresetOptions,
   type AgentConfig,
 } from "../lib/userState";
+import {
+  policySyncLabel,
+  shouldShowPublishPolicy,
+  validatePolicyLimits,
+  type PolicySyncStatus,
+} from "../lib/policyLimits";
 
 type Props = {
   config: AgentConfig | null;
   busy: boolean;
   onSave: (patch: Record<string, unknown>) => Promise<unknown>;
+  onPublishPolicy: () => Promise<unknown>;
+  policySyncStatus?: PolicySyncStatus;
 };
 
 const parseCsv = (value: string) =>
@@ -17,8 +25,9 @@ const parseCsv = (value: string) =>
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
-const AgentSettingsPanel: React.FC<Props> = ({ config, busy, onSave }) => {
+const AgentSettingsPanel: React.FC<Props> = ({ config, busy, onSave, onPublishPolicy, policySyncStatus }) => {
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Custom Select Dropdowns State
   const [objectiveOpen, setObjectiveOpen] = useState(false);
@@ -87,6 +96,16 @@ const AgentSettingsPanel: React.FC<Props> = ({ config, busy, onSave }) => {
   }, [config]);
 
   const save = async () => {
+    const validationError = validatePolicyLimits({
+      maxActionUsd: Number(form.maxActionUsd),
+      maxDailyUsd: Number(form.maxDailyUsd),
+      maxAutomationUsd: Number(form.maxAutomationUsd),
+    });
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
+    setFormError(null);
     await onSave({
       objective: form.objective,
       riskProfile: form.riskProfile,
@@ -109,6 +128,13 @@ const AgentSettingsPanel: React.FC<Props> = ({ config, busy, onSave }) => {
       pauseOnRiskEvent: form.pauseOnRiskEvent,
     });
   };
+
+  const publishPolicy = async () => {
+    setFormError(null);
+    await onPublishPolicy();
+  };
+
+  const showPublishPolicy = shouldShowPublishPolicy(policySyncStatus);
 
   return (
     <section className="glass-panel animate-enter delay-100 agent-settings-panel">
@@ -491,6 +517,78 @@ const AgentSettingsPanel: React.FC<Props> = ({ config, busy, onSave }) => {
             </div>
           </div>
 
+          <div
+            style={{
+              border: "1px solid var(--border-subtle)",
+              borderRadius: "8px",
+              padding: "0.85rem",
+              background: "oklch(100% 0 0 / 0.025)",
+              display: "grid",
+              gap: "0.75rem",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
+              <div>
+                <div className="vault-swiss-kicker">Policy Limits</div>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "0.2rem" }}>
+                  Draft limits require owner publish before becoming active on-chain.
+                </div>
+              </div>
+              <div
+                style={{
+                  fontSize: "0.72rem",
+                  color: showPublishPolicy ? "var(--color-lime)" : "var(--text-secondary)",
+                  border: "1px solid var(--border-subtle)",
+                  borderRadius: "999px",
+                  padding: "0.25rem 0.55rem",
+                  fontFamily: "var(--font-mono)",
+                  textTransform: "uppercase",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {policySyncLabel(policySyncStatus)}
+              </div>
+            </div>
+            <div className="agent-settings-simple-grid">
+              <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                Per Action (USD)
+                <input type="number" min="0" value={form.maxActionUsd} onChange={(event) => setForm((current) => ({ ...current, maxActionUsd: Number(event.target.value) }))} style={{ width: "100%", marginTop: "0.25rem" }} />
+              </label>
+              <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                Daily Limit (USD)
+                <input type="number" min="0" value={form.maxDailyUsd} onChange={(event) => setForm((current) => ({ ...current, maxDailyUsd: Number(event.target.value) }))} style={{ width: "100%", marginTop: "0.25rem" }} />
+              </label>
+            </div>
+            {showPublishPolicy && (
+              <button
+                type="button"
+                onClick={() => {
+                  void publishPolicy();
+                }}
+                disabled={busy}
+                style={{
+                  border: "1px solid var(--color-lime)",
+                  background: "transparent",
+                  color: "var(--color-lime)",
+                  padding: "0.55rem 0.8rem",
+                  borderRadius: "8px",
+                  fontWeight: 700,
+                  cursor: busy ? "not-allowed" : "pointer",
+                  opacity: busy ? 0.7 : 1,
+                  justifySelf: "start",
+                }}
+              >
+                Publish Policy
+              </button>
+            )}
+          </div>
+
+          {formError && (
+            <div style={{ color: "#ff9b9b", fontSize: "0.78rem", lineHeight: 1.4 }}>
+              {formError}
+            </div>
+          )}
+
           <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
             <input type="checkbox" checked={form.pauseOnRiskEvent} onChange={(event) => setForm((current) => ({ ...current, pauseOnRiskEvent: event.target.checked }))} />
             Pause automation if a risk event is detected
@@ -538,14 +636,6 @@ const AgentSettingsPanel: React.FC<Props> = ({ config, busy, onSave }) => {
               <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
                 Denied Protocols
                 <input value={form.deniedProtocols} onChange={(event) => setForm((current) => ({ ...current, deniedProtocols: event.target.value }))} placeholder="UnknownDex" style={{ width: "100%", marginTop: "0.25rem" }} />
-              </label>
-              <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-                Max Action USD
-                <input type="number" value={form.maxActionUsd} onChange={(event) => setForm((current) => ({ ...current, maxActionUsd: Number(event.target.value) }))} style={{ width: "100%", marginTop: "0.25rem" }} />
-              </label>
-              <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-                Max Daily USD
-                <input type="number" value={form.maxDailyUsd} onChange={(event) => setForm((current) => ({ ...current, maxDailyUsd: Number(event.target.value) }))} style={{ width: "100%", marginTop: "0.25rem" }} />
               </label>
               <label style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
                 Max Automation USD

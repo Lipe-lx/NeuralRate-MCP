@@ -11,6 +11,7 @@ import {
   verifyMutationAuthEnvelope,
 } from "./auth";
 import {
+  buildPolicyPublishNextAction,
   createAutomationGrantChallenge,
   type ExpectedPublishedPolicy,
   issueAutomationGrant,
@@ -970,18 +971,21 @@ export class NeuralRateConfigMcpAgent extends McpAgent<Env, Record<string, never
         const scoped = await getScoped();
         const config = await updateAgentPolicyFromScopedAccess(automation, scoped, args as unknown as Record<string, unknown>);
         const state = await withOnchainPolicyState(await automation.getAutomationState(scoped.ownerEoa), this.env);
+        const nextAction = buildPolicyPublishNextAction(state.policySyncStatus);
         return {
           content: [{ type: "text", text: JSON.stringify({
             config,
             policySyncStatus: state.policySyncStatus,
             draftPolicy: state.draftPolicy,
             activeOnchainPolicy: state.activeOnchainPolicy,
+            nextAction,
           }, null, 2) }],
           structuredContent: {
             config,
             policySyncStatus: state.policySyncStatus,
             draftPolicy: state.draftPolicy,
             activeOnchainPolicy: state.activeOnchainPolicy,
+            nextAction,
           } as Record<string, unknown>,
         };
       }
@@ -1630,12 +1634,14 @@ export default {
           });
 
           const state = await withOnchainPolicyState(await automation.getAutomationState(ownerEoa), env);
+          const nextAction = buildPolicyPublishNextAction(state.policySyncStatus);
           return new Response(JSON.stringify({
             success: true,
             config,
             policySyncStatus: state.policySyncStatus,
             draftPolicy: state.draftPolicy,
             activeOnchainPolicy: state.activeOnchainPolicy,
+            nextAction,
           }), { headers: corsHeaders });
         }
 

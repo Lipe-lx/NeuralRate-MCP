@@ -518,8 +518,13 @@ export const useNeuralRateUser = ({
         },
       });
 
-      await refresh(ownerEoa);
-      setNotice("Agent settings updated.");
+      const refreshed = await refresh(ownerEoa);
+      const syncStatus = refreshed?.policySyncStatus;
+      if (syncStatus === "drifted" || syncStatus === "pending_publish" || syncStatus === "not_published") {
+        setNotice("Policy draft saved. Publish on-chain to activate these limits.");
+      } else {
+        setNotice("Agent settings updated.");
+      }
       return response.config;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to update agent settings.";
@@ -1047,6 +1052,7 @@ export const useNeuralRateUser = ({
     try {
       await publishDraftPolicy();
       await refresh(ownerEoa);
+      setNotice("Policy published. Per-action and daily limits are active on-chain.");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to publish policy rules.";
       setError(message);

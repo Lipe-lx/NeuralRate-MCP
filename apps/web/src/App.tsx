@@ -394,7 +394,13 @@ function AppContent() {
                 )}
                 {activeVaultTab === 'settings' && (
                   <div className="centered-page-container" style={{ maxWidth: '1200px', margin: '0.65rem auto 0' }}>
-                    <AgentSettingsPanel config={neuralRateUser.state?.config ?? null} busy={neuralRateUser.busy} onSave={neuralRateUser.saveConfig} />
+                    <AgentSettingsPanel
+                      config={neuralRateUser.state?.config ?? null}
+                      busy={neuralRateUser.busy}
+                      onSave={neuralRateUser.saveConfig}
+                      onPublishPolicy={neuralRateUser.publishPolicy}
+                      policySyncStatus={neuralRateUser.state?.policySyncStatus}
+                    />
                   </div>
                 )}
                 {activeVaultTab === 'history' && (
