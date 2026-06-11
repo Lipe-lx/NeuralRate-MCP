@@ -7,6 +7,7 @@ type RequestOptions = {
 };
 
 type DataApiFetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+type WorkerRecordEnvelope = Record<string, unknown>;
 
 export class DataApiClient {
   constructor(
@@ -32,6 +33,16 @@ export class DataApiClient {
     }
 
     return (await response.json()) as T;
+  }
+
+  private async requestRecord(path: string, recordKey: "job" | "benchmarkJob", options: RequestOptions = {}) {
+    const envelope = await this.request<WorkerRecordEnvelope>(path, options);
+    const record = envelope[recordKey];
+    if (!record || typeof record !== "object" || Array.isArray(record)) {
+      throw new Error(`Data API response missing ${recordKey} record`);
+    }
+
+    return record as Record<string, unknown>;
   }
 
   getAutomationState(ownerEoa: string) {
@@ -89,19 +100,19 @@ export class DataApiClient {
   }
 
   upsertAutomationJob(body: Record<string, unknown>) {
-    return this.request("/automation/jobs", { method: "POST", body });
+    return this.requestRecord("/automation/jobs", "job", { method: "POST", body });
   }
 
   updateAutomationJob(jobId: string, body: Record<string, unknown>) {
-    return this.request(`/automation/jobs/${encodeURIComponent(jobId)}`, { method: "PATCH", body });
+    return this.requestRecord(`/automation/jobs/${encodeURIComponent(jobId)}`, "job", { method: "PATCH", body });
   }
 
   upsertBenchmarkJob(body: Record<string, unknown>) {
-    return this.request("/benchmark-jobs", { method: "POST", body });
+    return this.requestRecord("/benchmark-jobs", "benchmarkJob", { method: "POST", body });
   }
 
   updateBenchmarkJob(jobId: string, body: Record<string, unknown>) {
-    return this.request(`/benchmark-jobs/${encodeURIComponent(jobId)}`, { method: "PATCH", body });
+    return this.requestRecord(`/benchmark-jobs/${encodeURIComponent(jobId)}`, "benchmarkJob", { method: "PATCH", body });
   }
 
   updateDecisionBenchmark(decisionId: string, body: Record<string, unknown>) {
