@@ -32,7 +32,7 @@ These are distinct backend records:
 - `automation_grants` and `mcp_mutation_sessions`
 - `automation_sessions`
 
-Funding intent is not a blocking onboarding step. The vault can receive funds whenever the user chooses, and live funding telemetry should be derived from on-chain reads rather than required as an extra signed mutation in the activation path.
+Funding intent is not part of the production onboarding UI. The vault can receive any amount directly whenever the user chooses, and live funding telemetry is derived from on-chain balance reads rather than an extra signed mutation in the activation path.
 
 Legacy direct-signer or module-only runtime fallback is not a supported onboarding success path. If Safe7579, the delegate validator, the vault module, the execution guard, or required guard trust settings are missing, onboarding should fail as a release/configuration error.
 
@@ -81,9 +81,9 @@ It also lets the user:
 
 - bootstrap the vault
 - review wallet ownership and export/recovery options
+- copy the vault deposit address for direct funding
 - enable automation
 - revoke automation
-- queue the default demo strategy
 
 ### `AgentSettingsPanel`
 
@@ -108,14 +108,9 @@ This panel:
 - queues benchmark jobs through the worker
 - renders tx hashes and on-chain IDs when available
 
-## Current Sepolia Demo Truth
+## Production Funding UX
 
-The default strategy demo in the frontend is:
-
-- strategy key: `mnt-native-transfer`
-- target asset: `MNT`
-
-The preserved USDY path is not presented as a live canonical Sepolia strategy. When the backend marks that venue as unavailable, the UI shows the explicit failure reason coming back from the worker/executor flow.
+The production UI does not ask the user to predeclare an amount. It shows the vault address as the funding surface, lets the user copy it, and reflects direct deposits from on-chain telemetry. Demo strategy queueing is not exposed as a primary product action.
 
 ## Agent Access
 

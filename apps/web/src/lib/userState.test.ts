@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { hasRuntimeNativeDeposit, mergeLiveFundingTelemetry, shouldAutoRefreshState, type AutomationState } from "./userState";
+import { hasDetectedVaultDeposit, hasRuntimeNativeDeposit, mergeLiveFundingTelemetry, shouldAutoRefreshState, type AutomationState } from "./userState";
 
 const baseState = {
   ownerEoa: "0xowner",
@@ -42,6 +42,17 @@ test("hasRuntimeNativeDeposit accepts explicit flag, formatted balance, or wei b
   assert.equal(hasRuntimeNativeDeposit({ ...baseState, runtimeState: { nativeBalanceFormatted: "0.00001" } }), true);
   assert.equal(hasRuntimeNativeDeposit({ ...baseState, runtimeState: { nativeBalanceWei: "1" } }), true);
   assert.equal(hasRuntimeNativeDeposit({ ...baseState, runtimeState: { nativeBalanceWei: "0" } }), false);
+});
+
+test("hasDetectedVaultDeposit accepts backend-reconciled token deposits", () => {
+  assert.equal(hasDetectedVaultDeposit({
+    ...baseState,
+    vault: {
+      ...baseState.vault,
+      funding_status: "deposit_detected",
+    },
+    runtimeState: { nativeBalanceWei: "0" },
+  }), true);
 });
 
 test("mergeLiveFundingTelemetry preserves same-vault detected deposit across refresh", () => {

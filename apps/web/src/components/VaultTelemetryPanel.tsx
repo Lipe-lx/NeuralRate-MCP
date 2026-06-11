@@ -1,6 +1,6 @@
 import React from "react";
 import { DEMO_TARGET_ASSET, MANTLE_EXPLORER_BASE_URL } from "../config";
-import type { AutomationState } from "../lib/userState";
+import { hasDetectedVaultDeposit, type AutomationState } from "../lib/userState";
 
 type Props = {
   state: AutomationState | null;
@@ -51,16 +51,6 @@ const parseNumeric = (value: string | number | null | undefined) => {
   return 0;
 };
 
-const getRecordNumber = (record: Record<string, unknown> | null | undefined, key: string) => {
-  const value = record?.[key];
-  return typeof value === "number" || typeof value === "string" ? parseNumeric(value) : 0;
-};
-
-const getRecordString = (record: Record<string, unknown> | null | undefined, key: string) => {
-  const value = record?.[key];
-  return typeof value === "string" ? value : null;
-};
-
 const humanize = (value: string | null | undefined) =>
   value
     ? value
@@ -109,9 +99,7 @@ const VaultTelemetryPanel: React.FC<Props> = ({ state }) => {
   const managedValueUsd = parseNumeric(vault?.balance_usd);
   const liveNativeBalance = parseNumeric(state?.runtimeState?.nativeBalanceFormatted);
   const nativeAssetSymbol = state?.runtimeState?.nativeAssetSymbol ?? DEMO_TARGET_ASSET;
-  const hasOnchainDeposit = Boolean(state?.runtimeState?.hasNativeBalance) || liveNativeBalance > 0;
-  const fundingIntentUsd = getRecordNumber(vault?.last_funding_intent, "amountUsd");
-  const fundingIntentSource = humanize(getRecordString(vault?.last_funding_intent, "source"));
+  const hasOnchainDeposit = hasDetectedVaultDeposit(state);
   const allowedAssets = activePermission?.allowed_assets?.length
     ? activePermission.allowed_assets
     : (config?.allowed_assets ?? []);
@@ -240,12 +228,12 @@ const VaultTelemetryPanel: React.FC<Props> = ({ state }) => {
               <strong>{usageLimit ? formatCount(usageLimit) : "Not issued"}</strong>
             </div>
             <div className="vault-info-row">
-              <span>Funding intent</span>
-              <strong>{fundingIntentUsd > 0 ? formatUsd(fundingIntentUsd) : "None"}</strong>
+              <span>Deposit model</span>
+              <strong>Direct on-chain</strong>
             </div>
             <div className="vault-info-row">
               <span>Live vault balance</span>
-              <strong>{hasOnchainDeposit ? `${formatTokenBalance(liveNativeBalance)} ${nativeAssetSymbol}` : "Awaiting on-chain funds"}</strong>
+              <strong>{liveNativeBalance > 0 ? `${formatTokenBalance(liveNativeBalance)} ${nativeAssetSymbol}` : hasOnchainDeposit ? "Funds detected" : "Awaiting on-chain funds"}</strong>
             </div>
             <div className="vault-info-row">
               <span>Signed consent</span>
@@ -257,12 +245,10 @@ const VaultTelemetryPanel: React.FC<Props> = ({ state }) => {
             </div>
             <div className="vault-info-caption">
               {hasOnchainDeposit
-                ? `NeuralRate detected funds at the vault address.${fundingIntentUsd > 0 ? ` Funding intent target: ${formatUsd(fundingIntentUsd)}.` : ""}`
+                ? "NeuralRate detected funds at the vault address. Any token or amount sent directly to the vault can be reflected from on-chain balance telemetry."
                 : consentDigest
-                  ? `Consent digest ${truncate(consentDigest)}${fundingIntentUsd > 0 ? ` • last funding source: ${fundingIntentSource}` : ""}`
-                  : fundingIntentUsd > 0
-                    ? `Last funding source: ${fundingIntentSource}`
-                    : "Create a funding intent to stage the first deposit into the vault."}
+                  ? `Consent digest ${truncate(consentDigest)}. Send funds directly to the vault whenever you are ready.`
+                  : "Send funds directly to the vault address whenever you are ready; no preset funding amount is required."}
             </div>
           </div>
 
@@ -346,7 +332,7 @@ const VaultTelemetryPanel: React.FC<Props> = ({ state }) => {
               </div>
             ) : (
               <div className="vault-info-caption">
-                No execution jobs recorded yet. Queue the {DEMO_TARGET_ASSET} demo after enabling automation to populate the audit trail.
+                No execution jobs recorded yet. The trail will populate when the agent executes actions that match the active policy.
               </div>
             )}
           </div>

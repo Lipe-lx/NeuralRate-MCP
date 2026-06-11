@@ -14,11 +14,9 @@ const defaultProps = {
   onConnect: vi.fn(() => Promise.resolve()),
   onSwitchChain: vi.fn(() => Promise.resolve()),
   onBootstrap: vi.fn(() => Promise.resolve({})),
-  onFundingIntent: vi.fn(() => Promise.resolve()),
   onEnableAutomation: vi.fn(() => Promise.resolve()),
   onCompleteRuntimeSetup: vi.fn(() => Promise.resolve()),
   onRevokeAutomation: vi.fn(() => Promise.resolve()),
-  onQueueDemoStrategy: vi.fn(() => Promise.resolve()),
   mcpAccessBundle: null as McpAccessBundle | null,
   onIssueMcpAccess: vi.fn(() => Promise.resolve({} as McpAccessBundle)),
   onReviewOwnership: vi.fn(),
@@ -98,6 +96,10 @@ describe('VaultPanel', () => {
     render(<VaultPanel {...defaultProps} state={mockState} />);
     expect(screen.getByText(/Vault Address/i)).toBeInTheDocument();
     expect(screen.getByText('0xVaultA...ddress')).toBeInTheDocument();
+    expect(screen.getByText('Deposit to Vault')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Copy Address/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Funding Intent/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Queue .* Demo/i })).not.toBeInTheDocument();
   });
 
   it('renders simplified MCP Access view and toggles advanced details', async () => {

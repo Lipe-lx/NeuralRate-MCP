@@ -4,7 +4,6 @@ import {
   API_BASE_URL,
   DELEGATE_VALIDATOR_ADDRESS,
   ERC8004_AGENT_ID,
-  DEMO_STRATEGY_KEY,
   DEMO_TARGET_ASSET,
   MANTLE_CHAIN_NAME,
   MANTLE_CHAIN_ID,
@@ -29,7 +28,7 @@ import {
   type McpAccessBundle,
 } from "../lib/mcpAccess";
 import { authorizedGetJsonFetch, authorizedJsonFetch, signedGetJsonFetch, signedJsonFetch } from "../lib/auth";
-import { buildLocalSnapshotHash, sendPreparedTransaction, type PreparedTxRequest } from "../lib/policyRegistry";
+import { sendPreparedTransaction, type PreparedTxRequest } from "../lib/policyRegistry";
 import { mergeLiveFundingTelemetry, shouldAutoRefreshState, type AutomationState } from "../lib/userState";
 
 const fetchJson = async <T>(url: string, options?: RequestInit) => {
@@ -168,15 +167,6 @@ const isTransientPolicyPublishVerificationError = (error: unknown) => {
     /Published on-chain policy does not match the prepared draft/i.test(message)
   );
 };
-const isExecutorReachabilityError = (error: unknown) => {
-  const message = getErrorMessage(error);
-  return (
-    /EXECUTOR_BASE_URL/i.test(message) ||
-    /Executor origin .*403\/1003/i.test(message) ||
-    /Executor 403 Forbidden: error code: 1003/i.test(message)
-  );
-};
-
 const stateStorageKey = (ownerEoa: string) => `neuralrate:state:${ownerEoa.trim().toLowerCase()}`;
 
 const loadStoredState = (ownerEoa: string): AutomationState | null => {
@@ -533,36 +523,6 @@ export const useNeuralRateUser = ({
       return response.config;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to update agent settings.";
-      setError(message);
-      throw err;
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const createFundingIntent = async (amountUsd: number) => {
-    if (!ownerEoa) {
-      throw new Error("Connect a wallet before preparing a funding intent.");
-    }
-
-    setBusy(true);
-    setError(null);
-    try {
-      await signedJsonFetch({
-        ownerEoa,
-        signMessage,
-        url: `${API_BASE_URL}/vault/funding-intent`,
-        method: "POST",
-        body: {
-          ownerEoa,
-          amountUsd,
-          source: externalWalletAddress ? "external-wallet" : "embedded-wallet",
-        },
-      });
-      await refresh(ownerEoa);
-      setNotice("Funding intent recorded. Send funds to the vault deposit address shown below.");
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to create funding intent.";
       setError(message);
       throw err;
     } finally {
@@ -1078,71 +1038,6 @@ export const useNeuralRateUser = ({
     }
   };
 
-  const queueDemoStrategy = async () => {
-    if (!ownerEoa || !state?.activeGrant || !state?.vault?.vault_address) {
-      throw new Error(`Enable automation before queueing the ${DEMO_TARGET_ASSET} demo strategy.`);
-    }
-
-    setBusy(true);
-    setError(null);
-    try {
-      const isNativeMntDemo = DEMO_TARGET_ASSET.toUpperCase() === "MNT";
-      const snapshotPayload = {
-        strategyKey: DEMO_STRATEGY_KEY,
-        targetAsset: DEMO_TARGET_ASSET,
-        riskProfile: state.config?.risk_profile ?? "medium",
-        policyVersion: state.config?.policy_version ?? SESSION_POLICY_VERSION,
-        createdAt: new Date().toISOString(),
-      };
-      const snapshotHash = buildLocalSnapshotHash(snapshotPayload);
-      const deadline = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-      const response = await signedJsonFetch<{
-        success: boolean;
-        executionCapable: boolean;
-        job?: {
-          status?: string;
-        };
-      }>({
-        ownerEoa,
-        signMessage,
-        url: `${API_BASE_URL}/automation/jobs`,
-        method: "POST",
-        body: {
-          ownerEoa,
-          strategyKey: DEMO_STRATEGY_KEY,
-          intent: {
-            targetAsset: DEMO_TARGET_ASSET,
-            amountUsd: isNativeMntDemo ? 1 : state.config?.max_action_usd ?? 1000,
-            amountToken: isNativeMntDemo ? 1 : undefined,
-            slippageBps: isNativeMntDemo ? 0 : 50,
-            snapshotHash,
-            snapshotCid: `local-snapshot:${snapshotHash}`,
-            deadline,
-          },
-        },
-      });
-
-      await refresh(ownerEoa);
-      setNotice(
-        response.job?.status === "blocked"
-          ? `${DEMO_TARGET_ASSET} demo strategy was recorded but blocked by policy or deployment validation. Check the execution trail for the exact reason.`
-          : response.executionCapable
-            ? `${DEMO_TARGET_ASSET} demo strategy queued for execution inside the dedicated vault.`
-            : `${DEMO_TARGET_ASSET} demo strategy was accepted, but the managed signer is not execution-capable in this environment.`,
-      );
-    } catch (err) {
-      const message = isExecutorReachabilityError(err)
-        ? "Automation is enabled, but the execution service is misconfigured or unreachable in this environment. Configure the deployed executor URL and redeploy the worker before queueing strategies."
-        : err instanceof Error
-          ? err.message
-          : `Failed to queue the ${DEMO_TARGET_ASSET} demo strategy.`;
-      setError(message);
-      throw new Error(message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const publishPolicy = async () => {
     if (!ownerEoa) {
       throw new Error("Connect a wallet before publishing policy.");
@@ -1211,13 +1106,11 @@ export const useNeuralRateUser = ({
     refresh,
     bootstrap,
     saveConfig,
-    createFundingIntent,
     acknowledgeOwnership,
     issueMcpAccessBundle,
     enableAutomation,
     completeRuntimeSetup,
     revokeAutomation,
-    queueDemoStrategy,
     publishPolicy,
     finalizeGrant,
   };

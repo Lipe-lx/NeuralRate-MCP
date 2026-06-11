@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import {
-  DEMO_TARGET_ASSET,
   DELEGATE_VALIDATOR_ADDRESS,
   MANAGED_SIGNER_PROVIDER,
   MANTLE_EXPLORER_BASE_URL,
@@ -10,7 +9,7 @@ import {
   VAULT_PROVIDER_STRATEGY,
 } from "../config";
 import { loadStoredMcpAccessBundle, type McpAccessBundle } from "../lib/mcpAccess";
-import { hasRuntimeNativeDeposit, type AutomationState } from "../lib/userState";
+import { hasDetectedVaultDeposit, type AutomationState } from "../lib/userState";
 
 type Props = {
   state: AutomationState | null;
@@ -22,11 +21,9 @@ type Props = {
   onConnect: () => Promise<void>;
   onSwitchChain: () => Promise<void>;
   onBootstrap: () => Promise<unknown>;
-  onFundingIntent: (amountUsd: number) => Promise<void>;
   onEnableAutomation: () => Promise<void>;
   onCompleteRuntimeSetup: () => Promise<void>;
   onRevokeAutomation: () => Promise<void>;
-  onQueueDemoStrategy: () => Promise<void>;
   mcpAccessBundle: McpAccessBundle | null;
   onIssueMcpAccess: () => Promise<McpAccessBundle>;
   onReviewOwnership: () => void;
@@ -107,11 +104,9 @@ const VaultPanel: React.FC<Props> = ({
   onConnect,
   onSwitchChain,
   onBootstrap,
-  onFundingIntent,
   onEnableAutomation,
   onCompleteRuntimeSetup,
   onRevokeAutomation,
-  onQueueDemoStrategy,
   mcpAccessBundle,
   onIssueMcpAccess,
   onReviewOwnership,
@@ -128,7 +123,8 @@ const VaultPanel: React.FC<Props> = ({
   const activeGrant = state?.activeGrant;
   const activeMcpSession = state?.activeMcpSession;
   const ownershipAcknowledged = Boolean(vault?.ownership_acknowledged_at);
-  const hasOnchainDeposit = hasRuntimeNativeDeposit(state);
+  const hasOnchainDeposit = hasDetectedVaultDeposit(state);
+  const depositAddress = vault?.deposit_address ?? vault?.vault_address ?? null;
   const automationStatus = humanize(
     activeGrant?.status ??
     activeMcpSession?.status ??
@@ -440,6 +436,42 @@ const VaultPanel: React.FC<Props> = ({
           <div style={{ fontSize: "0.74rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
             Signature trail: mutation auth signs API writes, grant signature opens scoped MCP domains, policy publish writes on-chain limits, and Safe/module transactions activate or revoke execution runtime.
           </div>
+          {depositAddress && (
+            <div
+              style={{
+                border: "1px solid rgba(223, 246, 81, 0.16)",
+                background: "rgba(223, 246, 81, 0.045)",
+                borderRadius: "12px",
+                padding: "0.85rem 0.95rem",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "0.85rem",
+                flexWrap: "wrap",
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: "0.8rem", color: "var(--text-primary)", fontWeight: 700 }}>
+                  Deposit to Vault
+                </div>
+                <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)", lineHeight: 1.45, marginTop: "0.18rem" }}>
+                  Send any supported token or amount directly to this vault. NeuralRate detects on-chain balances automatically; no funding intent is required.
+                </div>
+                <div style={{ fontSize: "0.74rem", color: "var(--text-primary)", marginTop: "0.42rem" }}>
+                  {renderCopyValue("deposit_address_inline", depositAddress, truncate(depositAddress), {
+                    href: `${MANTLE_EXPLORER_BASE_URL}/address/${depositAddress}`,
+                    accent: true,
+                  })}
+                </div>
+              </div>
+              <ActionButton
+                label={copiedField === "deposit_address" ? "Copied" : "Copy Address"}
+                tone="primary"
+                onClick={() => handleCopy(depositAddress, "deposit_address")}
+                disabled={!depositAddress}
+              />
+            </div>
+          )}
           {runtimePending && (
             <div
               style={{
@@ -688,15 +720,6 @@ const VaultPanel: React.FC<Props> = ({
             </div>
           )}
 
-          {vault?.deposit_address && (
-            <div style={{ fontSize: "0.74rem", color: "var(--text-secondary)" }}>
-              Deposit address:{" "}
-              <span className="vault-inline-address" title={vault.deposit_address} style={{ color: "var(--text-primary)" }}>
-                {vault.deposit_address}
-              </span>
-            </div>
-          )}
-
           <div className="vault-actions-grid">
             {!isConnected ? (
               <ActionButton label="Connect Wallet" tone="primary" onClick={onConnect} disabled={busy} />
@@ -706,7 +729,6 @@ const VaultPanel: React.FC<Props> = ({
               <ActionButton label={busy ? "Bootstrapping..." : "Create User Vault"} tone="primary" onClick={onBootstrap} disabled={busy} />
             ) : (
               <>
-                <ActionButton label="Funding Intent" onClick={() => onFundingIntent(1000)} disabled={busy} />
                 {!activeGrant || activeGrant.status === "revoked" ? (
                   <ActionButton
                     label={busy ? "Enabling..." : "Enable Automation"}
@@ -747,12 +769,6 @@ const VaultPanel: React.FC<Props> = ({
                 label="Review Wallet Ownership"
                 onClick={onReviewOwnership}
                 disabled={busy}
-              />
-              <ActionButton
-                label={busy ? "Queueing Demo..." : `Queue ${DEMO_TARGET_ASSET} Demo`}
-                tone="primary"
-                onClick={onQueueDemoStrategy}
-                disabled={busy || !activeGrant || activeGrant.status !== "active"}
               />
             </div>
           )}

@@ -28,7 +28,6 @@ const defaultProps = {
   onBootstrap: vi.fn(() => Promise.resolve({})),
   onEnableAutomation: vi.fn(() => Promise.resolve()),
   onCompleteRuntimeSetup: vi.fn(() => Promise.resolve()),
-  onQueueDemoStrategy: vi.fn(() => Promise.resolve()),
   isConnected: true,
   isCorrectChain: true,
   onConnect: vi.fn(() => Promise.resolve()),
@@ -170,5 +169,56 @@ describe('OnboardingWizard', () => {
     });
 
     expect(onEnableAutomationMock).toHaveBeenCalled();
+  });
+
+  it('renders a ready state without exposing demo queue actions', () => {
+    const mockState: AutomationState = {
+      ...defaultProps.state!,
+      vault: {
+        vault_id: 'vault-123',
+        user_id: 'user-1',
+        owner_eoa: '0x123',
+        vault_address: '0xVaultAddress',
+        vault_kind: 'default',
+        vault_provider: 'safe',
+        agent_scope_wallet: '0xAgent',
+        chain_id: 5000,
+        status: 'active',
+        funding_status: 'deposit_detected',
+        automation_status: 'runtime_enabled',
+        balance_usd: '0',
+        deposit_address: '0xDepositAddress',
+        last_funding_intent: null,
+        ownership_acknowledged_at: '2026-06-09T00:00:00Z',
+      },
+      grants: [{
+        grant_id: 'grant-1',
+        owner_eoa: '0x123',
+        user_id: 'user-1',
+        vault_id: 'vault-123',
+        vault_address: '0xVaultAddress',
+        agent_subject: 'erc8004:49',
+        policy_version: 'vault-v1',
+        allowed_domains: ['state', 'config', 'benchmark', 'execution'],
+        nonce: 'nonce',
+        signature: '0xsig',
+        grant_message: 'grant',
+        issued_via: 'web',
+        status: 'active',
+        issued_at: '2026-06-09T00:00:00Z',
+        expires_at: '2026-06-10T00:00:00Z',
+        revoked_at: null,
+        session_id: 'session-1',
+      }],
+      activeGrant: null,
+      automationReady: true,
+    };
+    mockState.activeGrant = mockState.grants[0];
+
+    render(<OnboardingWizard {...defaultProps} state={mockState} />);
+
+    expect(screen.getByText('Vault Fully Operational!')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open Vault Dashboard' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Queue/i })).not.toBeInTheDocument();
   });
 });

@@ -376,11 +376,9 @@ function AppContent() {
                       onConnect={connect}
                       onSwitchChain={switchToMantle}
                       onBootstrap={handleBootstrap}
-                      onFundingIntent={neuralRateUser.createFundingIntent}
                       onEnableAutomation={neuralRateUser.enableAutomation}
                       onCompleteRuntimeSetup={neuralRateUser.completeRuntimeSetup}
                       onRevokeAutomation={neuralRateUser.revokeAutomation}
-                      onQueueDemoStrategy={neuralRateUser.queueDemoStrategy}
                       mcpAccessBundle={neuralRateUser.mcpAccessBundle}
                       onIssueMcpAccess={neuralRateUser.issueMcpAccessBundle}
                       onReviewOwnership={() => setIsOwnershipModalOpen(true)}
@@ -449,7 +447,6 @@ function AppContent() {
           onBootstrap={handleBootstrap}
           onEnableAutomation={neuralRateUser.enableAutomation}
           onCompleteRuntimeSetup={neuralRateUser.completeRuntimeSetup}
-          onQueueDemoStrategy={neuralRateUser.queueDemoStrategy}
           isConnected={isConnected}
           isCorrectChain={isCorrectChain}
           onConnect={connect}

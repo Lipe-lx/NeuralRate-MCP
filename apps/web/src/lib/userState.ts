@@ -302,6 +302,12 @@ export const hasRuntimeNativeDeposit = (state: Pick<AutomationState, "runtimeSta
   parsePositiveWei(state?.runtimeState?.nativeBalanceWei) ||
   parsePositiveDecimal(state?.runtimeState?.nativeBalanceFormatted);
 
+export const hasDetectedVaultDeposit = (
+  state: Pick<AutomationState, "runtimeState" | "vault"> | null | undefined,
+) =>
+  hasRuntimeNativeDeposit(state) ||
+  state?.vault?.funding_status === "deposit_detected";
+
 const sameVaultAddress = (left: AutomationState | null | undefined, right: AutomationState | null | undefined) => {
   const leftAddress = left?.vault?.vault_address?.toLowerCase();
   const rightAddress = right?.vault?.vault_address?.toLowerCase();
@@ -312,8 +318,8 @@ export const mergeLiveFundingTelemetry = (
   incoming: AutomationState,
   current: AutomationState | null | undefined,
 ): AutomationState => {
-  const incomingHasDeposit = hasRuntimeNativeDeposit(incoming);
-  const canReuseCurrentDeposit = sameVaultAddress(incoming, current) && hasRuntimeNativeDeposit(current);
+  const incomingHasDeposit = hasDetectedVaultDeposit(incoming);
+  const canReuseCurrentDeposit = sameVaultAddress(incoming, current) && hasDetectedVaultDeposit(current);
 
   if (!incomingHasDeposit && !canReuseCurrentDeposit) {
     return incoming;
@@ -334,7 +340,7 @@ export const mergeLiveFundingTelemetry = (
       nativeBalanceWei: incoming.runtimeState?.nativeBalanceWei ?? sourceRuntime?.nativeBalanceWei ?? null,
       nativeBalanceFormatted: incoming.runtimeState?.nativeBalanceFormatted ?? sourceRuntime?.nativeBalanceFormatted ?? null,
       nativeAssetSymbol: incoming.runtimeState?.nativeAssetSymbol ?? sourceRuntime?.nativeAssetSymbol ?? null,
-      hasNativeBalance: true,
+      hasNativeBalance: incoming.runtimeState?.hasNativeBalance ?? sourceRuntime?.hasNativeBalance ?? false,
       lastCheckedAt: incoming.runtimeState?.lastCheckedAt ?? sourceRuntime?.lastCheckedAt ?? null,
     },
   };

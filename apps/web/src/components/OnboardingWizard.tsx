@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import type { AutomationState } from "../lib/userState";
 import {
-  DEMO_TARGET_ASSET,
   DELEGATE_VALIDATOR_ADDRESS,
   NEURALRATE_EXECUTION_GUARD_CONTRACT,
   SAFE_7579_ADAPTER_ADDRESS,
@@ -16,7 +15,6 @@ interface OnboardingWizardProps {
   onBootstrap: (options?: { ownershipAcknowledgedAt?: string | null }) => Promise<unknown>;
   onEnableAutomation: () => Promise<void>;
   onCompleteRuntimeSetup: () => Promise<void>;
-  onQueueDemoStrategy: () => Promise<void>;
   isConnected: boolean;
   isCorrectChain: boolean;
   onConnect: () => Promise<void>;
@@ -33,7 +31,6 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   onBootstrap,
   onEnableAutomation,
   onCompleteRuntimeSetup,
-  onQueueDemoStrategy,
   isConnected,
   isCorrectChain,
   onConnect,
@@ -76,7 +73,7 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     { num: 2, label: "Vault" },
     { num: 3, label: "Authorize" },
     { num: 4, label: "Activate" },
-    { num: 5, label: "Launch" },
+    { num: 5, label: "Ready" },
   ];
 
   const handleCreateVault = async () => {
@@ -103,16 +100,6 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       await onCompleteRuntimeSetup();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Failed to complete runtime setup.");
-    }
-  };
-
-  const handleQueueDemo = async () => {
-    setActionError(null);
-    try {
-      await onQueueDemoStrategy();
-      onClose();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to queue demo strategy.");
     }
   };
 
@@ -573,12 +560,11 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               </div>
               <h3 style={{ margin: 0, fontSize: "1.35rem", fontWeight: 700 }}>Vault Fully Operational!</h3>
               <p style={{ margin: 0, fontSize: "0.88rem", color: "var(--text-secondary)", lineHeight: 1.6 }}>
-                Your smart vault, control policies, and Safe runtime are successfully activated. The operator agent can now run fully automated transactions.
+                Your smart vault, control policies, and Safe runtime are successfully activated. Send funds directly to the vault whenever you choose; NeuralRate detects on-chain balances automatically.
               </p>
               <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", marginTop: "1rem" }}>
                 <button
-                  onClick={handleQueueDemo}
-                  disabled={busy}
+                  onClick={onClose}
                   style={{
                     background: "var(--color-lime)",
                     border: "none",
@@ -587,24 +573,10 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                     borderRadius: "8px",
                     fontWeight: 700,
                     fontSize: "0.88rem",
-                    cursor: busy ? "not-allowed" : "pointer",
-                  }}
-                >
-                  {busy ? "Queueing Demo..." : `Queue ${DEMO_TARGET_ASSET} Strategy`}
-                </button>
-                <button
-                  onClick={onClose}
-                  style={{
-                    background: "transparent",
-                    border: "1px solid var(--border-subtle)",
-                    color: "var(--text-secondary)",
-                    padding: "0.7rem 1.5rem",
-                    borderRadius: "8px",
-                    fontSize: "0.88rem",
                     cursor: "pointer",
                   }}
                 >
-                  Go to Dashboard
+                  Open Vault Dashboard
                 </button>
               </div>
             </div>
