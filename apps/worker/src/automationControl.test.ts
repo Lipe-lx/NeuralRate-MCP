@@ -4,6 +4,7 @@ import {
   buildPolicyPublishNextAction,
   isVaultRuntimeInstallReady,
   preparePolicyPublish,
+  queueBenchmarkThroughExecutor,
   prepareVaultRuntimeEnable,
   submitPolicyPublish,
 } from "./automationControl";
@@ -194,5 +195,39 @@ test("policy publish submission requires the prepared expected policy", async ()
         }
       ),
     /expectedPolicy is required/
+  );
+});
+
+test("benchmark queue rejects decisions that already have on-chain proof", async () => {
+  await assert.rejects(
+    () =>
+      queueBenchmarkThroughExecutor(
+        { NEURALRATE_BENCHMARK_CONTRACT: "0x3333333333333333333333333333333333333333" },
+        {
+          getBenchmarkDecision: async () => ({
+            decision_id: "decision_onchain",
+            benchmark_status: "local",
+            tx_hash: "0xabc",
+            onchain_decision_id: "4",
+          }),
+        } as any,
+        {
+          ownerEoa: "0x1111111111111111111111111111111111111111",
+          userId: "user_1",
+          vaultId: "vault_1",
+          vaultAddress: "0x2222222222222222222222222222222222222222",
+          agentSubject: "agent",
+          policyVersion: "vault-v1",
+          sessionId: "session_1",
+          grantId: "grant_1",
+          allowedDomains: ["benchmark"],
+          grantExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+          authMode: "session",
+        },
+        {
+          decisionId: "decision_onchain",
+        }
+      ),
+    /already has an on-chain benchmark receipt/
   );
 });

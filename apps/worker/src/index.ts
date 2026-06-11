@@ -1200,7 +1200,7 @@ export class NeuralRateBenchmarkMcpAgent extends McpAgent<Env, Record<string, ne
       queueBenchmarkSchema,
       async (args) => {
         const scoped = await getScoped();
-        const result = await queueBenchmarkThroughExecutor(this.env, scoped, {
+        const result = await queueBenchmarkThroughExecutor(this.env, automation, scoped, {
           decisionId: args.decisionId,
           dataSnapshotHash: args.dataSnapshotHash,
           payload: args.payload as Record<string, unknown> | undefined,
@@ -1695,11 +1695,11 @@ export default {
             return new Response(JSON.stringify({ error: "ownerEoa is required" }), { status: 400, headers: corsHeaders });
           }
           await assertReadAuthorized(request, env, ownerEoa);
-          const res = await handlers.handleGetDecisions({
-            limit: Number.isFinite(requestedLimit) && requestedLimit > 0 ? requestedLimit : 50,
+          const decisions = await automation.listBenchmarkHistory(
             ownerEoa,
-          });
-          return new Response(res.content[0].text, { headers: corsHeaders });
+            Number.isFinite(requestedLimit) && requestedLimit > 0 ? requestedLimit : 50
+          );
+          return new Response(JSON.stringify({ decisions }), { headers: corsHeaders });
         }
 
         if (url.pathname === "/api/decisions" && request.method === "POST") {
@@ -2306,7 +2306,7 @@ export default {
           }
 
           const access = await resolveAutomationAccess(request, env, automation, body, "benchmark");
-          const result = await queueBenchmarkThroughExecutor(env, access, {
+          const result = await queueBenchmarkThroughExecutor(env, automation, access, {
             decisionId: String(body.decisionId),
             dataSnapshotHash: typeof body.dataSnapshotHash === "string" ? body.dataSnapshotHash : undefined,
             payload:

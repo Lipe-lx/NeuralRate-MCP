@@ -2,6 +2,7 @@ import { z } from "zod";
 import { DefiLlamaService } from "../services/defillama";
 import { FredService } from "../services/fred";
 import { NansenService } from "../services/nansen";
+import { effectiveBenchmarkStatus, hasBenchmarkProof } from "../benchmarkStatus";
 
 const asJson = <T>(value: unknown, fallback: T): T => {
   if (!value) {
@@ -870,10 +871,16 @@ export class McpToolHandlers {
     try {
       const updates: string[] = [];
       const bindings: Array<string | null> = [];
+      const existingDecision = await this.db
+        .prepare("SELECT benchmark_status, tx_hash, onchain_decision_id FROM decisions WHERE decision_id = ? LIMIT 1")
+        .bind(args.decisionId)
+        .first<Record<string, unknown>>();
+      const existingHasProof = hasBenchmarkProof(existingDecision);
+      const shouldPreserveOnchain = existingHasProof && args.benchmarkStatus !== undefined && args.benchmarkStatus !== "onchain";
 
       if (args.benchmarkStatus !== undefined) {
         updates.push("benchmark_status = ?");
-        bindings.push(args.benchmarkStatus);
+        bindings.push(shouldPreserveOnchain ? "onchain" : args.benchmarkStatus);
       }
       if (args.txHash !== undefined) {
         updates.push("tx_hash = ?");
@@ -927,7 +934,11 @@ export class McpToolHandlers {
           type: "text" as const,
           text: JSON.stringify({
             success: result.success,
-            decisionId: args.decisionId
+            decisionId: args.decisionId,
+            benchmarkStatus: args.benchmarkStatus !== undefined
+              ? (shouldPreserveOnchain ? "onchain" : args.benchmarkStatus)
+              : effectiveBenchmarkStatus(existingDecision),
+            preservedOnchainProof: shouldPreserveOnchain,
           })
         }]
       };

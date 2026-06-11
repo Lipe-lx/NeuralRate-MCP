@@ -1,3 +1,9 @@
+import {
+  benchmarkRequeueBlockedMessage,
+  isBenchmarkRequeueBlocked,
+  normalizeDecisionBenchmarkStatus,
+} from "./benchmarkStatus";
+
 export type AutomationAccountInput = {
   ownerEoa: string;
   userSmartAccount?: string | null;
@@ -1310,6 +1316,11 @@ export class AutomationStore {
     const identity = normalizedOwner ? await this.resolveIdentity(normalizedOwner, input.userId, input.vaultId) : null;
     const userId = input.userId ?? identity?.userId ?? null;
     const vaultId = input.vaultId ?? identity?.vaultId ?? null;
+    const existingDecision = await this.getBenchmarkDecision(input.decisionId, normalizedOwner);
+    const incomingStatus = input.status ?? "queued";
+    if (existingDecision && isBenchmarkRequeueBlocked(existingDecision) && incomingStatus !== "confirmed") {
+      throw new Error(benchmarkRequeueBlockedMessage(input.decisionId));
+    }
 
     await this.db
       .prepare(`
@@ -1399,7 +1410,37 @@ export class AutomationStore {
       .bind(ownerEoa.toLowerCase(), userId, limit)
       .all<DbRecord>();
 
-    return (results ?? []).map((record) => normalizeRecord(record));
+    return (results ?? [])
+      .map((record) => normalizeRecord(record))
+      .filter((record): record is NormalizedRecord => Boolean(record))
+      .map((record) => normalizeDecisionBenchmarkStatus(record));
+  }
+
+  async getBenchmarkDecision(decisionId: string, ownerEoa?: string | null) {
+    const normalizedOwner = ownerEoa?.toLowerCase() ?? null;
+    if (normalizedOwner) {
+      const identity = await this.resolveIdentity(normalizedOwner);
+      const userId = identity.userId ?? "";
+      const result = await this.db
+        .prepare(`
+          SELECT * FROM decisions
+          WHERE decision_id = ? AND (requested_by = ? OR user_id = ?)
+          LIMIT 1
+        `)
+        .bind(decisionId, normalizedOwner, userId)
+        .first<DbRecord>();
+
+      const record = normalizeRecord(result);
+      return record ? normalizeDecisionBenchmarkStatus(record) : null;
+    }
+
+    const result = await this.db
+      .prepare("SELECT * FROM decisions WHERE decision_id = ? LIMIT 1")
+      .bind(decisionId)
+      .first<DbRecord>();
+
+    const record = normalizeRecord(result);
+    return record ? normalizeDecisionBenchmarkStatus(record) : null;
   }
 
   async getAutomationState(ownerEoa: string) {

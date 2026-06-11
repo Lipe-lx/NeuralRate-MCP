@@ -1,5 +1,6 @@
 import { buildBenchmarkPolicy, buildExecutionPolicy } from "./policy";
 import { AutomationStore, type UserAgentConfigInput } from "./automation";
+import { benchmarkRequeueBlockedMessage, isBenchmarkRequeueBlocked } from "./benchmarkStatus";
 import {
   buildAutomationGrantDraft,
   createSessionToken,
@@ -1270,6 +1271,7 @@ async function callExecutor<T>(
 
 export async function queueBenchmarkThroughExecutor(
   env: ExecutorEnv,
+  store: AutomationStore,
   access: ScopedAutomationAccess,
   args: {
     decisionId: string;
@@ -1277,6 +1279,11 @@ export async function queueBenchmarkThroughExecutor(
     payload?: Record<string, unknown>;
   }
 ) {
+  const decision = await store.getBenchmarkDecision(args.decisionId, access.ownerEoa);
+  if (isBenchmarkRequeueBlocked(decision)) {
+    throw new Error(benchmarkRequeueBlockedMessage(args.decisionId));
+  }
+
   return callExecutor<{
     success: boolean;
     benchmarkJob: Record<string, unknown>;
