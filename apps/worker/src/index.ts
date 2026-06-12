@@ -1571,7 +1571,7 @@ export default {
             ilRisk: body.ilRisk || "no",
             stablecoin: body.stablecoin || false,
             sigma: body.sigma || 0,
-            nansenSmartMoneyNetFlow: body.nansenSmartMoneyNetFlow || 0
+            nansenSmartMoneyNetFlow: body.nansenSmartMoneyNetFlow !== undefined ? body.nansenSmartMoneyNetFlow : null
           });
           return new Response(res.content[0].text, { headers: corsHeaders });
         }

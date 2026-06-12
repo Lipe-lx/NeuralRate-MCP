@@ -79,6 +79,7 @@ function AppContent() {
   const [isAgentAccessModalOpen, setIsAgentAccessModalOpen] = useState(false);
   const [isOnboardingWizardOpen, setIsOnboardingWizardOpen] = useState(false);
   const [wizardDismissed, setWizardDismissed] = useState(false);
+  const [nansenFlows, setNansenFlows] = useState<Record<string, number>>({});
   const wallet = useWalletContext();
   const { address, isConnected, isCorrectChain, connect, switchToMantle } = wallet;
   const neuralRateUser = useNeuralRateUser({
@@ -379,9 +380,9 @@ function AppContent() {
           {activeTab === 'terminal' && (
             <div className="tab-pane animate-enter" style={{ display: 'grid', gridTemplateColumns: '370px 1fr', gap: '1.25rem', height: '100%' }}>
               <aside style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minHeight: 0, height: '100%', overflowY: 'auto' }}>
-                <RiskPanel selectedPool={selectedPool} />
+                <RiskPanel selectedPool={selectedPool} nansenFlow={nansenFlows[selectedPool?.pool || ''] ?? null} />
                 <div style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', margin: '0.25rem 0' }} />
-                <NansenRadar selectedPool={selectedPool} pools={data?.pools || []} />
+                <NansenRadar selectedPool={selectedPool} pools={data?.pools || []} onFlowsUpdate={setNansenFlows} />
               </aside>
               <div className="organic-col-divider" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%' }}>
                 <YieldScanner

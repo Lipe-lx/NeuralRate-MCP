@@ -43,7 +43,7 @@ export const riskAssessSchema = {
   ilRisk: z.string().optional().default("no").describe("Impermanent Loss risk flag"),
   stablecoin: z.boolean().optional().default(false).describe("Whether the pool is stablecoin-based"),
   sigma: z.number().optional().default(0).describe("APY standard deviation (volatility)"),
-  nansenSmartMoneyNetFlow: z.number().optional().default(0).describe("Net flow from smart money in 24h")
+  nansenSmartMoneyNetFlow: z.number().nullable().optional().describe("Net flow from smart money in 24h")
 };
 
 export const optimalAllocationSchema = {
@@ -470,7 +470,7 @@ export class McpToolHandlers {
     ilRisk: string;
     stablecoin: boolean;
     sigma: number;
-    nansenSmartMoneyNetFlow: number;
+    nansenSmartMoneyNetFlow?: number | null;
   }) {
     // ═══════════════════════════════════════════════════════
     // FACTOR 1: TVL Depth & Liquidity (Max 20 pts)
@@ -585,20 +585,28 @@ export class McpToolHandlers {
     // FACTOR 6: Institutional Flow Signal (Max 15 pts)
     // Smart money net flow from Nansen
     // ═══════════════════════════════════════════════════════
-    const flow = args.nansenSmartMoneyNetFlow;
-    let nansenScore: number;
-    if (flow > 500_000) nansenScore = 15;
-    else if (flow > 100_000) nansenScore = 12;
-    else if (flow > 0) nansenScore = 10;
-    else if (flow > -100_000) nansenScore = 7;
-    else nansenScore = 3;
+    const flow = args.nansenSmartMoneyNetFlow ?? null;
+    let nansenScore = 0;
+    let nansenMax = 0;
+
+    if (flow !== null) {
+      nansenMax = 15;
+      if (flow > 500_000) nansenScore = 15;
+      else if (flow > 100_000) nansenScore = 12;
+      else if (flow > 0) nansenScore = 10;
+      else if (flow > -100_000) nansenScore = 7;
+      else nansenScore = 3;
+    }
 
     // ═══════════════════════════════════════════════════════
     // TOTAL
     // ═══════════════════════════════════════════════════════
-    const totalScore = Math.round(
-      (tvlScore + volTvlScore + apyTotalScore + compositionScore + exposureScore + nansenScore) * 10
-    ) / 10;
+    const baseScore = tvlScore + volTvlScore + apyTotalScore + compositionScore + exposureScore;
+    const baseMax = 20 + 15 + 20 + 15 + 15; // 85
+    const totalMax = baseMax + nansenMax; // 85 or 100
+
+    const scaledScore = ((baseScore + nansenScore) / totalMax) * 100;
+    const totalScore = Math.round(scaledScore * 10) / 10;
 
     let classification = "CRITICAL";
     if (totalScore >= 80) classification = "LOW";
@@ -618,7 +626,7 @@ export class McpToolHandlers {
             apySustainability: { score: apyTotalScore, max: 20, sustainSub: Math.round(apySustainScore * 10) / 10, volatilitySub: Math.round(apyVolatilityScore * 10) / 10, deviation: Math.round(deviation * 1000) / 10, sigma: Math.round(sigma * 100) / 100 },
             yieldComposition: { score: compositionScore, max: 15, organicRatio: Math.round(organicRatio * 100), apyBase, apyReward },
             assetExposure: { score: exposureScore, max: 15, ilRisk: args.ilRisk, stablecoin: args.stablecoin },
-            institutionalFlow: { score: nansenScore, max: 15, netFlow: flow }
+            institutionalFlow: { score: nansenScore, max: nansenMax, netFlow: flow ?? 0, isEnabled: flow !== null }
           }
         }, null, 2)
       }]

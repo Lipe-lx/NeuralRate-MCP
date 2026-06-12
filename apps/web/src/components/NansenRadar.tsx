@@ -5,6 +5,7 @@ import { API_BASE_URL } from '../config';
 interface Props {
   selectedPool: Pool | null;
   pools: Pool[];
+  onFlowsUpdate?: (flows: Record<string, number>) => void;
 }
 
 interface NansenToken {
@@ -39,7 +40,7 @@ interface NansenBatchResponse {
   poolSummaries: Record<string, NansenPoolSummary>;
 }
 
-const NansenRadar: React.FC<Props> = ({ selectedPool, pools }) => {
+const NansenRadar: React.FC<Props> = ({ selectedPool, pools, onFlowsUpdate }) => {
   const [data, setData] = useState<NansenBatchResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [enabled, setEnabled] = useState(false);
@@ -59,6 +60,7 @@ const NansenRadar: React.FC<Props> = ({ selectedPool, pools }) => {
     if (!enabled) {
       setData(null);
       setLoading(false);
+      if (onFlowsUpdate) onFlowsUpdate({});
       return;
     }
 
@@ -69,6 +71,7 @@ const NansenRadar: React.FC<Props> = ({ selectedPool, pools }) => {
         message: 'Yield Scanner has no pools available for Nansen enrichment.',
         poolSummaries: {},
       });
+      if (onFlowsUpdate) onFlowsUpdate({});
       return;
     }
 
@@ -106,6 +109,13 @@ const NansenRadar: React.FC<Props> = ({ selectedPool, pools }) => {
       .then((nextData) => {
         if (!cancelled) {
           setData(nextData);
+          if (onFlowsUpdate) {
+            const flows: Record<string, number> = {};
+            for (const [poolId, summary] of Object.entries(nextData.poolSummaries)) {
+              flows[poolId] = summary.totalNetFlow24h;
+            }
+            onFlowsUpdate(flows);
+          }
         }
       })
       .catch((error: Error) => {
@@ -116,6 +126,7 @@ const NansenRadar: React.FC<Props> = ({ selectedPool, pools }) => {
             message: error.message || 'Nansen batch lookup failed.',
             poolSummaries: {},
           });
+          if (onFlowsUpdate) onFlowsUpdate({});
         }
       })
       .finally(() => {

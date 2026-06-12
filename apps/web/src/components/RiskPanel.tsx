@@ -5,6 +5,7 @@ import { useApi } from '../hooks/useApi';
 
 interface Props {
   selectedPool: Pool | null;
+  nansenFlow?: number | null;
 }
 
 interface RiskFactorBase {
@@ -41,6 +42,7 @@ interface AssetExposureFactor extends RiskFactorBase {
 
 interface InstitutionalFlowFactor extends RiskFactorBase {
   netFlow: number;
+  isEnabled?: boolean;
 }
 
 interface RiskFactors {
@@ -69,8 +71,8 @@ interface MetricRow {
 interface BreakdownCardProps {
   id: FactorKey;
   title: string;
-  score: number;
-  max: number;
+  score: number | string;
+  max: number | string;
   summary: string;
   metrics: MetricRow[];
   calculation: string;
@@ -128,24 +130,33 @@ const getClassificationColor = (classification: RiskAssessResponse['classificati
   return 'var(--color-danger)';
 };
 
-const getFactorAccent = (score: number, max: number) => {
-  const ratio = max > 0 ? score / max : 0;
+const getFactorAccent = (score: number | string, max: number | string) => {
+  if (typeof score === 'string' || typeof max === 'string') return 'var(--text-secondary)';
+  const numScore = Number(score);
+  const numMax = Number(max);
+  const ratio = numMax > 0 ? numScore / numMax : 0;
   if (ratio >= 0.8) return 'var(--color-lime)';
   if (ratio >= 0.55) return 'var(--color-warning)';
   return 'var(--color-danger)';
 };
 
-const FactorBar: React.FC<{ label: string; score: number; max: number }> = ({ label, score, max }) => (
-  <div style={{ marginBottom: '0.75rem' }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.3rem' }}>
-      <span style={{ color: 'var(--text-secondary)' }}>{label}</span>
-      <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{score}/{max}</span>
+const FactorBar: React.FC<{ label: string; score: number | string; max: number | string }> = ({ label, score, max }) => {
+  const isNA = typeof score === 'string' || typeof max === 'string' || Number(max) === 0;
+  const ratio = isNA ? 0 : Number(score) / Number(max);
+  return (
+    <div style={{ marginBottom: '0.75rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.3rem' }}>
+        <span style={{ color: 'var(--text-secondary)' }}>{label}</span>
+        <span style={{ color: 'var(--text-primary)', fontWeight: isNA ? 400 : 600 }}>
+          {isNA ? 'N/A' : `${score}/${max}`}
+        </span>
+      </div>
+      <div style={{ height: '5px', background: 'var(--bg-surface-elevated)', borderRadius: '3px', overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: isNA ? '0%' : `${ratio * 100}%`, background: isNA ? 'var(--bg-surface-elevated)' : `oklch(${0.5 + ratio * 0.4} 0.2 ${120 * ratio})`, borderRadius: '3px', transition: 'width 0.6s ease' }}></div>
+      </div>
     </div>
-    <div style={{ height: '5px', background: 'var(--bg-surface-elevated)', borderRadius: '3px', overflow: 'hidden' }}>
-      <div style={{ height: '100%', width: `${(score / max) * 100}%`, background: `oklch(${0.5 + (score / max) * 0.4} 0.2 ${120 * (score / max)})`, borderRadius: '3px', transition: 'width 0.6s ease' }}></div>
-    </div>
-  </div>
-);
+  );
+};
 
 const BreakdownCard: React.FC<BreakdownCardProps> = ({
   id,
@@ -191,7 +202,7 @@ const BreakdownCard: React.FC<BreakdownCardProps> = ({
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem', flexShrink: 0 }}>
             <span style={{ color: accent, fontWeight: 700, fontSize: '0.95rem' }}>
-              {score} / {max}
+              {typeof score === 'string' && typeof max === 'string' ? score : `${score} / ${max}`}
             </span>
             <span style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>
               {isOpen ? 'Collapse' : 'Expand'}
@@ -246,7 +257,7 @@ const BreakdownCard: React.FC<BreakdownCardProps> = ({
   );
 };
 
-const RiskPanel: React.FC<Props> = ({ selectedPool }) => {
+const RiskPanel: React.FC<Props> = ({ selectedPool, nansenFlow }) => {
   const { data, loading, execute } = useApi<RiskAssessResponse>('/risk-assess', {
     method: 'POST',
     immediate: false,
@@ -267,10 +278,10 @@ const RiskPanel: React.FC<Props> = ({ selectedPool }) => {
         ilRisk: selectedPool.ilRisk || 'no',
         stablecoin: selectedPool.stablecoin || false,
         sigma: selectedPool.sigma || 0,
-        nansenSmartMoneyNetFlow: 0,
+        nansenSmartMoneyNetFlow: nansenFlow ?? null,
       });
     }
-  }, [selectedPool, execute]);
+  }, [selectedPool, execute, nansenFlow]);
 
   useEffect(() => {
     if (!showDetails) {
@@ -347,7 +358,7 @@ const RiskPanel: React.FC<Props> = ({ selectedPool }) => {
             <FactorBar label="APY Sustainability" score={f.apySustainability.score} max={f.apySustainability.max} />
             <FactorBar label="Yield Composition" score={f.yieldComposition.score} max={f.yieldComposition.max} />
             <FactorBar label="IL & Asset Exposure" score={f.assetExposure.score} max={f.assetExposure.max} />
-            <FactorBar label="Institutional Flow" score={f.institutionalFlow.score} max={f.institutionalFlow.max} />
+            <FactorBar label="Institutional Flow" score={f.institutionalFlow.isEnabled === false ? 'N/A' : f.institutionalFlow.score} max={f.institutionalFlow.isEnabled === false ? 'N/A' : f.institutionalFlow.max} />
           </>
         ) : (
           <div style={{ color: 'var(--color-danger)', textAlign: 'center' }}>Failed to assess risk.</div>
@@ -561,16 +572,17 @@ const RiskPanel: React.FC<Props> = ({ selectedPool }) => {
               <BreakdownCard
                 id="institutionalFlow"
                 title="6. Institutional Flow Signal"
-                score={f.institutionalFlow.score}
-                max={f.institutionalFlow.max}
-                summary={`Current smart-money net flow is ${formatUsd(f.institutionalFlow.netFlow)}. The factor converts that directional flow into a confidence band from 3 to 15 points.`}
+                score={f.institutionalFlow.isEnabled === false ? 'N/A' : f.institutionalFlow.score}
+                max={f.institutionalFlow.isEnabled === false ? 'N/A' : f.institutionalFlow.max}
+                summary={f.institutionalFlow.isEnabled === false ? 'Nansen Radar is disabled. The total safety score is proportionally scaled out of the remaining 85 points.' : `Current smart-money net flow is ${formatUsd(f.institutionalFlow.netFlow)}. The factor converts that directional flow into a confidence band from 3 to 15 points.`}
                 metrics={[
-                  { label: 'Net flow', value: formatUsd(f.institutionalFlow.netFlow) },
-                  { label: 'Factor score', value: `${f.institutionalFlow.score} / ${f.institutionalFlow.max}` },
+                  { label: 'Net flow', value: f.institutionalFlow.isEnabled === false ? 'N/A' : formatUsd(f.institutionalFlow.netFlow) },
+                  { label: 'Factor score', value: f.institutionalFlow.isEnabled === false ? 'N/A' : `${f.institutionalFlow.score} / ${f.institutionalFlow.max}` },
                   { label: 'Signal source', value: 'Nansen Smart Money' },
-                  { label: 'Impact', value: f.institutionalFlow.netFlow >= 0 ? 'Positive flow' : 'Negative flow' },
+                  { label: 'Impact', value: f.institutionalFlow.isEnabled === false ? 'None' : f.institutionalFlow.netFlow >= 0 ? 'Positive flow' : 'Negative flow' },
                 ]}
                 calculation={
+                  f.institutionalFlow.isEnabled === false ? 'Disabled (Ignored from Total)' :
                   f.institutionalFlow.netFlow > 500_000
                     ? 'Net flow is above $500k, so the factor receives 15 points.'
                     : f.institutionalFlow.netFlow > 100_000
