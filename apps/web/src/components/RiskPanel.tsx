@@ -311,7 +311,7 @@ const RiskPanel: React.FC<Props> = ({ selectedPool }) => {
             Risk Assessment
           </h3>
           {data && (
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.05)', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-lime)', background: 'rgba(223, 246, 81, 0.1)', border: '1px solid rgba(223, 246, 81, 0.3)', padding: '0.35rem 0.85rem', borderRadius: '6px', transition: 'all 0.2s ease', boxShadow: '0 2px 8px rgba(223, 246, 81, 0.15)' }}>
               Open details
             </span>
           )}
