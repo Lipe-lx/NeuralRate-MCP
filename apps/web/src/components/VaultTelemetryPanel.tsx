@@ -19,6 +19,8 @@ const formatTokenBalance = (value: number) =>
     minimumFractionDigits: value > 0 && value < 1 ? 4 : 2,
     maximumFractionDigits: value >= 100 ? 2 : 4,
   }).format(value);
+const formatMaybeUsd = (value: number | null | undefined) =>
+  typeof value === "number" && Number.isFinite(value) ? formatUsd(value) : null;
 
 const formatDateTime = (value: string | null | undefined) => {
   if (!value) {
@@ -168,6 +170,36 @@ const VaultTelemetryPanel: React.FC<Props> = ({ state }) => {
     liveNativeBalance > 0 ? `${formatTokenBalance(liveNativeBalance)} ${nativeAssetSymbol}` : null,
     ...visibleTokenBalances.map((entry) => `${formatTokenBalance(parseNumeric(entry.balanceFormatted))} ${entry.asset}`),
   ].filter(Boolean).join(" · ");
+  const liveVaultBalanceRows = [
+    liveNativeBalance > 0
+      ? {
+          key: `native:${nativeAssetSymbol}`,
+          asset: nativeAssetSymbol,
+          kind: "Native",
+          balance: formatTokenBalance(liveNativeBalance),
+          valuation: null,
+          status: "Live",
+          address: null,
+        }
+      : null,
+    ...visibleTokenBalances.map((entry) => ({
+      key: `${entry.kind}:${entry.address ?? entry.asset}`,
+      asset: entry.asset,
+      kind: entry.kind === "native" ? "Native" : "ERC-20",
+      balance: formatTokenBalance(parseNumeric(entry.balanceFormatted)),
+      valuation: formatMaybeUsd(entry.valuationUsd),
+      status: humanize(entry.readStatus),
+      address: entry.address,
+    })),
+  ].filter((entry): entry is {
+    key: string;
+    asset: string;
+    kind: string;
+    balance: string;
+    valuation: string | null;
+    status: string;
+    address: string | null;
+  } => Boolean(entry));
 
   return (
     <section className="glass-panel animate-enter vault-panel">
@@ -245,14 +277,6 @@ const VaultTelemetryPanel: React.FC<Props> = ({ state }) => {
               <strong>Direct on-chain</strong>
             </div>
             <div className="vault-info-row">
-              <span>Live vault balance</span>
-              <strong>{liveBalanceLabel || (hasOnchainDeposit ? "Funds detected" : "Awaiting on-chain funds")}</strong>
-            </div>
-            <div className="vault-info-row">
-              <span>Tracked tokens</span>
-              <strong>{tokenBalances.length ? tokenBalances.map((entry) => entry.asset).join(" · ") : "None configured"}</strong>
-            </div>
-            <div className="vault-info-row">
               <span>Signed consent</span>
               <strong>{consentRecordedAt ? formatDateTime(consentRecordedAt) : "Pending"}</strong>
             </div>
@@ -267,6 +291,38 @@ const VaultTelemetryPanel: React.FC<Props> = ({ state }) => {
                   ? `Consent digest ${truncate(consentDigest)}. Send funds directly to the vault whenever you are ready.`
                   : "Send funds directly to the vault address whenever you are ready; no preset funding amount is required."}
             </div>
+          </div>
+
+          <div className="vault-info-card vault-balance-card">
+            <div className="vault-swiss-kicker">Live Vault Balance</div>
+            <div className="vault-balance-summary">
+              <strong>{liveBalanceLabel || (hasOnchainDeposit ? "Funds detected" : "Awaiting funds")}</strong>
+              <span>{tokenBalances.length ? `${formatCount(tokenBalances.length)} tracked` : "No tracked tokens"}</span>
+            </div>
+            {liveVaultBalanceRows.length ? (
+              <div className="vault-token-list">
+                {liveVaultBalanceRows.map((entry) => (
+                  <div className="vault-token-row" key={entry.key}>
+                    <div className="vault-token-identity">
+                      <div className="vault-token-symbol">{entry.asset}</div>
+                      <div className="vault-token-meta">
+                        <span>{entry.kind}</span>
+                        <span>{entry.status}</span>
+                        {entry.address && <span>{truncate(entry.address)}</span>}
+                      </div>
+                    </div>
+                    <div className="vault-token-amount">
+                      <strong>{entry.balance}</strong>
+                      {entry.valuation && <span>{entry.valuation}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="vault-info-caption">
+                No live token balances detected yet. Fund the vault directly and this card will list each detected asset.
+              </div>
+            )}
           </div>
 
           <div className="vault-info-card vault-info-card-span-2 vault-execution-card">

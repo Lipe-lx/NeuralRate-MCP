@@ -936,14 +936,14 @@ input[type="checkbox"] {
 }
 
 .vault-info-grid-wide {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-template-rows: auto minmax(0, 1fr);
   flex: 1;
   min-height: 0;
 }
 
 .vault-info-card-span-2 {
-  grid-column: span 2;
+  grid-column: span 3;
   min-height: 0;
 }
 
@@ -969,6 +969,95 @@ input[type="checkbox"] {
 
 .vault-execution-card {
   overflow: hidden;
+}
+
+.vault-balance-card {
+  max-height: 208px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.vault-balance-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.55rem;
+  align-items: baseline;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.vault-balance-summary strong {
+  color: var(--text-primary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vault-balance-summary span {
+  flex-shrink: 0;
+}
+
+.vault-token-list {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: 0.45rem;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.vault-token-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.7rem;
+  align-items: start;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.vault-token-row:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.vault-token-identity {
+  min-width: 0;
+}
+
+.vault-token-symbol {
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.vault-token-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.18rem;
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.vault-token-amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.14rem;
+  text-align: right;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.vault-token-amount strong {
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
 }
 
 .vault-execution-list {

@@ -356,10 +356,35 @@ describe('VaultPanel', () => {
       ],
       benchmarkJobs: [],
       automationReady: true,
+      runtimeState: {
+        nativeBalanceFormatted: '1.5',
+        nativeAssetSymbol: 'MNT',
+        tokenBalances: [
+          {
+            asset: 'mUSDY',
+            kind: 'erc20',
+            address: '0xMockUsdYToken',
+            decimals: 18,
+            balanceRaw: '250000000000000000000',
+            balanceFormatted: '250',
+            hasBalance: true,
+            valuationUsd: 250,
+            valuationSource: 'mock',
+            readStatus: 'live',
+            asOf: '2026-06-09T01:00:00Z',
+          },
+        ],
+      },
     };
 
     const { container } = render(<VaultTelemetryPanel state={mockState} />);
 
+    expect(screen.getByText('Live Vault Balance')).toBeInTheDocument();
+    const balanceCard = container.querySelector('.vault-balance-card');
+    expect(balanceCard).toBeInTheDocument();
+    expect(container.querySelector('.vault-token-list')).toBeInTheDocument();
+    expect(balanceCard?.textContent).toContain('mUSDY');
+    expect(balanceCard?.textContent).toContain('$250');
     expect(screen.getByText('Execution Trail')).toBeInTheDocument();
     expect(container.querySelector('.vault-execution-card')).toBeInTheDocument();
     expect(container.querySelector('.vault-execution-list')).toBeInTheDocument();
