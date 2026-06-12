@@ -7,6 +7,7 @@ import {
   preparePolicyPublish,
   queueBenchmarkThroughExecutor,
   prepareVaultRuntimeEnable,
+  rotateActiveMcpSessionToken,
   submitPolicyPublish,
   updateAgentPolicyFromScopedAccess,
 } from "./automationControl";
@@ -233,6 +234,102 @@ test("scoped MCP policy updates accept a composite authorization duration", asyn
   );
 
   assert.equal(saved?.authorizationTtlHours, 36);
+});
+
+test("MCP token rotation uses its own duration and can recover an expired session", async () => {
+  const grantExpiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+  const expiredSession = {
+    session_id: "session_old",
+    grant_id: "grant_1",
+    owner_eoa: "0x1111111111111111111111111111111111111111",
+    user_id: "user_1",
+    vault_id: "vault_1",
+    vault_address: "0x2222222222222222222222222222222222222222",
+    agent_subject: "agent",
+    policy_version: "vault-v1",
+    allowed_domains: ["state", "execution"],
+    issued_via: "web",
+    expires_at: new Date(Date.now() - 60_000).toISOString(),
+  };
+  let savedSession: Record<string, unknown> | undefined;
+  const store = {
+    getActiveAutomationGrant: async () => ({
+      grant_id: "grant_1",
+      owner_eoa: expiredSession.owner_eoa,
+      user_id: expiredSession.user_id,
+      vault_id: expiredSession.vault_id,
+      vault_address: expiredSession.vault_address,
+      agent_subject: expiredSession.agent_subject,
+      policy_version: expiredSession.policy_version,
+      allowed_domains: expiredSession.allowed_domains,
+      nonce: "nonce",
+      signature: "0xsig",
+      grant_message: "message",
+      issued_via: "web",
+      issued_at: new Date(Date.now() - 60_000).toISOString(),
+      expires_at: grantExpiresAt,
+      session_id: expiredSession.session_id,
+    }),
+    getActiveMcpMutationSession: async () => null,
+    getMcpMutationSession: async () => expiredSession,
+    revokeMcpMutationSession: async () => undefined,
+    upsertMcpMutationSession: async (input: Record<string, unknown>) => {
+      savedSession = input;
+      return input;
+    },
+    upsertAutomationGrant: async (input: Record<string, unknown>) => input,
+  } as any;
+
+  const result = await rotateActiveMcpSessionToken(store, expiredSession.owner_eoa, {
+    days: 1,
+    hours: 12,
+  });
+
+  const durationHours =
+    (Date.parse(String(savedSession?.expiresAt)) - Date.parse(String(savedSession?.issuedAt))) /
+    (60 * 60 * 1000);
+  assert.ok(Math.abs(durationHours - 36) < 0.001);
+  assert.equal(result.grantExpiresAt, savedSession?.expiresAt);
+});
+
+test("MCP token rotation cannot outlive the active authorization grant", async () => {
+  const grantExpiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+  let savedSession: Record<string, unknown> | undefined;
+  const session = {
+    session_id: "session_old",
+    grant_id: "grant_1",
+    owner_eoa: "0x1111111111111111111111111111111111111111",
+    user_id: "user_1",
+    vault_id: "vault_1",
+    vault_address: "0x2222222222222222222222222222222222222222",
+    agent_subject: "agent",
+    policy_version: "vault-v1",
+    allowed_domains: ["execution"],
+    issued_via: "web",
+    expires_at: grantExpiresAt,
+  };
+  const grant = {
+    ...session,
+    nonce: "nonce",
+    signature: "0xsig",
+    grant_message: "message",
+    issued_at: new Date().toISOString(),
+    session_id: session.session_id,
+  };
+  const store = {
+    getActiveAutomationGrant: async () => grant,
+    getActiveMcpMutationSession: async () => session,
+    revokeMcpMutationSession: async () => undefined,
+    upsertMcpMutationSession: async (input: Record<string, unknown>) => {
+      savedSession = input;
+      return input;
+    },
+    upsertAutomationGrant: async (input: Record<string, unknown>) => input,
+  } as any;
+
+  await rotateActiveMcpSessionToken(store, session.owner_eoa, { months: 1 });
+
+  assert.equal(savedSession?.expiresAt, grantExpiresAt);
 });
 
 test("policy publish submission requires the prepared expected policy", async () => {

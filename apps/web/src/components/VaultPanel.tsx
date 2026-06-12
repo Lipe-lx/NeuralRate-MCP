@@ -26,7 +26,16 @@ type Props = {
   onCompleteRuntimeSetup: () => Promise<void>;
   onRevokeAutomation: () => Promise<void>;
   mcpAccessBundle: McpAccessBundle | null;
-  onIssueMcpAccess: () => Promise<McpAccessBundle>;
+  onIssueMcpAccess: (
+    targetOwner?: string | null,
+    options?: {
+      sessionDuration?: {
+        months?: number;
+        days?: number;
+        hours?: number;
+      };
+    }
+  ) => Promise<McpAccessBundle>;
   onReviewOwnership: () => void;
   controlWalletLabel: string;
   onRefreshState: () => Promise<unknown>;
@@ -96,6 +105,16 @@ const rowStyle: React.CSSProperties = {
   color: "var(--text-secondary)",
 };
 
+const mcpRowStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "max-content minmax(0, 1fr)",
+  alignItems: "center",
+  justifyContent: "start",
+  columnGap: "0.45rem",
+  fontSize: "0.8rem",
+  color: "var(--text-secondary)",
+};
+
 const VaultPanel: React.FC<Props> = ({
   state,
   busy,
@@ -118,6 +137,9 @@ const VaultPanel: React.FC<Props> = ({
 }) => {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [showMcpAdvanced, setShowMcpAdvanced] = useState(false);
+  const [mcpTokenMonths, setMcpTokenMonths] = useState(0);
+  const [mcpTokenDays, setMcpTokenDays] = useState(0);
+  const [mcpTokenHours, setMcpTokenHours] = useState(12);
   const [showVaultAdvanced, setShowVaultAdvanced] = useState(false);
   const [mockUsdyAmount, setMockUsdyAmount] = useState("100");
   const [mockUsdyMinting, setMockUsdyMinting] = useState(false);
@@ -260,6 +282,16 @@ const VaultPanel: React.FC<Props> = ({
     }
   };
 
+  const handleIssueMcpAccess = async () => {
+    await onIssueMcpAccess(undefined, {
+      sessionDuration: {
+        months: mcpTokenMonths,
+        days: mcpTokenDays,
+        hours: mcpTokenHours,
+      },
+    });
+  };
+
   const renderCopyValue = (
     field: string,
     rawValue: string | null | undefined,
@@ -267,6 +299,7 @@ const VaultPanel: React.FC<Props> = ({
     options?: {
       href?: string | null;
       accent?: boolean;
+      compact?: boolean;
     },
   ) => {
     const copyEnabled = Boolean(rawValue);
@@ -278,7 +311,7 @@ const VaultPanel: React.FC<Props> = ({
         : "var(--text-primary)";
 
     return (
-      <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "flex-end", gap: "0.4rem", minWidth: 0 }}>
+      <span style={{ display: "inline-flex", alignItems: "center", justifyContent: options?.compact ? "flex-start" : "flex-end", gap: "0.4rem", minWidth: 0 }}>
         <button
           type="button"
           onClick={() => void handleCopy(rawValue, field)}
@@ -294,7 +327,7 @@ const VaultPanel: React.FC<Props> = ({
             font: "inherit",
             fontWeight: 700,
             cursor: copyEnabled ? "copy" : "default",
-            textAlign: "right",
+            textAlign: options?.compact ? "left" : "right",
             minWidth: 0,
             textDecoration: copyEnabled ? "underline dotted transparent" : "none",
             textUnderlineOffset: "0.18em",
@@ -580,30 +613,60 @@ const VaultPanel: React.FC<Props> = ({
                 gap: "0.7rem",
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: "0.75rem", flexWrap: "wrap" }}>
                 <div>
                   <div style={{ fontSize: "0.82rem", color: "var(--text-primary)", fontWeight: 700 }}>MCP Access</div>
                   <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)", marginTop: "0.18rem", lineHeight: 1.45 }}>
                     Created automatically when automation is enabled. Rotate only if you need to reconnect an external agent or recover access on this browser.
                   </div>
                 </div>
-                <ActionButton
-                  label={mcpAccessBundle ? "Rotate MCP Token" : "Recover MCP Access"}
-                  onClick={onIssueMcpAccess}
-                  disabled={busy || !hasAutomation}
-                />
+                <div style={{ display: "flex", alignItems: "flex-end", gap: "0.45rem", flexWrap: "wrap" }}>
+                  {[
+                    { label: "Months", value: mcpTokenMonths, setValue: setMcpTokenMonths, max: 12 },
+                    { label: "Days", value: mcpTokenDays, setValue: setMcpTokenDays },
+                    { label: "Hours", value: mcpTokenHours, setValue: setMcpTokenHours },
+                  ].map((field) => (
+                    <label key={field.label} style={{ fontSize: "0.66rem", color: "var(--text-secondary)" }}>
+                      <span style={{ display: "block", marginBottom: "0.2rem" }}>{field.label}</span>
+                      <input
+                        aria-label={`MCP Token ${field.label}`}
+                        type="number"
+                        min="0"
+                        max={field.max}
+                        step="1"
+                        value={field.value}
+                        onChange={(event) => field.setValue(Number(event.target.value))}
+                        style={{ width: "3.5rem", padding: "0.42rem 0.45rem" }}
+                      />
+                    </label>
+                  ))}
+                  <ActionButton
+                    label={mcpAccessBundle ? "Rotate MCP Token" : "Recover MCP Access"}
+                    onClick={handleIssueMcpAccess}
+                    disabled={
+                      busy ||
+                      !hasAutomation ||
+                      ![mcpTokenMonths, mcpTokenDays, mcpTokenHours].every((value) => Number.isInteger(value) && value >= 0) ||
+                      mcpTokenMonths * 720 + mcpTokenDays * 24 + mcpTokenHours < 1 ||
+                      mcpTokenMonths * 720 + mcpTokenDays * 24 + mcpTokenHours > 8640
+                    }
+                  />
+                </div>
+              </div>
+              <div style={{ fontSize: "0.68rem", color: "var(--text-secondary)", marginTop: "-0.35rem" }}>
+                Token lifetime is capped by the remaining authorization period. One month equals 30 days.
               </div>
 
               {mcpAccessBundle ? (
                 <>
                   <div className="vault-detail-grid">
-                    <div style={rowStyle}>
+                    <div style={mcpRowStyle}>
                       <span>Endpoint URL</span>
-                      {renderCopyValue("mcp_endpoint", mcpAccessBundle.recommendedTransport.url, truncate(mcpAccessBundle.recommendedTransport.url))}
+                      {renderCopyValue("mcp_endpoint", mcpAccessBundle.recommendedTransport.url, truncate(mcpAccessBundle.recommendedTransport.url), { compact: true })}
                     </div>
-                    <div style={rowStyle}>
+                    <div style={mcpRowStyle}>
                       <span>Session Token</span>
-                      {renderCopyValue("mcp_token", mcpAccessBundle.sessionToken, truncate(mcpAccessBundle.sessionToken))}
+                      {renderCopyValue("mcp_token", mcpAccessBundle.sessionToken, truncate(mcpAccessBundle.sessionToken), { accent: true, compact: true })}
                     </div>
                   </div>
 
@@ -646,30 +709,31 @@ const VaultPanel: React.FC<Props> = ({
 
                   {showMcpAdvanced && (
                     <div className="vault-detail-grid" style={{ marginTop: "0.4rem", paddingTop: "0.4rem", borderTop: "1px dashed rgba(255, 255, 255, 0.08)", animation: "fadeIn 0.2s ease-out" }}>
-                      <div style={rowStyle}>
+                      <div style={mcpRowStyle}>
                         <span>MCP Type</span>
-                        {renderCopyValue("mcp_type", mcpAccessBundle.recommendedTransport.type, mcpAccessBundle.recommendedTransport.type)}
+                        {renderCopyValue("mcp_type", mcpAccessBundle.recommendedTransport.type, mcpAccessBundle.recommendedTransport.type, { compact: true })}
                       </div>
-                      <div style={rowStyle}>
+                      <div style={mcpRowStyle}>
                         <span>Token Header</span>
-                        {renderCopyValue("mcp_header_name", "x-neuralrate-session-token", "x-neuralrate-session-token")}
+                        {renderCopyValue("mcp_header_name", "x-neuralrate-session-token", "x-neuralrate-session-token", { compact: true })}
                       </div>
-                      <div style={rowStyle}>
+                      <div style={mcpRowStyle}>
                         <span>Allowed Domains</span>
                         {renderCopyValue(
                           "mcp_domains",
                           mcpAccessBundle.allowedDomains.join(", "),
                           mcpAccessBundle.allowedDomains.length ? mcpAccessBundle.allowedDomains.join(", ") : "Any",
+                          { compact: true },
                         )}
                       </div>
-                      <div style={rowStyle}>
+                      <div style={mcpRowStyle}>
                         <span>Expires At</span>
-                        {renderCopyValue("mcp_expires", mcpAccessBundle.expiresAt, new Date(mcpAccessBundle.expiresAt).toLocaleDateString())}
+                        {renderCopyValue("mcp_expires", mcpAccessBundle.expiresAt, new Date(mcpAccessBundle.expiresAt).toLocaleString(), { compact: true })}
                       </div>
                       {mcpConfigCatalog?.httpUrl && (
-                        <div style={rowStyle}>
+                        <div style={mcpRowStyle}>
                           <span>Config Endpoint</span>
-                          {renderCopyValue("mcp_config_endpoint", mcpConfigCatalog.httpUrl, truncate(mcpConfigCatalog.httpUrl))}
+                          {renderCopyValue("mcp_config_endpoint", mcpConfigCatalog.httpUrl, truncate(mcpConfigCatalog.httpUrl), { compact: true })}
                         </div>
                       )}
                     </div>

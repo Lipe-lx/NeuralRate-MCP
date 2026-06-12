@@ -682,7 +682,14 @@ export const useNeuralRateUser = ({
 
   const issueMcpAccessBundle = async (
     targetOwner = ownerEoa,
-    options?: { silent?: boolean }
+    options?: {
+      silent?: boolean;
+      sessionDuration?: {
+        months?: number;
+        days?: number;
+        hours?: number;
+      };
+    }
   ) => {
     if (!targetOwner) {
       throw new Error("Connect a wallet before requesting MCP access.");
@@ -701,6 +708,7 @@ export const useNeuralRateUser = ({
         method: "POST",
         body: {
           ownerEoa: targetOwner,
+          sessionDuration: options?.sessionDuration,
         },
       });
 

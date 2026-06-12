@@ -294,6 +294,39 @@ describe('VaultPanel', () => {
     expect(screen.getByText('x-neuralrate-session-token')).toBeInTheDocument();
   });
 
+  it('rotates MCP access with the selected token duration', async () => {
+    const onIssueMcpAccess = vi.fn(() => Promise.resolve({} as McpAccessBundle));
+    const mockState = {
+      ownerEoa: '0x123',
+      userId: 'user-1',
+      profile: null,
+      config: null,
+      vault: { vault_id: 'vault-1' },
+      activeGrant: { status: 'active' },
+      automationReady: true,
+    } as AutomationState;
+
+    render(
+      <VaultPanel
+        {...defaultProps}
+        state={mockState}
+        onIssueMcpAccess={onIssueMcpAccess}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText('MCP Token Days'), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText('MCP Token Hours'), { target: { value: '12' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Recover MCP Access' }));
+
+    await vi.waitFor(() => expect(onIssueMcpAccess).toHaveBeenCalledWith(undefined, {
+      sessionDuration: {
+        months: 0,
+        days: 1,
+        hours: 12,
+      },
+    }));
+  });
+
   it('renders Vault details and toggles technical details accordion', async () => {
     const mockState: AutomationState = {
       ownerEoa: '0x123',

@@ -1812,7 +1812,11 @@ export default {
           }
           await assertMutationAuthorized(request, env, body, ownerEoa);
 
-          const access = await rotateActiveMcpSessionToken(automation, ownerEoa);
+          const sessionDuration =
+            body.sessionDuration && typeof body.sessionDuration === "object"
+              ? body.sessionDuration as { months?: number; days?: number; hours?: number }
+              : undefined;
+          const access = await rotateActiveMcpSessionToken(automation, ownerEoa, sessionDuration);
           const bundle = buildMcpAccessBundle(request, access);
           return new Response(JSON.stringify(bundle), { headers: corsHeaders });
         }

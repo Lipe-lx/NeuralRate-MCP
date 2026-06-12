@@ -687,10 +687,20 @@ export async function resolveAutomationAccessFromOwner(
 
 export async function rotateActiveMcpSessionToken(
   store: AutomationStore,
-  ownerEoa: string
+  ownerEoa: string,
+  sessionDuration?: {
+    months?: number;
+    days?: number;
+    hours?: number;
+  }
 ): Promise<RotatedMcpSessionAccess> {
   const grant = await store.getActiveAutomationGrant(ownerEoa);
-  const session = await store.getActiveMcpMutationSession(ownerEoa);
+  const activeSession = await store.getActiveMcpMutationSession(ownerEoa);
+  const session = activeSession ?? (
+    grant?.session_id
+      ? await store.getMcpMutationSession(String(grant.session_id))
+      : null
+  );
   if (!grant || !session) {
     throw new Error("Enable automation and issue an active grant before requesting MCP access.");
   }
@@ -709,6 +719,17 @@ export async function rotateActiveMcpSessionToken(
 
   const rotatedSessionId = makeId("mcp_session");
   const rotatedAt = new Date().toISOString();
+  const requestedTtlHours = sessionDuration
+    ? authorizationDurationToHours(sessionDuration)
+    : normalizeAuthorizationTtlHours(12);
+  const requestedExpiresAt = new Date(
+    Date.parse(rotatedAt) + requestedTtlHours * 60 * 60 * 1000
+  ).toISOString();
+  const grantExpiresAt = String(grant.expires_at);
+  const sessionExpiresAt =
+    Date.parse(requestedExpiresAt) < Date.parse(grantExpiresAt)
+      ? requestedExpiresAt
+      : grantExpiresAt;
   const sessionToken = createSessionToken();
   const sessionTokenHash = await hashSessionToken(sessionToken);
 
@@ -727,10 +748,7 @@ export async function rotateActiveMcpSessionToken(
     issuedVia: typeof session.issued_via === "string" ? session.issued_via : "web",
     status: "active",
     issuedAt: rotatedAt,
-    expiresAt:
-      typeof session.expires_at === "string"
-        ? session.expires_at
-        : String(grant.expires_at),
+    expiresAt: sessionExpiresAt,
     lastUsedAt: null,
     revokedAt: null,
   });
@@ -765,7 +783,7 @@ export async function rotateActiveMcpSessionToken(
     sessionId: rotatedSessionId,
     grantId: String(grant.grant_id),
     allowedDomains,
-    grantExpiresAt: String(session.expires_at ?? grant.expires_at),
+    grantExpiresAt: sessionExpiresAt,
     authMode: "session",
     sessionToken,
   };
