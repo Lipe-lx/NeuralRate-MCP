@@ -104,6 +104,7 @@ describe('VaultPanel', () => {
     expect(container.querySelector('.vault-summary-card')).toBeInTheDocument();
     expect(container.querySelector('.vault-funding-grid')).toBeInTheDocument();
     expect(container.querySelectorAll('.vault-action-card')).toHaveLength(2);
+    expect(container.querySelector('.vault-primary-grid .vault-mcp-card')).toBeInTheDocument();
     expect(screen.getByText(/Vault Address/i)).toBeInTheDocument();
     expect(screen.getByText('0xVaultA...ddress')).toBeInTheDocument();
     expect(screen.getByText('Deposit to Vault')).toBeInTheDocument();
@@ -203,6 +204,7 @@ describe('VaultPanel', () => {
     );
 
     // Verify basic details are visible
+    expect(screen.getAllByText('MCP Access')).toHaveLength(1);
     expect(screen.getByText('Endpoint URL')).toBeInTheDocument();
     expect(screen.getByText('Session Token')).toBeInTheDocument();
 

@@ -566,52 +566,6 @@ const VaultPanel: React.FC<Props> = ({
             </div>
           )}
           </div>
-        </div>
-          {runtimePending && (
-            <div
-              className="vault-frameless-card"
-              style={{
-                border: "1px solid rgba(255, 184, 77, 0.22)",
-                borderRadius: "12px",
-                padding: "0.9rem",
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.7rem",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-                <div>
-                  <div style={{ fontSize: "0.82rem", color: "var(--text-primary)", fontWeight: 700 }}>Runtime Setup Pending</div>
-                  <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)", marginTop: "0.18rem", lineHeight: 1.45 }}>
-                    The grant is active, but the vault still cannot execute. Finish these on-chain Safe actions to make the agent operational.
-                  </div>
-                </div>
-                <ActionButton
-                  label={busy ? "Finishing..." : "Finish Runtime Setup"}
-                  tone="primary"
-                  onClick={onCompleteRuntimeSetup}
-                  disabled={busy}
-                />
-              </div>
-              <div style={{ display: "grid", gap: "0.45rem" }}>
-                {runtimeChecklist.map((step) => (
-                  <div
-                    key={step.key}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: "0.75rem",
-                      fontSize: "0.76rem",
-                      color: step.done ? "var(--color-lime)" : "var(--text-secondary)",
-                    }}
-                  >
-                    <span>{step.label}</span>
-                    <span style={{ fontWeight: 700 }}>{step.done ? "Done" : "Pending"}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
           {state?.automationReady && (
             <div
               className="vault-mcp-card"
@@ -724,6 +678,52 @@ const VaultPanel: React.FC<Props> = ({
                   Automation normally creates this bundle for you. If this browser lost the session, recover it here and pass the execution route to the agent as the scoped MCP connection. Use the config route only when the agent also needs to change policy.
                 </div>
               )}
+            </div>
+          )}
+        </div>
+          {runtimePending && (
+            <div
+              className="vault-frameless-card"
+              style={{
+                border: "1px solid rgba(255, 184, 77, 0.22)",
+                borderRadius: "12px",
+                padding: "0.9rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.7rem",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+                <div>
+                  <div style={{ fontSize: "0.82rem", color: "var(--text-primary)", fontWeight: 700 }}>Runtime Setup Pending</div>
+                  <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)", marginTop: "0.18rem", lineHeight: 1.45 }}>
+                    The grant is active, but the vault still cannot execute. Finish these on-chain Safe actions to make the agent operational.
+                  </div>
+                </div>
+                <ActionButton
+                  label={busy ? "Finishing..." : "Finish Runtime Setup"}
+                  tone="primary"
+                  onClick={onCompleteRuntimeSetup}
+                  disabled={busy}
+                />
+              </div>
+              <div style={{ display: "grid", gap: "0.45rem" }}>
+                {runtimeChecklist.map((step) => (
+                  <div
+                    key={step.key}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: "0.75rem",
+                      fontSize: "0.76rem",
+                      color: step.done ? "var(--color-lime)" : "var(--text-secondary)",
+                    }}
+                  >
+                    <span>{step.label}</span>
+                    <span style={{ fontWeight: 700 }}>{step.done ? "Done" : "Pending"}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
           <div
