@@ -71,7 +71,7 @@ const ActionButton: React.FC<{
       }}
       disabled={disabled}
       style={{
-        border: tone === "primary" ? "none" : "1px solid var(--border-subtle)",
+        border: tone === "primary" ? "none" : "var(--border-subtle)",
         background,
         color,
         padding: "0.5rem 0.7rem",
@@ -327,6 +327,8 @@ const VaultPanel: React.FC<Props> = ({
   return (
     <section className="glass-panel animate-enter vault-panel">
       <div className="vault-panel-main">
+        <div className="vault-primary-grid">
+          <div className="vault-summary-card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
               <h2 style={{ margin: 0, fontSize: "1.1rem" }}>Vault</h2>
@@ -458,11 +460,13 @@ const VaultPanel: React.FC<Props> = ({
           <div style={{ fontSize: "0.74rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
             Signature trail: mutation auth signs API writes, grant signature opens scoped MCP domains, policy publish writes on-chain limits, and Safe/module transactions activate or revoke execution runtime.
           </div>
+          </div>
+          <div className="vault-funding-grid">
           {depositAddress && (
             <div
+              className="vault-action-card vault-action-card-deposit"
               style={{
                 border: "1px solid rgba(223, 246, 81, 0.16)",
-                background: "rgba(223, 246, 81, 0.045)",
                 borderRadius: "12px",
                 padding: "0.85rem 0.95rem",
                 display: "flex",
@@ -496,9 +500,9 @@ const VaultPanel: React.FC<Props> = ({
           )}
           {depositAddress && mockUsdyConfigured && (
             <div
+              className="vault-action-card vault-action-card-faucet"
               style={{
                 border: "1px solid rgba(111, 205, 255, 0.18)",
-                background: "rgba(111, 205, 255, 0.055)",
                 borderRadius: "12px",
                 padding: "0.85rem 0.95rem",
                 display: "flex",
@@ -544,7 +548,7 @@ const VaultPanel: React.FC<Props> = ({
                   style={{
                     width: "7.5rem",
                     minHeight: "2.15rem",
-                    border: "1px solid var(--border-subtle)",
+                    border: "var(--border-subtle)",
                     borderRadius: "8px",
                     background: "rgba(255,255,255,0.04)",
                     color: "var(--text-primary)",
@@ -561,11 +565,13 @@ const VaultPanel: React.FC<Props> = ({
               </div>
             </div>
           )}
+          </div>
+        </div>
           {runtimePending && (
             <div
+              className="vault-frameless-card"
               style={{
                 border: "1px solid rgba(255, 184, 77, 0.22)",
-                background: "rgba(255, 184, 77, 0.08)",
                 borderRadius: "12px",
                 padding: "0.9rem",
                 display: "flex",
@@ -608,10 +614,10 @@ const VaultPanel: React.FC<Props> = ({
           )}
           {state?.automationReady && (
             <div
+              className="vault-mcp-card"
               style={{
                 border: "1px solid rgba(223, 246, 81, 0.18)",
                 borderRadius: "12px",
-                background: "rgba(223, 246, 81, 0.04)",
                 padding: "0.9rem",
                 display: "flex",
                 flexDirection: "column",
@@ -683,7 +689,7 @@ const VaultPanel: React.FC<Props> = ({
                   </div>
 
                   {showMcpAdvanced && (
-                    <div className="vault-detail-grid" style={{ marginTop: "0.4rem", paddingTop: "0.4rem", borderTop: "1px dashed var(--border-subtle)", animation: "fadeIn 0.2s ease-out" }}>
+                    <div className="vault-detail-grid" style={{ marginTop: "0.4rem", paddingTop: "0.4rem", borderTop: "1px dashed rgba(255, 255, 255, 0.08)", animation: "fadeIn 0.2s ease-out" }}>
                       <div style={rowStyle}>
                         <span>MCP Type</span>
                         {renderCopyValue("mcp_type", mcpAccessBundle.recommendedTransport.type, mcpAccessBundle.recommendedTransport.type)}
@@ -721,10 +727,10 @@ const VaultPanel: React.FC<Props> = ({
             </div>
           )}
           <div
+            className="vault-frameless-card"
             style={{
-              border: "1px solid var(--border-subtle)",
+              border: "var(--border-subtle)",
               borderRadius: "12px",
-              background: "rgba(255,255,255,0.02)",
               padding: "0.9rem",
               display: "flex",
               flexDirection: "column",
@@ -765,7 +771,7 @@ const VaultPanel: React.FC<Props> = ({
                        fontWeight: 700,
                        background: "rgba(255, 255, 255, 0.06)",
                        color: "var(--text-secondary)",
-                       border: "1px solid var(--border-subtle)",
+                       border: "var(--border-subtle)",
                      }}
                    >
                      {onboardingSteps.indexOf(nextStep) + 1}
@@ -787,9 +793,9 @@ const VaultPanel: React.FC<Props> = ({
 
           {vault && !ownershipAcknowledged && (
             <div
+              className="vault-frameless-card"
               style={{
                 border: "1px solid rgba(255, 184, 77, 0.22)",
-                background: "rgba(255, 184, 77, 0.08)",
                 borderRadius: "12px",
                 padding: "0.85rem 0.95rem",
                 display: "flex",

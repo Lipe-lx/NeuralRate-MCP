@@ -272,7 +272,7 @@ const VaultTelemetryPanel: React.FC<Props> = ({ state }) => {
           <div className="vault-info-card vault-info-card-span-2">
             <div className="vault-swiss-kicker">Execution Trail</div>
             {latestJobs.length ? (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "0.7rem" }}>
+              <div className="vault-execution-list">
                 {latestJobs.map((job) => {
                   const payload = parsePayloadJson(job.payload_json);
                   const targetAsset =
@@ -289,22 +289,16 @@ const VaultTelemetryPanel: React.FC<Props> = ({ state }) => {
                   return (
                     <div
                       key={job.job_id}
-                      style={{
-                        border: "1px solid var(--border-subtle)",
-                        borderRadius: "12px",
-                        padding: "0.8rem",
-                        background: "rgba(255,255,255,0.02)",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "0.35rem",
-                      }}
+                      className="vault-execution-row"
                     >
-                      <div className="vault-info-row">
-                        <span>{humanize(job.job_type)}</span>
-                        <strong>{humanize(job.status)}</strong>
-                      </div>
-                      <div style={{ fontSize: "0.74rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
-                        {targetAsset} · {humanize(job.execution_domain)} · {protocolId ? humanize(protocolId) : "Registry-pinned strategy"}
+                      <div className="vault-execution-row-main">
+                        <div>
+                          <div className="vault-execution-title">{humanize(job.job_type)}</div>
+                          <div className="vault-execution-meta">
+                            {targetAsset} · {humanize(job.execution_domain)} · {protocolId ? humanize(protocolId) : "Registry-pinned strategy"}
+                          </div>
+                        </div>
+                        <strong className="vault-execution-status">{humanize(job.status)}</strong>
                       </div>
                       {validationStatus && (
                         <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)" }}>

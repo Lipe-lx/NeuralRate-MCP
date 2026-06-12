@@ -1,6 +1,7 @@
 import { render, screen, act, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import VaultPanel from '../VaultPanel';
+import VaultTelemetryPanel from '../VaultTelemetryPanel';
 import type { AutomationState } from '../../lib/userState';
 import type { McpAccessBundle } from '../../lib/mcpAccess';
 
@@ -98,7 +99,11 @@ describe('VaultPanel', () => {
       benchmarkJobs: [],
       automationReady: true,
     };
-    render(<VaultPanel {...defaultProps} state={mockState} />);
+    const { container } = render(<VaultPanel {...defaultProps} state={mockState} />);
+    expect(container.querySelector('.vault-primary-grid')).toBeInTheDocument();
+    expect(container.querySelector('.vault-summary-card')).toBeInTheDocument();
+    expect(container.querySelector('.vault-funding-grid')).toBeInTheDocument();
+    expect(container.querySelectorAll('.vault-action-card')).toHaveLength(2);
     expect(screen.getByText(/Vault Address/i)).toBeInTheDocument();
     expect(screen.getByText('0xVaultA...ddress')).toBeInTheDocument();
     expect(screen.getByText('Deposit to Vault')).toBeInTheDocument();
@@ -273,5 +278,90 @@ describe('VaultPanel', () => {
     // Verify technical details are now visible
     expect(screen.getByText('Managed Signer')).toBeInTheDocument();
     expect(screen.getByText('Vault Strategy')).toBeInTheDocument();
+  });
+
+  it('renders telemetry execution trail as a list', () => {
+    const mockState: AutomationState = {
+      ownerEoa: '0x123',
+      userId: 'user-1',
+      profile: null,
+      config: {
+        user_id: 'user-1',
+        owner_eoa: '0x123',
+        vault_id: 'vault-123',
+        objective: 'income',
+        risk_profile: 'medium',
+        horizon_hours: 24,
+        automation_mode: 'auto-within-limits',
+        restriction_preset: 'rwa-focused',
+        allowed_assets: ['MNT', 'mUSDY'],
+        denied_assets: [],
+        allowed_protocols: ['Ondo'],
+        denied_protocols: [],
+        max_protocol_weight_bps: 5000,
+        max_asset_weight_bps: 5000,
+        max_action_usd: 250,
+        max_daily_usd: 500,
+        max_automation_usd: 1000,
+        max_slippage_bps: 50,
+        rebalance_cadence_hours: 24,
+        min_apy_bps: 0,
+        min_spread_over_tbill_bps: 0,
+        require_manual_above_usd: 500,
+        pause_on_risk_event: 1,
+        policy_version: '1',
+      },
+      vault: {
+        vault_id: 'vault-123',
+        user_id: 'user-1',
+        owner_eoa: '0x123',
+        vault_address: '0xVaultAddress',
+        vault_kind: 'default',
+        vault_provider: 'safe',
+        agent_scope_wallet: '0xAgentWallet',
+        chain_id: 5000,
+        status: 'active',
+        funding_status: 'funded',
+        automation_status: 'ready',
+        balance_usd: '1000',
+        deposit_address: '0xDepositAddress',
+        last_funding_intent: null,
+        ownership_acknowledged_at: '2026-06-09T00:00:00Z',
+      },
+      permissions: [],
+      activePermission: null,
+      sessions: [],
+      activeSession: null,
+      grants: [],
+      activeGrant: null,
+      mcpSessions: [],
+      activeMcpSession: null,
+      automationJobs: [
+        {
+          job_id: 'job-1',
+          session_id: 'session-1',
+          execution_domain: 'execution',
+          job_type: 'transfer_asset',
+          target_contract: null,
+          target_selector: null,
+          payload_json: JSON.stringify({ targetAsset: 'mUSDY', protocolId: 'ondo', validationStatus: 'approved' }),
+          status: 'confirmed',
+          tx_hash: '0xTxHash',
+          confirmed_at: '2026-06-09T01:00:00Z',
+          failure_reason: null,
+          created_at: '2026-06-09T00:00:00Z',
+        },
+      ],
+      benchmarkJobs: [],
+      automationReady: true,
+    };
+
+    const { container } = render(<VaultTelemetryPanel state={mockState} />);
+
+    expect(screen.getByText('Execution Trail')).toBeInTheDocument();
+    expect(container.querySelector('.vault-execution-list')).toBeInTheDocument();
+    expect(container.querySelector('.vault-execution-row')).toBeInTheDocument();
+    expect(screen.getByText('Transfer Asset')).toBeInTheDocument();
+    expect(screen.getByText('Confirmed')).toBeInTheDocument();
   });
 });
