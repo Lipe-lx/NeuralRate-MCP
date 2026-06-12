@@ -46,8 +46,8 @@ A Git push alone does not:
 Commands:
 
 ```bash
-npm run cf:executor:secrets:sync
 npm run cf:worker:secrets:sync
+npm run cf:executor:secrets:sync
 npm run cf:prod:publish
 ```
 
@@ -63,12 +63,14 @@ npx wrangler login
 Then use:
 
 ```bash
-npm run cf:executor:secrets:sync
 npm run cf:worker:secrets:sync
+npm run cf:executor:secrets:sync
 npm run cf:prod:publish
 ```
 
-`npm run cf:prod:publish` publishes in this order:
+Always sync both Worker secret profiles locally before a release push or publish. The publish command deploys the private executor first and then the public worker because the public worker depends on the executor service binding.
+
+`npm run cf:prod:publish` publishes runtime code in this order:
 
 1. private executor
 2. public worker
@@ -108,6 +110,22 @@ These checks are recommended to reduce regressions before pushing:
 ```bash
 npx tsc -p apps/worker/tsconfig.json
 node --import tsx --test apps/worker/src/auth.test.ts apps/worker/src/auth.smoke.test.ts apps/worker/src/grants.test.ts apps/worker/src/services/nansen.test.ts
+```
+
+For executor, ERC-4337, Safe7579, paymaster, or strategy routing changes, run:
+
+```bash
+npm --workspace apps/executor test
+npx tsc -p apps/executor/tsconfig.json --noEmit
+```
+
+For runtime state, MCP scoped state, vault UI, or telemetry changes, run:
+
+```bash
+npm --workspace apps/worker test
+npx tsc -p apps/worker/tsconfig.json --noEmit
+npm --workspace apps/web test
+npm --workspace apps/web run build
 ```
 
 For release hygiene, the repository also keeps these commands:

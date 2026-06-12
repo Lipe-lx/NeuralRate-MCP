@@ -16,7 +16,8 @@ The project features a **Cloudflare Worker public control plane**, a **private C
 3. **Session-Scoped Mutation Catalogs**: Scoped mutation routes (`/mcp/scoped/config`, `/mcp/scoped/benchmark`, `/mcp/scoped/execution`) that expose sensitive tools only to authorized agents holding a valid, owner-signed session token.
 4. **On-Chain Policy Enforcement**: Decentralized verification where all automation boundaries (spend caps, allowlisted assets, selectors, delegates, validity windows) are stored directly in `NeuralRatePolicyRegistry.sol` and enforced by `NeuralRateExecutionGuard.sol`.
 5. **On-Chain Decision Receipts**: Immutable logging of yield-allocation decisions to `NeuralRateDecisionReceiptRegistry.sol` with cryptographic data snapshots for third-party auditability and performance settlement.
-6. **Real Safe-Module Vault Execution**: Automated execution executed from the user's Safe vault through the `NeuralRateVaultModule.sol`, validating delegate authority and intent limits on-chain before transaction dispatch.
+6. **Real Safe7579 Vault Execution**: Automated execution is dispatched from the user's Safe vault through the Safe7579/ERC-4337 runtime and `NeuralRateVaultModule.sol`, validating delegate authority and intent limits on-chain before transaction dispatch.
+7. **Mock USDY Testnet Harness**: Mantle Sepolia exposes an explicit `mock-usdy-sepolia-allocation` path for ERC-20 demo execution because Ondo has no canonical public USDY deployment on this testnet.
 
 ---
 
@@ -32,15 +33,17 @@ graph TD
     Worker -->|Policy & Session Discovery| PolicyRegistry[NeuralRatePolicyRegistry]
     Executor -->|Anchor Snapshot / Read Policy| PolicyRegistry
     Executor -->|Anchor Receipt Tx| ReceiptRegistry[NeuralRateDecisionReceiptRegistry]
-    Executor -->|Vault Module Dispatch| VaultModule[NeuralRateVaultModule]
+    Executor -->|Safe7579 UserOperation| EntryPoint[ERC-4337 EntryPoint]
+    EntryPoint --> Safe[User Safe7579 Vault]
+    Safe -->|Module Call| VaultModule[NeuralRateVaultModule]
     VaultModule --> Guard[NeuralRateExecutionGuard]
-    VaultModule --> Safe[User Safe Vault]
+    VaultModule --> MockUSDY[Mock USDY Testnet Token]
 ```
 
 ### Component Breakdown
 
 *   **`apps/worker` (Public Control Plane)**: Exposes public REST endpoints and the MCP server. Resolves market data (DefiLlama, FRED API, Nansen), manages user/vault records in D1, handles EIP-712 nonce authentication, manages short-lived MCP sessions, and queues jobs to the executor.
-*   **`apps/executor` (Internal Dispatcher)**: A private Cloudflare Worker that receives authorized jobs from the public Worker through service binding, checks strategy parameters, anchors data snapshots to the policy registry, and dispatches on-chain transactions (decision receipts and Safe module calls) using Turnkey-managed keys and AA bundlers.
+*   **`apps/executor` (Internal Dispatcher)**: A private Cloudflare Worker that receives authorized jobs from the public Worker through service binding, checks strategy parameters, anchors data snapshots to the policy registry, and dispatches on-chain transactions (decision receipts and Safe7579 vault calls) using Turnkey-managed keys, paymaster-backed AA, and the delegate validator.
 *   **`apps/web` (Vite React Operator Panel)**: React application providing wallet connection (via Privy), dedicated Safe vault bootstrapping, policy publication/revocation directly on-chain, and an operator panel to view historical allocations, jobs, and telemetry.
 *   **`contracts` (Solidity Framework)**: Deployed contract workspace providing the secure foundation for policy validation, benchmark receipt logging, and Safe module execution guards.
 
@@ -56,27 +59,30 @@ All production contracts are deployed on Mantle Sepolia (`5003`):
 | **`NeuralRatePolicyRegistry`** | Anchors owner policy parameters & snapshot references | [`0x86cD4f8c2528E71a473ED342aa73B8a00de906a4`](https://sepolia.mantlescan.xyz/address/0x86cD4f8c2528E71a473ED342aa73B8a00de906a4) |
 | **`NeuralRateExecutionGuard`** | On-chain guard validating vault transaction limits | [`0x666Bc822156824F40F2b70aAaAcBfe87467D79A5`](https://sepolia.mantlescan.xyz/address/0x666Bc822156824F40F2b70aAaAcBfe87467D79A5) |
 | **`NeuralRateVaultModule`** | Safe Module executing automated transactions | [`0xf7061501a464e893636a5BF8eB4ab7Ba2819154D`](https://sepolia.mantlescan.xyz/address/0xf7061501a464e893636a5BF8eB4ab7Ba2819154D) |
+| **`NeuralRateDelegateValidator`** | Safe7579 delegate validator for ERC-4337 UserOperations | [`0x0A03F7763d53757183aD86C393eEfF6D8177e4cE`](https://sepolia.mantlescan.xyz/address/0x0A03F7763d53757183aD86C393eEfF6D8177e4cE) |
 | **`NeuralRateUsdYStrategyAdapter`** | Preserved strategy adapter for USDY allocation | [`0xFeE16FAd13789e9bBA4779D025186341e58799a3`](https://sepolia.mantlescan.xyz/address/0xFeE16FAd13789e9bBA4779D025186341e58799a3) |
+| **`MockERC20` as Mock USDY** | Testnet-only USDY-shaped ERC-20 demo token | [`0xC63FB10deD215c6De6cDB438FB2Ce7944F6Af5bE`](https://sepolia.mantlescan.xyz/address/0xC63FB10deD215c6De6cDB438FB2Ce7944F6Af5bE) |
 
 ---
 
-## Strategy Truth & execution Scope
+## Strategy Truth & Execution Scope
 
-NeuralRate supports two execution targets under testnet demo profiles:
+NeuralRate supports three execution targets under testnet demo profiles:
 
-1.  **`mnt-native-transfer` (Active Demo Target)**
+1.  **`mock-usdy-sepolia-allocation` (Current USDY Demo Harness)**
+    *   **Asset**: Mock USDY ERC-20 on Mantle Sepolia.
+    *   **Mechanism**: Moves Safe-held Mock USDY through the same Safe module ERC-20 routing path used by governed execution.
+    *   **Funding**: Use the Vault UI Mock USDY Faucet or MCP `prepare_mock_usdy_mint` to mint testnet balance to the Safe vault, not the user's EOA.
+    *   **Live proof**: Confirmed on 2026-06-12 with tx [`0x36281947f5fb3088c29e6926979f150eb10ee03e5be86e4973599bf8823409b6`](https://sepolia.mantlescan.xyz/tx/0x36281947f5fb3088c29e6926979f150eb10ee03e5be86e4973599bf8823409b6), moving `1 USDY` from the Safe vault through ERC-4337 EntryPoint execution.
+    *   **Disclosure**: USDY is mocked on Mantle Sepolia because Ondo has no canonical public testnet USDY deployment; mainnet integration uses Ondo's canonical USDY contract.
+2.  **`mnt-native-transfer` (Supported Native Demo Target)**
     *   **Asset**: Native `MNT`
     *   **Mechanism**: A real transfer transaction executed from the user's Safe vault via `NeuralRateVaultModule.sol` to an allowlisted destination.
     *   **Enforcement**: Fully verified against the active on-chain policy and execution guard.
-2.  **`usdy-stable-allocation` (Preserved Target)**
+3.  **`usdy-stable-allocation` (Preserved Canonical Target)**
     *   **Asset**: Ondo USDY Stablecoin
     *   **Mechanism**: Intended to swap stablecoins for USDY yields.
     *   **Sepolia Behavior**: Blocked with an explicit reason when no canonical venue is configured on testnet.
-3.  **`mock-usdy-sepolia-allocation` (Testnet Demo Harness)**
-    *   **Asset**: Mock USDY ERC-20 on Mantle Sepolia.
-    *   **Mechanism**: Moves wallet-held Mock USDY through the same Safe module ERC-20 routing path used by governed execution.
-    *   **Funding**: Use the Vault UI Mock USDY Faucet or MCP `prepare_mock_usdy_mint` to mint testnet balance to the Safe vault.
-    *   **Disclosure**: USDY is mocked on Mantle Sepolia because Ondo has no canonical public testnet USDY deployment; mainnet integration uses Ondo's canonical USDY contract.
 
 ---
 
@@ -99,7 +105,8 @@ The Worker advertises the canonical read-only MCP endpoint in [agent-card.json](
 *   `get_user_state` / `list_jobs`: Retrieves active configuration, session and background job logs (requires `sessionToken`).
 *   `update_agent_policy` (Config Scope): Modifies the owner's off-chain configuration limits (requires config domain session).
 *   `queue_benchmark` (Benchmark Scope): Submits a transaction to anchor a decision receipt on-chain.
-*   `execute_strategy` (Execution Scope): Dispatches an automated strategy call through the user's Safe module.
+*   `prepare_mock_usdy_mint` (Execution Scope): Prepares a wallet-signable Mock USDY mint transaction for the agent Safe vault.
+*   `execute_strategy` and governed strategy helpers (Execution Scope): Dispatch automated strategy calls through the user's Safe7579 vault and Safe module.
 
 ---
 

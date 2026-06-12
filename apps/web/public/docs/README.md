@@ -18,9 +18,9 @@ This directory contains the current documentation split into two groups:
 - [database.md](database.md)
   D1 schema derived from migrations `0001` through `0008`.
 - [smart-contract.md](smart-contract.md)
-  Benchmark registry, vault module, and preserved USDY adapter.
+  Benchmark registry, vault module, delegate validator, preserved USDY adapter, and Mock USDY testnet harness.
 - [frontend.md](frontend.md)
-  Role of the web app and the current Mantle Sepolia demo surface.
+  Role of the web app, vault telemetry, Safe7579 onboarding, and the current Mantle Sepolia demo surface.
 - [risk-model.md](risk-model.md)
   Deterministic six-factor risk model, thresholds, formulas, and worked examples.
 - [data-lineage.md](data-lineage.md)

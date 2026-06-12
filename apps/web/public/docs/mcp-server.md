@@ -18,7 +18,7 @@ The MCP server runs inside `apps/worker` and is split into one public read-only 
 
 This is the endpoint advertised in [agent-card.json](../agent-card.json).
 
-Preferred client behavior as of 2026-06-04:
+Preferred client behavior as of 2026-06-12:
 
 - use `/mcp` as the canonical remote MCP endpoint
 - prefer Streamable HTTP client configs (`type: "http"` in most clients)
@@ -72,6 +72,8 @@ The public catalog intentionally does not expose vault-bound state or execution 
 
 These tools are session-bound and return only the vault attached to the scoped session.
 
+`get_vault_balances` returns the native vault balance plus configured tracked ERC-20 balances. On the Mantle Sepolia demo profile, `NEURALRATE_USDY_TOKEN_ADDRESS` tracks the Mock USDY testnet token so agents can verify faucet funding before queueing `mock-usdy-sepolia-allocation`.
+
 ## Scoped Mutation Tools
 
 The mutation catalogs remain intentionally narrow and reuse the same scoped session model.
@@ -113,10 +115,11 @@ The mutation catalogs remain intentionally narrow and reuse the same scoped sess
   - `rebalance_to_target`
   - `rotate_strategy`
   - `approve_strategy_spender`
+  - `prepare_mock_usdy_mint`
   - `execute_strategy`
 - required session domain: `execution`
 
-The governed execution tools always run an internal preflight before any queueing side effect. As of June 5, 2026, the live execution surface is intentionally narrower than the full conceptual tool list:
+The governed execution tools always run an internal preflight before any queueing side effect. As of June 12, 2026, the live execution surface is intentionally narrower than the full conceptual tool list:
 
 - fully queueable today:
   - `transfer_asset` for `MNT`
@@ -129,6 +132,7 @@ The governed execution tools always run an internal preflight before any queuein
   - `approve_strategy_spender`
 - preflight-aware special cases:
   - `prepare_mock_usdy_mint` returns a wallet-signable Mock USDY mint transaction for Mantle Sepolia demo funding; it does not submit the transaction server-side
+  - by default, `prepare_mock_usdy_mint` mints to the agent Safe vault attached to the scoped session, not to the owner's EOA
   - `open_position`, `increase_position`, `rebalance_to_target`, and `rotate_strategy` accept `protocolHint: "mock-usdy-sepolia"` to use the labeled Mock USDY Mantle Sepolia testnet harness
   - `claim_rewards` returns `noop` when the resolved position has no claimable rewards on the current state surface, and `blocked` when rewards exist but no pinned claim adapter exists yet
   - `rotate_strategy` returns `noop` when the source position already matches the requested target asset, aliases to `rebalance_to_target` when rotating into `USDY`, and returns `blocked` for unsupported unwind or conversion paths
@@ -196,6 +200,32 @@ The `sessionToken` is now primarily used for MCP scoping and discovery. Real str
 - `intent.slippageBps`
 
 The executor expects these values when building an on-chain execution intent.
+
+The governed strategy helpers such as `open_position` also pass snapshot-aware intent fields through to the executor. If the active policy requires snapshots, clients should provide:
+
+- `snapshotHash`
+- `snapshotCid`
+- `deadline`
+- `slippageBps`
+
+The deadline must be inside the active policy validity window. A missing or expired snapshot/deadline is treated as a preflight or executor failure, not silently ignored.
+
+## Current Live Execution Proof
+
+On 2026-06-12, the scoped execution MCP catalog confirmed a Mock USDY allocation through the full Safe7579 path:
+
+- tool: `open_position`
+- protocol hint: `mock-usdy-sepolia`
+- strategy: `mock-usdy-sepolia-allocation`
+- Safe vault: `0xa151ca59f090946ab1ac1f8028771ec716a9a82f`
+- token: Mock USDY at `0xC63FB10deD215c6De6cDB438FB2Ce7944F6Af5bE`
+- amount: `1 USDY`
+- job id: `job_45f65784-6756-4124-9a75-7870c8b66806`
+- userOpHash: `0x3b55075fed671db366b2e1fc6447da31b0fb149e0e739f337dfbf5099168b637`
+- tx_hash: `0x36281947f5fb3088c29e6926979f150eb10ee03e5be86e4973599bf8823409b6`
+- result: transaction receipt status `1`, gas paid by paymaster, `anchoredSnapshot: true`
+
+This proof demonstrates the testnet Mock USDY harness only. It does not claim canonical Ondo USDY execution on Mantle Sepolia.
 
 ## Out of Public MCP Scope
 

@@ -6,7 +6,7 @@ This file is intentionally factual. It describes the current codebase behavior a
 
 ## One-Liner
 
-NeuralRate MCP is a Mantle Sepolia worker and MCP server that anchors per-user vault policy on-chain, records decision receipts on-chain, and dispatches real Safe-module execution jobs under owner-approved automation scope.
+NeuralRate MCP is a Mantle Sepolia worker and MCP server that anchors per-user vault policy on-chain, records decision receipts on-chain, and dispatches real Safe7579 vault execution jobs under owner-approved automation scope.
 
 ## What the Demo Actually Shows
 
@@ -18,7 +18,7 @@ NeuralRate MCP is a Mantle Sepolia worker and MCP server that anchors per-user v
 6. Funding is optional and is reflected from live on-chain balance telemetry; production UX uses direct vault deposits rather than a funding-intent step.
 7. A decision can be logged locally and queued for an on-chain receipt.
 8. The executor anchors the referenced snapshot and writes the receipt transaction on-chain.
-9. The preserved live execution demo can queue a real `MNT` transfer through the Safe module for operator testing, but it is not exposed as a production onboarding CTA.
+9. The execution demo can mint Mock USDY to the agent Safe vault, verify it in telemetry, and queue a real ERC-20 transfer through the Safe7579 and Safe module path.
 
 ## Final-Week Proof Checklist
 
@@ -27,7 +27,7 @@ Before submitting, capture a fresh proof bundle from the live environment:
 - public MCP `/mcp` tools list showing only the five read-only advisory tools
 - scoped state MCP `get_execution_readiness` returning `ready`
 - active on-chain policy or policy publication transaction hash
-- latest successful execution or receipt transaction hash
+- latest successful execution or receipt transaction hash, preferably the Mock USDY Safe7579 execution proof
 - screenshot of the verify page or operator history showing the same identifiers
 
 Do not reuse stale failed or blocked jobs as the main evidence trail. If a live execution is intentionally skipped, document the reason and submit readiness plus policy proof as the fallback evidence.
@@ -37,7 +37,7 @@ Do not reuse stale failed or blocked jobs as the main evidence trail. If a live 
 - **Worker**
   Public REST and MCP surface. Validates auth, stores indexed state, issues grants and sessions, and queues jobs.
 - **Executor**
-  Internal service. Resolves on-chain policy, anchors snapshots, and submits receipt or vault-module transactions.
+  Internal service. Resolves on-chain policy, anchors snapshots, signs prepared Safe7579 UserOperations, and submits receipt or vault-module transactions.
 - **Web**
   User/operator panel. Shows state and gathers signatures.
 - **Receipt registry**
@@ -54,22 +54,38 @@ Do not reuse stale failed or blocked jobs as the main evidence trail. If a live 
 - The on-chain policy registry and execution guard are part of execution enforcement.
 - The executor is internal and only accepts worker-authenticated requests.
 - Benchmark identity is separate from user vault execution.
-- The live Sepolia demo uses a real Safe module and a real on-chain transaction.
+- The live Sepolia demo uses a real Safe7579 vault, a real Safe module, and a real on-chain transaction.
 
 ## Current Strategy Truth
 
 - `mnt-native-transfer`
-  - live default demo
+  - supported native transfer demo
   - real native `MNT` transfer through the Safe module
 - `usdy-stable-allocation`
   - preserved in code
   - not the default demo
   - blocked on Sepolia when no canonical venue is configured
 - `mock-usdy-sepolia-allocation`
-  - explicit Mantle Sepolia demo harness
-  - routes wallet-held Mock USDY through the same Safe module ERC-20 execution path
+  - current ERC-20 Mantle Sepolia demo harness
+  - routes Safe-held Mock USDY through the same Safe module ERC-20 execution path
   - funding can be initiated from the Vault UI Mock USDY Faucet or prepared via MCP `prepare_mock_usdy_mint`
+  - faucet and MCP mint preparation target the agent Safe vault by default, not the owner's EOA
   - disclosed as a testnet substitute because Ondo has no canonical public Mantle Sepolia USDY deployment; mainnet uses Ondo's canonical USDY contract
+
+## Current Live Proof
+
+On 2026-06-12, a scoped MCP `open_position` call confirmed the full Mock USDY path:
+
+- protocol hint: `mock-usdy-sepolia`
+- strategy: `mock-usdy-sepolia-allocation`
+- amount: `1 USDY`
+- Safe vault: `0xa151ca59f090946ab1ac1f8028771ec716a9a82f`
+- token: `0xC63FB10deD215c6De6cDB438FB2Ce7944F6Af5bE`
+- job id: `job_45f65784-6756-4124-9a75-7870c8b66806`
+- userOpHash: `0x3b55075fed671db366b2e1fc6447da31b0fb149e0e739f337dfbf5099168b637`
+- tx_hash: `0x36281947f5fb3088c29e6926979f150eb10ee03e5be86e4973599bf8823409b6`
+- receipt: status `1`, gas paid by paymaster, snapshot anchored
+- balance result: vault Mock USDY decreased from `10000` to `9999`
 
 ## Claims That Match the Current Code
 
@@ -79,6 +95,7 @@ Do not reuse stale failed or blocked jobs as the main evidence trail. If a live 
 - Decision receipt writes are real Mantle Sepolia transactions in the new contract path.
 - The worker stores the resulting receipt tx hash and on-chain identifiers.
 - The live Sepolia execution demo routes through a deployed Safe module.
+- Safe7579 execution signs the prepared UserOperation before submission and does not submit placeholder signatures.
 - Unsupported Sepolia venues fail closed with an explicit reason.
 - Mock USDY execution is labeled separately from canonical USDY execution.
 

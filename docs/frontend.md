@@ -11,6 +11,7 @@ The frontend lives in `apps/web` and is a Vite React application. It is a panel 
 - requests nonce signatures for owner-authorized actions
 - requests canonical grant signatures for MCP mutation sessions
 - shows benchmark history and automation jobs
+- shows live vault telemetry, including native MNT and configured tracked ERC-20 balances
 - queues benchmark and strategy actions through the worker
 
 The frontend should call the worker, not the executor.
@@ -33,6 +34,8 @@ These are distinct backend records:
 - `automation_sessions`
 
 Funding intent is not part of the production onboarding UI. The vault can receive any amount directly whenever the user chooses, and live funding telemetry is derived from on-chain balance reads rather than an extra signed mutation in the activation path.
+
+When the Mantle Sepolia demo profile includes `NEURALRATE_USDY_TOKEN_ADDRESS`, the same telemetry surface also tracks Mock USDY balances for the agent Safe vault.
 
 Legacy direct-signer or module-only runtime fallback is not a supported onboarding success path. If Safe7579, the delegate validator, the vault module, the execution guard, or required guard trust settings are missing, onboarding should fail as a release/configuration error.
 
@@ -72,6 +75,7 @@ It shows:
 
 - vault identity and address
 - funding status
+- tracked token balances, including Mock USDY when configured
 - automation status
 - current policy-derived limits
 - active grant and mutation session state
@@ -82,8 +86,22 @@ It also lets the user:
 - bootstrap the vault
 - review wallet ownership and export/recovery options
 - copy the vault deposit address for direct funding
+- mint testnet-only Mock USDY directly to the agent Safe vault when the demo faucet is configured
 - enable automation
 - revoke automation
+
+The Mock USDY Faucet signs a wallet transaction from the connected owner EOA to the Mock USDY contract, but the encoded `mint(to, amount)` recipient is the agent Safe vault address. The faucet is only a Mantle Sepolia demo harness and is not canonical Ondo USDY.
+
+### `VaultTelemetryPanel`
+
+This panel renders worker-derived runtime telemetry:
+
+- native vault balance and read status
+- configured tracked ERC-20 balances from `runtimeState.tokenBalances`
+- funding detection based on live or cached on-chain reads
+- execution readiness context for the active vault
+
+The browser may perform supplemental local balance reads, but the durable product state is the worker snapshot. Direct deposits and Mock USDY mints should appear after the next on-chain balance refresh.
 
 ### `AgentSettingsPanel`
 
@@ -108,9 +126,11 @@ This panel:
 - queues benchmark jobs through the worker
 - renders tx hashes and on-chain IDs when available
 
-## Production Funding UX
+## Production Funding and Demo Token UX
 
 The production UI does not ask the user to predeclare an amount. It shows the vault address as the funding surface, lets the user copy it, and reflects direct deposits from on-chain telemetry. Demo strategy queueing is not exposed as a primary product action.
+
+Mock USDY is the exception for Mantle Sepolia demos: the faucet exists so judges and agents can fund the Safe vault with an ERC-20 balance that exercises the governed token routing path. The copy must keep the token clearly labeled as mock/testnet-only.
 
 ## Agent Access
 

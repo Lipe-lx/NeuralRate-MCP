@@ -2,7 +2,7 @@
 
 **Status:** Canonical doc
 
-NeuralRate centers its automation trust model on five Solidity surfaces in the repository, plus one ERC-7579-compliant validator and one preserved strategy adapter.
+NeuralRate centers its automation trust model on five Solidity surfaces in the repository, plus one ERC-7579-compliant validator, one preserved strategy adapter, and one testnet-only Mock USDY token harness.
 
 ## Contract Inventory
 
@@ -95,6 +95,7 @@ What it does:
 - implements the ERC-7579 `IValidator` interface to validate Smart Account UserOperations under ERC-4337.
 - recovers the signer from the signature and verifies it matches the authorized delegate key.
 - restricts the target contract: only allows the delegate to submit UserOperations that call `NeuralRateVaultModule` or the `NeuralRatePolicyRegistry` contract.
+- protects the Safe7579 runtime path used by the private executor; the executor must replace the Safe7579 placeholder signature with a managed-signer signature before dispatch.
 
 Important functions:
 
@@ -119,11 +120,15 @@ Current status in the codebase:
 - file: `contracts/contracts/mocks/MockERC20.sol`
 - role: explicit Mantle Sepolia demo harness for USDY-shaped ERC-20 execution
 - deployment manifest after deploy: `deployments/mantle-sepolia-mock-usdy.json`
+- live Sepolia mock deployment: [`0xC63FB10deD215c6De6cDB438FB2Ce7944F6Af5bE`](https://sepolia.mantlescan.xyz/address/0xC63FB10deD215c6De6cDB438FB2Ce7944F6Af5bE)
 
 Current status in the codebase:
 
 - used only through the labeled `mock-usdy-sepolia-allocation` strategy
+- token metadata is `Mock USDY`, symbol `USDY`, `18` decimals
+- exposes the ERC-20 behavior needed by the demo path, including `mint`, `transfer`, `approve`, `transferFrom`, `balanceOf`, and `allowance`
 - minting is exposed as a UI faucet and as MCP `prepare_mock_usdy_mint`, both labeled testnet-only
+- the UI faucet and default MCP mint preparation target the agent Safe vault, not the owner's EOA
 - not treated as a canonical Ondo venue
 - disclosed as a testnet substitute because Ondo has no canonical public Mantle Sepolia USDY deployment; mainnet uses Ondo's canonical USDY contract
 
@@ -134,13 +139,16 @@ All deployed addresses are fully synchronized and validated via `npm run sync:de
 ## Execution Truth on Sepolia
 
 - **Real Safe-module execution path:** yes
-- **Default live demo:** `mnt-native-transfer`
-- **Default live asset:** native `MNT`
+- **Current USDY demo path:** `mock-usdy-sepolia-allocation`
+- **Current USDY demo asset:** Mock USDY at `0xC63FB10deD215c6De6cDB438FB2Ce7944F6Af5bE`
+- **Native transfer demo path:** `mnt-native-transfer`
+- **Native demo asset:** native `MNT`
 - **Policy anchoring and snapshot hashing:** implemented in code
 - **Receipt-registry target for new deployments:** implemented in code
 - **USDY path on Sepolia:** preserved but blocked without a canonical venue
 - **Mock USDY path on Sepolia:** explicit demo harness via `mock-usdy-sepolia-allocation`
+- **Latest confirmed strategy tx:** [`0x36281947f5fb3088c29e6926979f150eb10ee03e5be86e4973599bf8823409b6`](https://sepolia.mantlescan.xyz/tx/0x36281947f5fb3088c29e6926979f150eb10ee03e5be86e4973599bf8823409b6)
 
 ## Pinned Deployment Behavior
 
-The executor validates pinned deployment metadata before dispatching Safe calls and now also expects the on-chain policy/snapshot path to be available when configured.
+The executor validates pinned deployment metadata before dispatching Safe calls and now also expects the on-chain policy/snapshot path to be available when configured. For Safe7579 jobs, it signs the prepared UserOperation and rejects any final request that still carries the known placeholder signature, preventing `AA24 signature error` regressions from reaching the bundler.

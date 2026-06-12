@@ -41,7 +41,7 @@ const safe7579Abi = [
 
 const MODE_SINGLE = `0x${"00".repeat(32)}` as Hex;
 const MODE_BATCH = `0x01${"00".repeat(31)}` as Hex;
-const STUB_SIGNATURE = `0x${"11".repeat(65)}` as Hex;
+export const SAFE7579_STUB_SIGNATURE = `0x${"11".repeat(65)}` as Hex;
 const FALLBACK_MAX_PRIORITY_FEE_PER_GAS = 1_000_000n;
 const FALLBACK_MAX_FEE_PER_GAS = 50_000_000n;
 
@@ -49,6 +49,10 @@ type AARuntimeCall = {
   to: string;
   data?: string;
   value?: bigint;
+};
+
+type SignableSafe7579Account = {
+  signUserOperation(parameters: UserOperation<"0.7"> & { chainId?: number }): Promise<Hex>;
 };
 
 export type BundlerEndpointStatus = {
@@ -114,6 +118,29 @@ const redactBundlerUrl = (url: string) => url.replace(/([?&](?:apikey|apiKey|key
 const redactRpcUrl = redactBundlerUrl;
 
 export const hasAAPaymaster = () => Boolean(getExecutorRuntime().config.aaPaymasterUrl);
+
+export const isSafe7579StubSignature = (signature: Hex | null | undefined) =>
+  signature?.toLowerCase() === SAFE7579_STUB_SIGNATURE;
+
+export const signPreparedSafe7579UserOperation = async (
+  account: SignableSafe7579Account,
+  request: UserOperation<"0.7">,
+  chainId: number,
+) => {
+  const signature = await account.signUserOperation({
+    ...request,
+    chainId,
+  });
+
+  if (!signature || isSafe7579StubSignature(signature)) {
+    throw new Error("Safe7579 UserOperation signing returned the stub signature; refusing to submit an invalid AA request.");
+  }
+
+  return {
+    ...request,
+    signature,
+  };
+};
 
 const createPaymasterOptions = () => {
   const { config } = getExecutorRuntime();
@@ -314,7 +341,7 @@ const buildSafe7579Account = async (signer: ManagedSigner, vaultAddress: string)
       });
     },
     async getStubSignature() {
-      return STUB_SIGNATURE;
+      return SAFE7579_STUB_SIGNATURE;
     },
     async signMessage() {
       throw new Error("Message signing is not supported on the Safe7579 executor account.");
@@ -382,8 +409,13 @@ export async function sendAAVaultUserOperation(args: {
       if (!request.maxFeePerGas || !request.maxPriorityFeePerGas) {
         throw new Error("Bundler prepareUserOperation did not populate required gas fee fields.");
       }
+      const signedRequest = await signPreparedSafe7579UserOperation(
+        account,
+        request as UserOperation<"0.7">,
+        chain.id,
+      );
       userOpHash = await bundlerClient.sendUserOperation({
-        ...request,
+        ...signedRequest,
       });
       sendingBundlerUrl = bundlerUrl;
       break;

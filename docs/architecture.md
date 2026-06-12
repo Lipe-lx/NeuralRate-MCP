@@ -2,7 +2,7 @@
 
 **Status:** Canonical doc
 
-This document describes the architecture implemented in the repository after the on-chain policy and receipt refactor.
+This document describes the architecture implemented in the repository after the on-chain policy, Safe7579 execution, and Mock USDY Sepolia demo refactors.
 
 ## Topology
 
@@ -15,7 +15,7 @@ NeuralRate has three runtime services plus on-chain contracts:
 3. `apps/web`
    User and operator panel.
 4. Mantle Sepolia contracts
-   Policy registry, execution guard, receipt registry, Safe vault module, and preserved USDY adapter.
+   Policy registry, execution guard, receipt registry, Safe vault module, delegate validator, preserved USDY adapter, and testnet-only Mock USDY harness.
 
 ```mermaid
 graph TD
@@ -27,9 +27,11 @@ graph TD
     Worker -->|policy discovery| PolicyRegistry[NeuralRatePolicyRegistry.sol]
     Executor -->|anchor snapshot / read policy| PolicyRegistry
     Executor -->|receipt tx| ReceiptRegistry[NeuralRateDecisionReceiptRegistry.sol]
-    Executor -->|vault module tx| Module[NeuralRateVaultModule.sol]
+    Executor -->|Safe7579 UserOperation| EntryPoint[ERC-4337 EntryPoint]
+    EntryPoint -->|execute| Safe[User Safe7579 Vault]
+    Safe -->|module call| Module[NeuralRateVaultModule.sol]
     Module --> Guard[NeuralRateExecutionGuard.sol]
-    Module --> Safe[User Safe Vault]
+    Module --> MockUSDY[Mock USDY testnet token]
 ```
 
 ## Public vs Internal Boundaries
@@ -70,12 +72,19 @@ To ensure high performance and isolation, `apps/worker` leverages Cloudflare Dur
    - Binding: `MCP_EXECUTION_OBJECT`
    - Purpose: Exposes governed execution and strategy tools, restricted to sessions carrying `execution` domain approval.
 
-## Client-Side Telemetry Pipeline
+## Telemetry and Balance Pipeline
 
 To track client errors and system health, a logging pipeline is integrated:
 1. When a client-side exception or connection failure occurs, the **web app** POSTs a telemetry payload to the worker endpoint `/api/telemetry/error`.
 2. The **Worker** validates the payload and inserts the event details (source, level, message, route, and metadata JSON) into the D1 `telemetry_events` table.
 3. Operators can retrieve the last 24h error metrics via `/api/telemetry/summary`.
+
+Vault balance telemetry is derived from on-chain reads rather than a user-declared funding record:
+
+1. The worker reads the Safe vault native balance and configured tracked ERC-20 balances.
+2. When `NEURALRATE_USDY_TOKEN_ADDRESS` is configured, the worker includes Mock USDY as a tracked token in `runtimeState.tokenBalances`.
+3. The web `Telemetry` panel renders the worker snapshot and can show native MNT plus live ERC-20 balances such as Mock USDY.
+4. Direct vault deposits and Mock USDY mints are therefore reflected by the next live/cached on-chain balance refresh, without creating a separate funding-intent mutation.
 
 ## Release and Configuration Boundary
 
@@ -122,6 +131,8 @@ The worker is now mostly a control plane and indexing layer.
 
 The executor is the dispatch layer. Governed vault automation uses the Safe7579/ERC-4337 runtime only: it builds an ERC-4337 `UserOperation` calling `execute` on the Safe, targeting the vault module or policy registry, signed by the managed signer and validated on-chain by `NeuralRateDelegateValidator.sol`.
 
+The bundler/paymaster preparation step may return the Safe7579 placeholder signature (`0x11...`). The executor signs the prepared UserOperation with the managed account before submission and refuses to dispatch if the final signature is still the placeholder. This keeps `AA24 signature error` regressions inside tests and pre-submission checks.
+
 There is no legacy direct-signer fallback for user onboarding or vault automation. If AA runtime prerequisites are missing, execution must fail as configuration or funding-not-ready rather than silently switching authority models.
 
 Core responsibilities:
@@ -132,7 +143,7 @@ Core responsibilities:
 - anchors `snapshotHash` and `snapshotCid` in the policy registry when needed
 - validates pinned strategy configuration
 - builds receipt-registry writes for decisions
-- submits vault execution transactions through the Safe module path
+- submits vault execution transactions through the Safe7579 and Safe module path
 - reports job status back to the worker
 
 ### Web
@@ -199,15 +210,29 @@ This means catalog exposure is reduced before the model sees the tool list.
 5. The executor submits `createDecisionReceipt` on `NeuralRateDecisionReceiptRegistry.sol`.
 6. The worker persists `tx_hash`, on-chain receipt metadata, and job status.
 
-### 6. Strategy Execution Flow
+### 7. Strategy Execution Flow
 
 1. The worker validates scoped access and queues a strategy job.
 2. The worker forwards the job to the private executor through the internal service binding.
 3. The executor resolves the active on-chain policy.
 4. The executor anchors the referenced snapshot if needed.
 5. The executor builds an intent with snapshot hash, slippage, deadline, and policy version.
-6. `NeuralRateExecutionGuard` validates the execution when the module call is made.
-7. The module executes the real Safe call with `execTransactionFromModule`.
+6. The executor prepares the Safe7579 UserOperation, replaces the placeholder signature with a managed-signer signature, and submits it through the bundler/paymaster path.
+7. `NeuralRateExecutionGuard` validates the execution when the module call is made.
+8. The module executes the real Safe call with `execTransactionFromModule`.
+9. For the Mock USDY Sepolia demo, the final module call is an ERC-20 `transfer` from the Safe vault to the configured recipient.
+
+### 8. Current Sepolia Execution Proof
+
+On 2026-06-12, a scoped MCP `open_position` call using `protocolHint: "mock-usdy-sepolia"` confirmed the full path:
+
+- strategy: `mock-usdy-sepolia-allocation`
+- Safe vault: `0xa151ca59f090946ab1ac1f8028771ec716a9a82f`
+- Mock USDY token: `0xC63FB10deD215c6De6cDB438FB2Ce7944F6Af5bE`
+- amount: `1 USDY`
+- userOpHash: `0x3b55075fed671db366b2e1fc6447da31b0fb149e0e739f337dfbf5099168b637`
+- tx_hash: `0x36281947f5fb3088c29e6926979f150eb10ee03e5be86e4973599bf8823409b6`
+- result: transaction receipt status `1`; vault Mock USDY balance decreased from `10000` to `9999`
 
 ## Persistence and Cache
 
