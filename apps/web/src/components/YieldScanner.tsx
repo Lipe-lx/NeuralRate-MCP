@@ -39,7 +39,11 @@ const YieldScanner: React.FC<Props> = ({ pools, loading, onSelectPool, selectedP
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', overflowY: 'auto', flex: 1, paddingRight: '0.5rem' }}>
-          {[...pools].sort((a, b) => b.apy - a.apy).map((p, idx) => {
+          {[...pools].sort((a, b) => {
+            if (a.symbol === 'USDY') return -1;
+            if (b.symbol === 'USDY') return 1;
+            return b.apy - a.apy;
+          }).map((p, idx) => {
             const isSelected = p.pool === selectedPool?.pool;
             return (
               <div key={idx} style={{ 

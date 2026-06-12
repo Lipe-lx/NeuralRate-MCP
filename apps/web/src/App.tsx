@@ -218,7 +218,7 @@ function AppContent() {
     if (selectedPoolId) {
       return pools.find((pool) => pool.pool === selectedPoolId) ?? null;
     }
-    return pools[0] ?? null;
+    return pools.find((pool) => pool.symbol === 'USDY') ?? pools[0] ?? null;
   }, [pools, selectedPoolId]);
 
   const controlWalletAddress = wallet.embeddedWalletAddress ?? wallet.address;
