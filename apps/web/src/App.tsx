@@ -352,11 +352,10 @@ function AppContent() {
               <span>Vault Automation</span>
             </button>
             <button
-              className="sidebar-nav-item sidebar-agent-access"
+              className="sidebar-nav-item"
               onClick={() => setIsAgentAccessModalOpen(true)}
               title="Connect an AI agent to NeuralRate MCP"
             >
-              <span className="agent-dot agent-dot-active" aria-hidden="true" />
               <span>Agent Access</span>
             </button>
           </nav>

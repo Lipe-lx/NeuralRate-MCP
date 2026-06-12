@@ -588,29 +588,6 @@ h1, h2, h3, h4, h5, h6 {
   filter: drop-shadow(0 0 4px var(--color-lime-glow));
 }
 
-.sidebar-agent-access {
-  margin-top: 0.35rem;
-  color: var(--color-lime);
-  border-color: rgba(223, 246, 81, 0.12);
-  background: rgba(223, 246, 81, 0.035);
-}
-
-.sidebar-agent-access:hover {
-  color: var(--color-lime);
-  border-color: rgba(223, 246, 81, 0.28);
-  background: rgba(223, 246, 81, 0.08);
-  box-shadow: 0 0 18px rgba(223, 246, 81, 0.06);
-}
-
-.sidebar-agent-access .agent-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--color-lime);
-  box-shadow: 0 0 7px var(--color-lime);
-  flex-shrink: 0;
-}
-
 .sidebar-footer {
   margin-top: auto;
   padding-top: 1.5rem;
