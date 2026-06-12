@@ -513,7 +513,7 @@ const VaultPanel: React.FC<Props> = ({
                   Mock USDY Faucet
                 </div>
                 <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)", lineHeight: 1.45, marginTop: "0.18rem" }}>
-                  Mints testnet Mock USDY directly to this vault for Sepolia demo execution.
+                  Mints testnet Mock USDY directly to the agent Safe vault for Sepolia demo execution.
                 </div>
                 <div style={{ fontSize: "0.74rem", color: "var(--text-primary)", marginTop: "0.42rem" }}>
                   {renderCopyValue("mock_usdy_token", MOCK_USDY_TOKEN_ADDRESS, truncate(MOCK_USDY_TOKEN_ADDRESS), {

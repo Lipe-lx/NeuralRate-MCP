@@ -99,6 +99,11 @@ const VaultTelemetryPanel: React.FC<Props> = ({ state }) => {
   const managedValueUsd = parseNumeric(vault?.balance_usd);
   const liveNativeBalance = parseNumeric(state?.runtimeState?.nativeBalanceFormatted);
   const nativeAssetSymbol = state?.runtimeState?.nativeAssetSymbol ?? DEMO_TARGET_ASSET;
+  const tokenBalances = state?.runtimeState?.tokenBalances ?? [];
+  const visibleTokenBalances = tokenBalances.filter((entry) =>
+    entry.hasBalance || parseNumeric(entry.balanceFormatted) > 0
+  );
+  const primaryTokenBalance = visibleTokenBalances[0] ?? null;
   const hasOnchainDeposit = hasDetectedVaultDeposit(state);
   const allowedAssets = activePermission?.allowed_assets?.length
     ? activePermission.allowed_assets
@@ -140,11 +145,15 @@ const VaultTelemetryPanel: React.FC<Props> = ({ state }) => {
   const latestJobs = (state?.automationJobs ?? []).slice(0, 3);
   const managedCapitalValue = managedValueUsd > 0
     ? formatUsd(managedValueUsd)
+    : primaryTokenBalance
+      ? `${formatTokenBalance(parseNumeric(primaryTokenBalance.balanceFormatted))} ${primaryTokenBalance.asset}`
     : hasOnchainDeposit
       ? `${formatTokenBalance(liveNativeBalance)} ${nativeAssetSymbol}`
       : formatUsd(0);
   const managedCapitalNote = managedValueUsd > 0
     ? "Current balance administered inside this dedicated Safe vault."
+    : primaryTokenBalance
+      ? `${primaryTokenBalance.asset} detected inside this dedicated Safe vault.`
     : hasOnchainDeposit
       ? `On-chain ${nativeAssetSymbol} balance detected inside this dedicated Safe vault.`
       : "Current balance administered inside this dedicated Safe vault.";
@@ -152,9 +161,13 @@ const VaultTelemetryPanel: React.FC<Props> = ({ state }) => {
     ? managedValueUsd > 0
       ? `Policy ceiling ${formatUsd(automationBudgetUsd)} • ${Math.round(budgetCoverage)}% currently represented`
       : hasOnchainDeposit
-        ? `Policy ceiling ${formatUsd(automationBudgetUsd)} • on-chain ${nativeAssetSymbol} detected, USD normalization pending`
+        ? `Policy ceiling ${formatUsd(automationBudgetUsd)} • on-chain funds detected, USD normalization pending`
         : `Policy ceiling ${formatUsd(automationBudgetUsd)}`
     : `Policy ceiling ${formatUsd(automationBudgetUsd)}`;
+  const liveBalanceLabel = [
+    liveNativeBalance > 0 ? `${formatTokenBalance(liveNativeBalance)} ${nativeAssetSymbol}` : null,
+    ...visibleTokenBalances.map((entry) => `${formatTokenBalance(parseNumeric(entry.balanceFormatted))} ${entry.asset}`),
+  ].filter(Boolean).join(" · ");
 
   return (
     <section className="glass-panel animate-enter vault-panel">
@@ -233,7 +246,11 @@ const VaultTelemetryPanel: React.FC<Props> = ({ state }) => {
             </div>
             <div className="vault-info-row">
               <span>Live vault balance</span>
-              <strong>{liveNativeBalance > 0 ? `${formatTokenBalance(liveNativeBalance)} ${nativeAssetSymbol}` : hasOnchainDeposit ? "Funds detected" : "Awaiting on-chain funds"}</strong>
+              <strong>{liveBalanceLabel || (hasOnchainDeposit ? "Funds detected" : "Awaiting on-chain funds")}</strong>
+            </div>
+            <div className="vault-info-row">
+              <span>Tracked tokens</span>
+              <strong>{tokenBalances.length ? tokenBalances.map((entry) => entry.asset).join(" · ") : "None configured"}</strong>
             </div>
             <div className="vault-info-row">
               <span>Signed consent</span>

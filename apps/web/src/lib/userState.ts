@@ -181,6 +181,20 @@ export interface AutomationJob {
   created_at: string | null;
 }
 
+export interface RuntimeTokenBalance {
+  asset: string;
+  kind: "native" | "erc20";
+  address: string | null;
+  decimals: number;
+  balanceRaw: string;
+  balanceFormatted: string;
+  hasBalance: boolean;
+  valuationUsd: number | null;
+  valuationSource: string | null;
+  readStatus: "live" | "cached" | "unavailable";
+  asOf: string | null;
+}
+
 export interface AutomationState {
   ownerEoa: string;
   userId: string | null;
@@ -241,6 +255,8 @@ export interface AutomationState {
     nativeBalanceFormatted?: string | null;
     nativeAssetSymbol?: string | null;
     hasNativeBalance?: boolean;
+    tokenBalances?: RuntimeTokenBalance[];
+    hasTokenBalance?: boolean;
     lastCheckedAt?: string | null;
   } | null;
   onchainPolicy?: {
@@ -302,10 +318,19 @@ export const hasRuntimeNativeDeposit = (state: Pick<AutomationState, "runtimeSta
   parsePositiveWei(state?.runtimeState?.nativeBalanceWei) ||
   parsePositiveDecimal(state?.runtimeState?.nativeBalanceFormatted);
 
+export const hasRuntimeTokenDeposit = (state: Pick<AutomationState, "runtimeState"> | null | undefined) =>
+  Boolean(state?.runtimeState?.hasTokenBalance) ||
+  Boolean(state?.runtimeState?.tokenBalances?.some((entry) =>
+    entry.hasBalance ||
+    parsePositiveWei(entry.balanceRaw) ||
+    parsePositiveDecimal(entry.balanceFormatted)
+  ));
+
 export const hasDetectedVaultDeposit = (
   state: Pick<AutomationState, "runtimeState" | "vault"> | null | undefined,
 ) =>
   hasRuntimeNativeDeposit(state) ||
+  hasRuntimeTokenDeposit(state) ||
   state?.vault?.funding_status === "deposit_detected";
 
 const sameVaultAddress = (left: AutomationState | null | undefined, right: AutomationState | null | undefined) => {
@@ -341,6 +366,8 @@ export const mergeLiveFundingTelemetry = (
       nativeBalanceFormatted: incoming.runtimeState?.nativeBalanceFormatted ?? sourceRuntime?.nativeBalanceFormatted ?? null,
       nativeAssetSymbol: incoming.runtimeState?.nativeAssetSymbol ?? sourceRuntime?.nativeAssetSymbol ?? null,
       hasNativeBalance: incoming.runtimeState?.hasNativeBalance ?? sourceRuntime?.hasNativeBalance ?? false,
+      tokenBalances: incoming.runtimeState?.tokenBalances ?? sourceRuntime?.tokenBalances ?? [],
+      hasTokenBalance: incoming.runtimeState?.hasTokenBalance ?? sourceRuntime?.hasTokenBalance ?? false,
       lastCheckedAt: incoming.runtimeState?.lastCheckedAt ?? sourceRuntime?.lastCheckedAt ?? null,
     },
   };

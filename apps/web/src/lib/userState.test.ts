@@ -53,6 +53,24 @@ test("hasDetectedVaultDeposit accepts backend-reconciled token deposits", () => 
     },
     runtimeState: { nativeBalanceWei: "0" },
   }), true);
+  assert.equal(hasDetectedVaultDeposit({
+    ...baseState,
+    runtimeState: {
+      tokenBalances: [{
+        asset: "USDY",
+        kind: "erc20",
+        address: "0x2222222222222222222222222222222222222222",
+        decimals: 18,
+        balanceRaw: "25000000000000000000",
+        balanceFormatted: "25",
+        hasBalance: true,
+        valuationUsd: null,
+        valuationSource: null,
+        readStatus: "live",
+        asOf: "2026-06-12T12:00:00.000Z",
+      }],
+    },
+  }), true);
 });
 
 test("mergeLiveFundingTelemetry preserves same-vault detected deposit across refresh", () => {
@@ -84,6 +102,43 @@ test("mergeLiveFundingTelemetry preserves same-vault detected deposit across ref
   assert.equal(merged.runtimeState?.hasNativeBalance, true);
   assert.equal(merged.runtimeState?.nativeBalanceWei, "420000000000000000");
   assert.equal(merged.runtimeState?.nativeBalanceFormatted, "0.42");
+});
+
+test("mergeLiveFundingTelemetry preserves same-vault token balance telemetry", () => {
+  const current = {
+    ...baseState,
+    runtimeState: {
+      hasTokenBalance: true,
+      tokenBalances: [{
+        asset: "USDY",
+        kind: "erc20",
+        address: "0x2222222222222222222222222222222222222222",
+        decimals: 18,
+        balanceRaw: "25000000000000000000",
+        balanceFormatted: "25",
+        hasBalance: true,
+        valuationUsd: null,
+        valuationSource: null,
+        readStatus: "live",
+        asOf: "2026-06-12T12:00:00.000Z",
+      }],
+      lastCheckedAt: "2026-06-12T12:00:00.000Z",
+    },
+  } satisfies AutomationState;
+  const incoming = {
+    ...baseState,
+    runtimeState: {
+      safeDeployed: true,
+      vaultModuleEnabled: true,
+    },
+  } satisfies AutomationState;
+
+  const merged = mergeLiveFundingTelemetry(incoming, current);
+
+  assert.equal(merged.vault?.funding_status, "deposit_detected");
+  assert.equal(merged.runtimeState?.hasTokenBalance, true);
+  assert.equal(merged.runtimeState?.tokenBalances?.[0]?.asset, "USDY");
+  assert.equal(merged.runtimeState?.tokenBalances?.[0]?.balanceFormatted, "25");
 });
 
 test("mergeLiveFundingTelemetry does not carry funding across different vaults", () => {

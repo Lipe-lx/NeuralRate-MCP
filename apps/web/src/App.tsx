@@ -97,7 +97,7 @@ function AppContent() {
     if (!isCorrectChain) {
       await switchToMantle();
     }
-    const vaultAddress = neuralRateUser.state?.vault?.deposit_address ?? neuralRateUser.state?.vault?.vault_address;
+    const vaultAddress = neuralRateUser.state?.vault?.vault_address ?? neuralRateUser.state?.vault?.deposit_address;
     if (!vaultAddress) {
       throw new Error('Create a vault before minting Mock USDY.');
     }

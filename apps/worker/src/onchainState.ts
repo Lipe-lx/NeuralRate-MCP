@@ -742,6 +742,24 @@ export async function withOnchainPolicyState<T extends Record<string, unknown>>(
       onchainPolicy = null;
       runtimeState = null;
     }
+
+    try {
+      const balances = await readVaultBalances(vaultAddress, env);
+      const nativeBalance = balances.nativeBalance;
+      runtimeState = {
+        ...(runtimeState ?? {}),
+        nativeBalanceWei: nativeBalance.balanceRaw,
+        nativeBalanceFormatted: nativeBalance.balanceFormatted,
+        nativeAssetSymbol: nativeBalance.asset,
+        hasNativeBalance: nativeBalance.hasBalance,
+        tokenBalances: balances.tokenBalances,
+        hasTokenBalance: balances.tokenBalances.some((entry) => entry.hasBalance),
+        balanceSources: balances.sources,
+        lastCheckedAt: new Date().toISOString(),
+      };
+    } catch {
+      // Best-effort balance telemetry should not hide policy/runtime state.
+    }
   }
 
   const draftConfig = (state.config as Record<string, unknown> | null) ?? null;
