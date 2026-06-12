@@ -140,6 +140,13 @@ This reduces anonymous scraping of per-user state while preserving signed owner 
 - scoped MCP catalog access is denied when session scope is invalid/expired
 - execution still requires policy-valid bounds at dispatch time
 
+### Browser-Provided Nansen Keys
+
+- Nansen Radar keeps a user-provided API key only in the current browser tab's React memory
+- the key is never written to local storage, session storage, D1, KV, application logs, or telemetry
+- the browser sends the key only to the Nansen batch proxy over HTTPS; the worker uses it for that request and discards it
+- cached Nansen response data never contains the API key
+
 ### Revoke Semantics
 
 - grant revoke transitions session state off-chain

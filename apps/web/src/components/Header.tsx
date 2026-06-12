@@ -9,9 +9,16 @@ type HeaderProps = {
   activeVaultTab?: VaultHeaderTab;
   onVaultTabChange?: (tab: VaultHeaderTab) => void;
   compact?: boolean;
+  showAgentAccess?: boolean;
 };
 
-const Header: React.FC<HeaderProps> = ({ vaultTabsVisible = false, activeVaultTab, onVaultTabChange, compact = false }) => {
+const Header: React.FC<HeaderProps> = ({
+  vaultTabsVisible = false,
+  activeVaultTab,
+  onVaultTabChange,
+  compact = false,
+  showAgentAccess = true,
+}) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -208,14 +215,16 @@ const Header: React.FC<HeaderProps> = ({ vaultTabsVisible = false, activeVaultTa
         ) : (
           // Workspace actions (original wallet connections)
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <button 
-              onClick={() => setIsModalOpen(true)}
-              className="btn-premium btn-premium-agent"
-              title="Connect AI Agent to MCP"
-            >
-              <span className="agent-dot"></span>
-              <span style={{ fontSize: '0.8rem', fontWeight: 600, letterSpacing: '0.5px' }}>AGENT ACCESS</span>
-            </button>
+            {showAgentAccess && (
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="btn-premium btn-premium-agent"
+                title="Connect AI Agent to MCP"
+              >
+                <span className="agent-dot"></span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 600, letterSpacing: '0.5px' }}>AGENT ACCESS</span>
+              </button>
+            )}
 
             {!isConnected ? (
               <button

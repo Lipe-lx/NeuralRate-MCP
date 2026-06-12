@@ -99,6 +99,24 @@ test("getSmartMoneyFlowsBatch reuses fresh cache and avoids a second upstream ca
   assert.equal(fetchCount, 1);
 });
 
+test("Nansen API key is used only as the upstream authentication header", async () => {
+  const kv = new MemoryKv();
+  const service = new NansenService(kv as unknown as KVNamespace, "browser-private-key");
+
+  await withFetchMock(async (_input, init) => {
+    const headers = new Headers(init?.headers);
+    assert.equal(headers.get("apikey"), "browser-private-key");
+    assert.doesNotMatch(String(init?.body), /browser-private-key/);
+    return new Response(JSON.stringify({ data: [makeToken()] }), { status: 200 });
+  }, async () => {
+    const result = await service.getSmartMoneyFlowsBatch({
+      chain: "mantle",
+      tokenAddresses: [tokenA],
+    });
+    assert.equal(result.status, "success");
+  });
+});
+
 test("getSmartMoneyFlowsBatch fetches only cache misses when part of the batch is already warm", async () => {
   const kv = new MemoryKv();
   const service = new NansenService(kv as unknown as KVNamespace, "test-key");

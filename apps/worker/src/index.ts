@@ -163,6 +163,8 @@ const CORS_ALLOW_HEADERS = [
   "X-NeuralRate-Auth-Signature",
   "X-NeuralRate-Session-Token",
   "x-neuralrate-session-token",
+  "X-NeuralRate-Nansen-Api-Key",
+  "x-neuralrate-nansen-api-key",
   "mcp-session-id",
   "mcp-protocol-version",
 ].join(", ");
@@ -1515,6 +1517,16 @@ export default {
         }
 
         if (url.pathname === "/api/nansen/batch" && request.method === "POST") {
+          const browserApiKey = request.headers.get("x-neuralrate-nansen-api-key")?.trim();
+          if (browserApiKey && (browserApiKey.length < 8 || browserApiKey.length > 512)) {
+            return new Response(JSON.stringify({ error: "Nansen API key format is invalid." }), {
+              status: 400,
+              headers: {
+                ...corsHeaders,
+                "Cache-Control": "no-store",
+              },
+            });
+          }
           const body = await request.json() as {
             chain?: string;
             pools?: Array<{
@@ -1527,8 +1539,15 @@ export default {
             }>;
           };
 
-          const result = await nansen.buildBatchPoolResponse(body.pools || [], body.chain || "mantle");
-          return new Response(JSON.stringify(result), { headers: corsHeaders });
+          // Browser-provided keys are request-scoped and are never persisted.
+          const requestNansen = new NansenService(env.CACHE_KV, browserApiKey || env.NANSEN_API_KEY);
+          const result = await requestNansen.buildBatchPoolResponse(body.pools || [], body.chain || "mantle");
+          return new Response(JSON.stringify(result), {
+            headers: {
+              ...corsHeaders,
+              "Cache-Control": "no-store",
+            },
+          });
         }
 
         if (url.pathname.startsWith("/api/nansen/") && request.method === "GET") {

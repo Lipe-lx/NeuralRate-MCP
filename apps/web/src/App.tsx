@@ -11,6 +11,7 @@ import WalletOwnershipModal from './components/WalletOwnershipModal';
 import OnboardingWizard from './components/OnboardingWizard';
 import VerifyPanel from './components/VerifyPanel';
 import HomePanel from './components/HomePanel';
+import McpConnectModal from './components/McpConnectModal';
 import { useApi } from './hooks/useApi';
 import { WalletProvider } from './context/WalletContext';
 import { useWalletContext } from './context/WalletContext';
@@ -75,6 +76,7 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState<AppTab>(() => (window.location.pathname === '/verify' ? 'verify' : 'terminal'));
   const [activeVaultTab, setActiveVaultTab] = useState<'vault' | 'telemetry' | 'settings' | 'history'>('vault');
   const [isOwnershipModalOpen, setIsOwnershipModalOpen] = useState(false);
+  const [isAgentAccessModalOpen, setIsAgentAccessModalOpen] = useState(false);
   const [isOnboardingWizardOpen, setIsOnboardingWizardOpen] = useState(false);
   const [wizardDismissed, setWizardDismissed] = useState(false);
   const wallet = useWalletContext();
@@ -349,6 +351,14 @@ function AppContent() {
             <button className={`sidebar-nav-item ${activeTab === 'vault' ? 'active' : ''}`} onClick={() => setActiveTab('vault')}>
               <span>Vault Automation</span>
             </button>
+            <button
+              className="sidebar-nav-item sidebar-agent-access"
+              onClick={() => setIsAgentAccessModalOpen(true)}
+              title="Connect an AI agent to NeuralRate MCP"
+            >
+              <span className="agent-dot agent-dot-active" aria-hidden="true" />
+              <span>Agent Access</span>
+            </button>
           </nav>
 
           <div className="sidebar-footer">
@@ -363,6 +373,7 @@ function AppContent() {
           vaultTabsVisible={activeTab === 'vault'}
           activeVaultTab={activeVaultTab}
           onVaultTabChange={setActiveVaultTab}
+          showAgentAccess={false}
         />
 
         <main style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
@@ -485,6 +496,11 @@ function AppContent() {
           runtimeProgressStatus={neuralRateUser.runtimeProgressStatus}
         />
       )}
+
+      <McpConnectModal
+        isOpen={isAgentAccessModalOpen}
+        onClose={() => setIsAgentAccessModalOpen(false)}
+      />
     </div>
   );
 }

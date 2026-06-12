@@ -43,6 +43,10 @@ const NansenRadar: React.FC<Props> = ({ selectedPool, pools }) => {
   const [data, setData] = useState<NansenBatchResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [enabled, setEnabled] = useState(false);
+  const [apiKey, setApiKey] = useState('');
+  const [apiKeyDraft, setApiKeyDraft] = useState('');
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
 
   const poolSignature = pools.map((pool) => pool.pool).join('|');
   const selectedSummary = selectedPool ? data?.poolSummaries?.[selectedPool.pool] ?? null : null;
@@ -75,7 +79,11 @@ const NansenRadar: React.FC<Props> = ({ selectedPool, pools }) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-NeuralRate-Nansen-Api-Key': apiKey,
       },
+      cache: 'no-store',
+      credentials: 'omit',
+      referrerPolicy: 'no-referrer',
       body: JSON.stringify({
         chain: 'mantle',
         pools: pools.map((pool) => ({
@@ -119,7 +127,41 @@ const NansenRadar: React.FC<Props> = ({ selectedPool, pools }) => {
     return () => {
       cancelled = true;
     };
-  }, [enabled, poolSignature, pools]);
+  }, [apiKey, enabled, poolSignature, pools]);
+
+  const requestEnable = () => {
+    if (enabled) {
+      setEnabled(false);
+      setApiKey('');
+      setApiKeyDraft('');
+      setData(null);
+      return;
+    }
+
+    setApiKeyDraft('');
+    setShowApiKey(false);
+    setIsApiKeyModalOpen(true);
+  };
+
+  const closeApiKeyModal = () => {
+    setApiKeyDraft('');
+    setShowApiKey(false);
+    setIsApiKeyModalOpen(false);
+  };
+
+  const enableWithApiKey = (event: React.FormEvent) => {
+    event.preventDefault();
+    const nextApiKey = apiKeyDraft.trim();
+    if (nextApiKey.length < 8 || nextApiKey.length > 512) {
+      return;
+    }
+
+    setApiKey(nextApiKey);
+    setApiKeyDraft('');
+    setShowApiKey(false);
+    setIsApiKeyModalOpen(false);
+    setEnabled(true);
+  };
 
   const isUnavailable = data?.status === 'disabled' || data?.status === 'error';
   const hasSummary = Boolean(selectedSummary && selectedSummary.tokenAddresses.length > 0);
@@ -138,7 +180,9 @@ const NansenRadar: React.FC<Props> = ({ selectedPool, pools }) => {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <button
-            onClick={(event) => { event.stopPropagation(); setEnabled((value) => !value); }}
+            onClick={(event) => { event.stopPropagation(); requestEnable(); }}
+            aria-pressed={enabled}
+            aria-label={enabled ? 'Disable Nansen Radar' : 'Enable Nansen Radar'}
             style={{
               width: '32px', height: '18px', borderRadius: '9px',
               background: enabled ? 'var(--color-lime)' : 'rgba(255,255,255,0.1)',
@@ -183,7 +227,7 @@ const NansenRadar: React.FC<Props> = ({ selectedPool, pools }) => {
             {data?.message || 'Nansen API unavailable'}
           </div>
           <div style={{ fontSize: '0.75rem', opacity: 0.7, marginBottom: '0.75rem' }}>
-            Configure your API key in `.dev.vars` to enable
+            Check your Nansen API key and subscription access, then try again.
           </div>
           <a
             href="https://docs.nansen.ai/api/smart-money/netflows"
@@ -262,6 +306,102 @@ const NansenRadar: React.FC<Props> = ({ selectedPool, pools }) => {
           <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', opacity: 0.8 }}>
             Cache source: {Object.values(selectedSummary.cacheStatus).join(', ')} • Snapshot: {new Date(data?.fetchedAt || Date.now()).toLocaleTimeString()}
           </div>
+        </div>
+      )}
+      {isApiKeyModalOpen && (
+        <div
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              closeApiKeyModal();
+            }
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 12000,
+            display: 'grid',
+            placeItems: 'center',
+            padding: '1rem',
+            background: 'rgba(4, 6, 12, 0.78)',
+            backdropFilter: 'blur(14px)',
+          }}
+        >
+          <form
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="nansen-api-key-title"
+            onSubmit={enableWithApiKey}
+            style={{
+              width: 'min(440px, 100%)',
+              border: '1px solid rgba(223, 246, 81, 0.18)',
+              borderRadius: '16px',
+              padding: '1.1rem',
+              background: 'var(--bg-surface)',
+              boxShadow: '0 24px 80px rgba(0, 0, 0, 0.55)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start' }}>
+              <div>
+                <h3 id="nansen-api-key-title" style={{ margin: 0, fontSize: '1rem' }}>Connect Nansen API</h3>
+                <p style={{ margin: '0.35rem 0 0', color: 'var(--text-secondary)', fontSize: '0.76rem', lineHeight: 1.5 }}>
+                  Your key stays only in this browser tab memory. It is never saved to browser storage, NeuralRate databases, KV, logs, or telemetry.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeApiKeyModal}
+                aria-label="Close Nansen API key dialog"
+                style={{ border: 'none', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '1.1rem' }}
+              >
+                ×
+              </button>
+            </div>
+
+            <label htmlFor="nansen-api-key" style={{ display: 'block', marginTop: '1rem', fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+              Nansen API Key
+            </label>
+            <div style={{ display: 'flex', gap: '0.45rem', marginTop: '0.3rem' }}>
+              <input
+                id="nansen-api-key"
+                aria-label="Nansen API Key"
+                type={showApiKey ? 'text' : 'password'}
+                value={apiKeyDraft}
+                onChange={(event) => setApiKeyDraft(event.target.value)}
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                maxLength={512}
+                required
+                autoFocus
+                style={{ flex: 1, minWidth: 0 }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowApiKey((value) => !value)}
+                className="btn-premium"
+                aria-label={showApiKey ? 'Hide Nansen API key' : 'Show Nansen API key'}
+              >
+                {showApiKey ? 'Hide' : 'Show'}
+              </button>
+            </div>
+
+            <div style={{ marginTop: '0.7rem', fontSize: '0.7rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+              The key is sent over HTTPS only when Nansen data is requested and is discarded after each worker request.
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+              <button type="button" className="btn-premium" onClick={closeApiKeyModal}>Cancel</button>
+              <button
+                type="submit"
+                className="btn-premium btn-premium-wallet"
+                disabled={apiKeyDraft.trim().length < 8}
+              >
+                Enable Radar
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </section>
