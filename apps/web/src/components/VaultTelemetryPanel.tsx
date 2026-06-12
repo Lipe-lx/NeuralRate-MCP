@@ -269,7 +269,7 @@ const VaultTelemetryPanel: React.FC<Props> = ({ state }) => {
             </div>
           </div>
 
-          <div className="vault-info-card vault-info-card-span-2">
+          <div className="vault-info-card vault-info-card-span-2 vault-execution-card">
             <div className="vault-swiss-kicker">Execution Trail</div>
             {latestJobs.length ? (
               <div className="vault-execution-list">

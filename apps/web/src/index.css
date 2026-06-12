@@ -772,6 +772,9 @@ input[type="checkbox"] {
   flex-direction: column;
   gap: 0.85rem;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .vault-telemetry-top {
@@ -934,10 +937,14 @@ input[type="checkbox"] {
 
 .vault-info-grid-wide {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: auto minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
 }
 
 .vault-info-card-span-2 {
   grid-column: span 2;
+  min-height: 0;
 }
 
 .vault-info-card {
@@ -960,10 +967,18 @@ input[type="checkbox"] {
   text-align: right;
 }
 
+.vault-execution-card {
+  overflow: hidden;
+}
+
 .vault-execution-list {
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.25rem;
 }
 
 .vault-execution-row {

@@ -386,7 +386,7 @@ function AppContent() {
 
           {activeTab === 'vault' && (
             <div className="tab-pane animate-enter" style={{ minHeight: 0 }}>
-              <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: '0.25rem' }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: activeVaultTab === 'telemetry' ? 'hidden' : 'auto', paddingRight: '0.25rem' }}>
                 {activeVaultTab === 'vault' && (
                   <div className="centered-page-container" style={{ maxWidth: '1160px', margin: '0.65rem auto 0', height: '100%' }}>
                     <VaultPanel
@@ -412,7 +412,7 @@ function AppContent() {
                   </div>
                 )}
                 {activeVaultTab === 'telemetry' && (
-                  <div className="centered-page-container" style={{ maxWidth: '1240px', margin: '0.65rem auto 0', height: '100%' }}>
+                  <div className="centered-page-container" style={{ maxWidth: '1240px', margin: '0.65rem auto 0', height: '100%', minHeight: 0 }}>
                     <VaultTelemetryPanel state={neuralRateUser.state} />
                   </div>
                 )}

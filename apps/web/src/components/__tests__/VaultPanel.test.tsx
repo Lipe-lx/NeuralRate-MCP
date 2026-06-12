@@ -361,6 +361,7 @@ describe('VaultPanel', () => {
     const { container } = render(<VaultTelemetryPanel state={mockState} />);
 
     expect(screen.getByText('Execution Trail')).toBeInTheDocument();
+    expect(container.querySelector('.vault-execution-card')).toBeInTheDocument();
     expect(container.querySelector('.vault-execution-list')).toBeInTheDocument();
     expect(container.querySelector('.vault-execution-row')).toBeInTheDocument();
     expect(screen.getByText('Transfer Asset')).toBeInTheDocument();
