@@ -3,6 +3,7 @@ import {
   isBenchmarkRequeueBlocked,
   normalizeDecisionBenchmarkStatus,
 } from "./benchmarkStatus";
+import { normalizeAuthorizationTtlHours } from "./grants";
 
 export type AutomationAccountInput = {
   ownerEoa: string;
@@ -71,6 +72,7 @@ export type UserAgentConfigInput = {
   minSpreadOverTbillBps?: number;
   requireManualAboveUsd?: number;
   pauseOnRiskEvent?: boolean;
+  authorizationTtlHours?: number;
   policyVersion?: string;
 };
 
@@ -336,6 +338,7 @@ const defaultAgentConfig = (input: { ownerEoa: string; userId: string; vaultId: 
   minSpreadOverTbillBps: 0,
   requireManualAboveUsd: 2500,
   pauseOnRiskEvent: true,
+  authorizationTtlHours: 12,
   policyVersion: "vault-v1",
 });
 
@@ -607,6 +610,13 @@ export class AutomationStore {
     const identity = await this.resolveIdentity(input.ownerEoa, input.userId, input.vaultId);
     const userId = input.userId ?? identity.userId ?? makeId("user");
     const vaultId = input.vaultId ?? identity.vaultId ?? null;
+    const existing = await this.getAgentConfig(input.ownerEoa);
+    const authorizationTtlHours = normalizeAuthorizationTtlHours(
+      input.authorizationTtlHours ??
+      (typeof existing?.authorization_ttl_hours === "number"
+        ? existing.authorization_ttl_hours
+        : undefined)
+    );
 
     await this.db
       .prepare(`
@@ -615,8 +625,8 @@ export class AutomationStore {
           allowed_assets_json, denied_assets_json, allowed_protocols_json, denied_protocols_json,
           max_protocol_weight_bps, max_asset_weight_bps, max_action_usd, max_daily_usd, max_automation_usd,
           max_slippage_bps, rebalance_cadence_hours, min_apy_bps, min_spread_over_tbill_bps,
-          require_manual_above_usd, pause_on_risk_event, policy_version
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          require_manual_above_usd, pause_on_risk_event, authorization_ttl_hours, policy_version
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(user_id) DO UPDATE SET
           owner_eoa = excluded.owner_eoa,
           vault_id = excluded.vault_id,
@@ -640,6 +650,7 @@ export class AutomationStore {
           min_spread_over_tbill_bps = excluded.min_spread_over_tbill_bps,
           require_manual_above_usd = excluded.require_manual_above_usd,
           pause_on_risk_event = excluded.pause_on_risk_event,
+          authorization_ttl_hours = excluded.authorization_ttl_hours,
           policy_version = excluded.policy_version,
           updated_at = datetime('now')
       `)
@@ -647,27 +658,32 @@ export class AutomationStore {
         userId,
         input.ownerEoa.toLowerCase(),
         vaultId,
-        input.objective ?? "income",
-        input.riskProfile ?? "medium",
-        input.horizonHours ?? 24,
-        input.automationMode ?? "auto-within-limits",
-        input.restrictionPreset ?? "blue-chip-defi",
-        JSON.stringify(input.allowedAssets ?? []),
-        JSON.stringify(input.deniedAssets ?? []),
-        JSON.stringify(input.allowedProtocols ?? []),
-        JSON.stringify(input.deniedProtocols ?? []),
-        input.maxProtocolWeightBps ?? 5000,
-        input.maxAssetWeightBps ?? 5000,
-        input.maxActionUsd ?? 1000,
-        input.maxDailyUsd ?? 2500,
-        input.maxAutomationUsd ?? 10000,
-        input.maxSlippageBps ?? 50,
-        input.rebalanceCadenceHours ?? 24,
-        input.minApyBps ?? 0,
-        input.minSpreadOverTbillBps ?? 0,
-        input.requireManualAboveUsd ?? 2500,
-        input.pauseOnRiskEvent === false ? 0 : 1,
-        input.policyVersion ?? "vault-v1"
+        input.objective ?? existing?.objective ?? "income",
+        input.riskProfile ?? existing?.risk_profile ?? "medium",
+        input.horizonHours ?? existing?.horizon_hours ?? 24,
+        input.automationMode ?? existing?.automation_mode ?? "auto-within-limits",
+        input.restrictionPreset ?? existing?.restriction_preset ?? "blue-chip-defi",
+        JSON.stringify(input.allowedAssets ?? existing?.allowed_assets ?? []),
+        JSON.stringify(input.deniedAssets ?? existing?.denied_assets ?? []),
+        JSON.stringify(input.allowedProtocols ?? existing?.allowed_protocols ?? []),
+        JSON.stringify(input.deniedProtocols ?? existing?.denied_protocols ?? []),
+        input.maxProtocolWeightBps ?? existing?.max_protocol_weight_bps ?? 5000,
+        input.maxAssetWeightBps ?? existing?.max_asset_weight_bps ?? 5000,
+        input.maxActionUsd ?? existing?.max_action_usd ?? 1000,
+        input.maxDailyUsd ?? existing?.max_daily_usd ?? 2500,
+        input.maxAutomationUsd ?? existing?.max_automation_usd ?? 10000,
+        input.maxSlippageBps ?? existing?.max_slippage_bps ?? 50,
+        input.rebalanceCadenceHours ?? existing?.rebalance_cadence_hours ?? 24,
+        input.minApyBps ?? existing?.min_apy_bps ?? 0,
+        input.minSpreadOverTbillBps ?? existing?.min_spread_over_tbill_bps ?? 0,
+        input.requireManualAboveUsd ?? existing?.require_manual_above_usd ?? 2500,
+        input.pauseOnRiskEvent === undefined
+          ? existing?.pause_on_risk_event ?? 1
+          : input.pauseOnRiskEvent
+            ? 1
+            : 0,
+        authorizationTtlHours,
+        input.policyVersion ?? existing?.policy_version ?? "vault-v1"
       )
       .run();
 

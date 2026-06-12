@@ -974,7 +974,27 @@ export const useNeuralRateUser = ({
       } else if (isRuntimeInstallVerified(refreshed) && refreshed?.runtimeState?.delegateGasReady === false && !paymasterReady) {
         setNotice("Runtime setup verified on-chain. Fund the delegate signer with MNT before asking the agent to execute or create receipts.");
       } else {
-        setNotice("Runtime setup is still pending on-chain. Review the checklist and retry after the wallet confirmations settle.");
+        const diagnostics = refreshed?._readyDiagnostics;
+        const authorizationPending = Boolean(
+          diagnostics &&
+          diagnostics.safeDeployed &&
+          diagnostics.vaultModuleEnabled &&
+          diagnostics.safe7579Enabled &&
+          diagnostics.fallbackHandlerReady &&
+          diagnostics.moduleGuardReady &&
+          diagnostics.delegateReady &&
+          (
+            !diagnostics.policyActiveNow ||
+            !diagnostics.policySyncInSync ||
+            !diagnostics.grantActiveScopedExecution ||
+            !diagnostics.mcpSessionActiveScopedExecution
+          )
+        );
+        setNotice(
+          authorizationPending
+            ? "Safe runtime is verified on-chain, but the time-limited policy or MCP authorization still needs renewal."
+            : "Runtime setup is still pending on-chain. Review the checklist and retry after the wallet confirmations settle."
+        );
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to complete the runtime setup.";

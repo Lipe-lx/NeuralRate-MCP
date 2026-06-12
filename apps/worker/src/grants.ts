@@ -1,6 +1,80 @@
 import { recoverMessageAddress } from "viem";
 
-const DEFAULT_GRANT_TTL_MS = 12 * 60 * 60 * 1000;
+export const DEFAULT_AUTHORIZATION_TTL_HOURS = 12;
+export const MIN_AUTHORIZATION_TTL_HOURS = 1;
+export const AUTHORIZATION_HOURS_PER_DAY = 24;
+export const AUTHORIZATION_DAYS_PER_MONTH = 30;
+export const MAX_AUTHORIZATION_TTL_HOURS =
+  12 * AUTHORIZATION_DAYS_PER_MONTH * AUTHORIZATION_HOURS_PER_DAY;
+const HOUR_MS = 60 * 60 * 1000;
+const DEFAULT_GRANT_TTL_MS = DEFAULT_AUTHORIZATION_TTL_HOURS * HOUR_MS;
+
+export type AuthorizationDuration = {
+  months?: number;
+  days?: number;
+  hours?: number;
+};
+
+export const authorizationDurationToHours = (duration: AuthorizationDuration) => {
+  const months = duration.months ?? 0;
+  const days = duration.days ?? 0;
+  const hours = duration.hours ?? 0;
+  if (
+    !Number.isInteger(months) ||
+    !Number.isInteger(days) ||
+    !Number.isInteger(hours) ||
+    months < 0 ||
+    days < 0 ||
+    hours < 0
+  ) {
+    throw new Error("Authorization months, days, and hours must be non-negative integers.");
+  }
+  return normalizeAuthorizationTtlHours(
+    months * AUTHORIZATION_DAYS_PER_MONTH * AUTHORIZATION_HOURS_PER_DAY +
+      days * AUTHORIZATION_HOURS_PER_DAY +
+      hours
+  );
+};
+
+export const normalizeAuthorizationTtlHours = (value: number | null | undefined) => {
+  const ttlHours = value ?? DEFAULT_AUTHORIZATION_TTL_HOURS;
+  if (
+    !Number.isInteger(ttlHours) ||
+    ttlHours < MIN_AUTHORIZATION_TTL_HOURS ||
+    ttlHours > MAX_AUTHORIZATION_TTL_HOURS
+  ) {
+    throw new Error(
+      `Authorization duration must be an integer between ${MIN_AUTHORIZATION_TTL_HOURS} and ${MAX_AUTHORIZATION_TTL_HOURS} hours.`
+    );
+  }
+  return ttlHours;
+};
+
+export const buildAuthorizationExpiresAt = (issuedAt: string, ttlHours: number) => {
+  const issuedAtMs = Date.parse(issuedAt);
+  if (!Number.isFinite(issuedAtMs)) {
+    throw new Error("Authorization issuedAt is invalid.");
+  }
+  return new Date(issuedAtMs + normalizeAuthorizationTtlHours(ttlHours) * HOUR_MS).toISOString();
+};
+
+export const validateAuthorizationWindow = (issuedAt: string, expiresAt: string) => {
+  const issuedAtMs = Date.parse(issuedAt);
+  const expiresAtMs = Date.parse(expiresAt);
+  if (!Number.isFinite(issuedAtMs) || !Number.isFinite(expiresAtMs)) {
+    throw new Error("Authorization timestamps are invalid.");
+  }
+  const durationHours = (expiresAtMs - issuedAtMs) / HOUR_MS;
+  if (
+    durationHours < MIN_AUTHORIZATION_TTL_HOURS ||
+    durationHours > MAX_AUTHORIZATION_TTL_HOURS
+  ) {
+    throw new Error(
+      `Authorization duration must be between ${MIN_AUTHORIZATION_TTL_HOURS} and ${MAX_AUTHORIZATION_TTL_HOURS} hours.`
+    );
+  }
+  return expiresAt;
+};
 
 export const AUTOMATION_GRANT_DOMAIN_VALUES = [
   "state",

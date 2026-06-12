@@ -28,6 +28,7 @@ const baseConfig: AgentConfig = {
   min_spread_over_tbill_bps: 0,
   require_manual_above_usd: 2500,
   pause_on_risk_event: 1,
+  authorization_ttl_hours: 12,
   policy_version: 'vault-v1',
 };
 
@@ -60,6 +61,35 @@ describe('AgentSettingsPanel policy limits', () => {
       maxActionUsd: 750,
       maxDailyUsd: 2200,
     }));
+  });
+
+  it('saves the authorization duration with the policy settings', async () => {
+    const { onSave } = renderPanel();
+
+    expect(screen.getByLabelText('Authorization Days')).toHaveValue(0);
+    expect(screen.getByLabelText('Authorization Hours')).toHaveValue(12);
+    fireEvent.change(screen.getByLabelText('Authorization Days'), { target: { value: '1' } });
+    fireEvent.click(screen.getByText('Save Agent Settings'));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      authorizationTtlHours: 36,
+    }));
+  });
+
+  it('displays authorization durations above 24 hours as days and hours', () => {
+    render(
+      <AgentSettingsPanel
+        config={{ ...baseConfig, authorization_ttl_hours: 36 }}
+        busy={false}
+        onSave={vi.fn()}
+        onPublishPolicy={vi.fn()}
+      />
+    );
+
+    expect(screen.getByLabelText('Authorization Months')).toHaveValue(0);
+    expect(screen.getByLabelText('Authorization Days')).toHaveValue(1);
+    expect(screen.getByLabelText('Authorization Hours')).toHaveValue(12);
   });
 
   it('shows Publish Policy when policy sync status needs owner publish', () => {
@@ -109,6 +139,17 @@ describe('AgentSettingsPanel policy limits', () => {
     fireEvent.click(screen.getByText('Save Agent Settings'));
 
     expect(await screen.findByText('Per Action must be less than or equal to Daily Limit.')).toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('blocks authorization durations outside the supported range', async () => {
+    const { onSave } = renderPanel();
+
+    fireEvent.change(screen.getByLabelText('Authorization Months'), { target: { value: '12' } });
+    fireEvent.change(screen.getByLabelText('Authorization Hours'), { target: { value: '1' } });
+    fireEvent.click(screen.getByText('Save Agent Settings'));
+
+    expect(await screen.findByText('Authorization duration must be between 1 hour and 12 months.')).toBeInTheDocument();
     expect(onSave).not.toHaveBeenCalled();
   });
 });

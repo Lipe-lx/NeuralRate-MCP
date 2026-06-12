@@ -162,7 +162,7 @@ const isActiveScopedDomain = (record: Record<string, unknown> | null, requiredDo
   Array.isArray(record?.allowed_domains) &&
   (record.allowed_domains as unknown[]).map((value) => String(value)).includes(requiredDomain);
 
-const isPolicyActiveNow = (policy: Record<string, unknown> | null, nowMs: number) => {
+export const isPolicyActiveNow = (policy: Record<string, unknown> | null, nowMs: number) => {
   if (!policy) {
     return false;
   }
@@ -176,6 +176,17 @@ const isPolicyActiveNow = (policy: Record<string, unknown> | null, nowMs: number
     return false;
   }
   return true;
+};
+
+export const derivePolicySyncStatus = (
+  fieldsInSync: boolean,
+  activeOnchainPolicy: Record<string, unknown> | null,
+  nowMs = Date.now(),
+): "in_sync" | "drifted" | "pending_publish" => {
+  if (!fieldsInSync) {
+    return "drifted";
+  }
+  return isPolicyActiveNow(activeOnchainPolicy, nowMs) ? "in_sync" : "pending_publish";
 };
 
 const isPaymasterConfigured = (env: RuntimeEnv) =>
@@ -771,6 +782,7 @@ export async function withOnchainPolicyState<T extends Record<string, unknown>>(
     maxSlippageBps: asNumber(draftConfig.max_slippage_bps),
     allowedAssets: normalizeTextList(draftConfig.allowed_assets),
     allowedProtocols: normalizeTextList(draftConfig.allowed_protocols),
+    authorizationTtlHours: asNumber(draftConfig.authorization_ttl_hours) || 12,
     requireSnapshot: true,
   } : null;
 
@@ -789,11 +801,17 @@ export async function withOnchainPolicyState<T extends Record<string, unknown>>(
       { key: "requireSnapshot", onchain: Boolean(activeOnchainPolicy.requireSnapshot), draft: draftPolicy.requireSnapshot, match: Boolean(activeOnchainPolicy.requireSnapshot) === draftPolicy.requireSnapshot },
       { key: "allowedAssets", onchain: normalizeTextList(activeOnchainPolicy.allowedAssets), draft: draftPolicy.allowedAssets, match: sameStringSet(normalizeTextList(activeOnchainPolicy.allowedAssets), draftPolicy.allowedAssets) },
       { key: "allowedProtocols", onchain: normalizeTextList(activeOnchainPolicy.allowedProtocols), draft: draftPolicy.allowedProtocols, match: sameStringSet(normalizeTextList(activeOnchainPolicy.allowedProtocols), draftPolicy.allowedProtocols) },
+      {
+        key: "authorizationTtlHours",
+        onchain: Math.max(0, asNumber(activeOnchainPolicy.validUntil) - asNumber(activeOnchainPolicy.validAfter)) / 3600,
+        draft: draftPolicy.authorizationTtlHours,
+        match: asNumber(activeOnchainPolicy.validUntil) - asNumber(activeOnchainPolicy.validAfter) === draftPolicy.authorizationTtlHours * 3600,
+      },
     ];
 
-    const inSync = fieldChecks.every((check) => check.match);
-    policySyncStatus = inSync ? "in_sync" : "drifted";
-    if (!inSync) {
+    const fieldsInSync = fieldChecks.every((check) => check.match);
+    policySyncStatus = derivePolicySyncStatus(fieldsInSync, activeOnchainPolicy);
+    if (!fieldsInSync) {
       _policyDriftDetails = {};
       for (const check of fieldChecks) {
         if (!check.match) {

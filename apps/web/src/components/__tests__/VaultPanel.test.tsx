@@ -114,6 +114,76 @@ describe('VaultPanel', () => {
     expect(screen.queryByRole('button', { name: /Queue .* Demo/i })).not.toBeInTheDocument();
   });
 
+  it('labels a fully installed runtime with expired policy as authorization renewal', () => {
+    const mockState: AutomationState = {
+      ownerEoa: '0x123',
+      userId: 'user-1',
+      profile: null,
+      config: null,
+      vault: {
+        vault_id: 'vault-123',
+        user_id: 'user-1',
+        owner_eoa: '0x123',
+        vault_address: '0xVaultAddress',
+        vault_kind: 'default',
+        vault_provider: 'safe',
+        agent_scope_wallet: '0xAgentWallet',
+        chain_id: 5000,
+        status: 'active',
+        funding_status: 'funded',
+        automation_status: 'enabled',
+        balance_usd: '1000',
+        deposit_address: '0xDepositAddress',
+        last_funding_intent: null,
+        ownership_acknowledged_at: '2026-06-09T00:00:00Z',
+      },
+      permissions: [],
+      activePermission: null,
+      sessions: [],
+      activeSession: null,
+      grants: [],
+      activeGrant: {
+        grant_id: 'grant-1',
+        owner_eoa: '0x123',
+        user_id: 'user-1',
+        vault_id: 'vault-123',
+        vault_address: '0xVaultAddress',
+        agent_subject: 'erc8004:1',
+        policy_version: 'vault-v1',
+        allowed_domains: ['state', 'execution'],
+        nonce: 'nonce',
+        signature: '0xsig',
+        grant_message: 'grant',
+        issued_via: 'web',
+        status: 'active',
+        issued_at: '2026-06-12T00:00:00Z',
+        expires_at: '2026-06-13T00:00:00Z',
+        revoked_at: null,
+        session_id: 'session-1',
+      },
+      mcpSessions: [],
+      activeMcpSession: null,
+      automationJobs: [],
+      benchmarkJobs: [],
+      automationReady: false,
+      policySyncStatus: 'pending_publish',
+      runtimeState: {
+        safeDeployed: true,
+        vaultModuleEnabled: true,
+        safe7579Enabled: true,
+        delegateReady: true,
+        fallbackHandlerReady: true,
+        moduleGuardReady: true,
+      },
+    };
+
+    render(<VaultPanel {...defaultProps} state={mockState} />);
+
+    expect(screen.getByText('Authorization Renewal Pending')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Renew Authorization' }).length).toBeGreaterThan(0);
+    expect(screen.queryByText('Runtime Setup Pending')).not.toBeInTheDocument();
+  });
+
   it('renders simplified MCP Access view and toggles advanced details', async () => {
     const mockMcpAccessBundle = {
       recommendedTransport: {

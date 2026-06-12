@@ -2,10 +2,14 @@ import { buildBenchmarkPolicy, buildExecutionPolicy } from "./policy";
 import { AutomationStore, type UserAgentConfigInput } from "./automation";
 import { benchmarkRequeueBlockedMessage, isBenchmarkRequeueBlocked } from "./benchmarkStatus";
 import {
+  authorizationDurationToHours,
+  buildAuthorizationExpiresAt,
   buildAutomationGrantDraft,
   createSessionToken,
+  normalizeAuthorizationTtlHours,
   hashSessionToken,
   type AutomationGrantDomain,
+  validateAuthorizationWindow,
   verifyAutomationGrantSignature,
 } from "./grants";
 import { withOnchainPolicyState } from "./onchainState";
@@ -334,6 +338,14 @@ export async function createAutomationGrantChallenge(
 ) {
   const state = await store.getAutomationState(args.ownerEoa);
   assertVaultReadyForGrant(state);
+  const issuedAt = args.issuedAt ?? new Date().toISOString();
+  const ttlHours = normalizeAuthorizationTtlHours(
+    Number(state.config!.authorization_ttl_hours ?? 12)
+  );
+  const configuredExpiresAt = buildAuthorizationExpiresAt(issuedAt, ttlHours);
+  const expiresAt = args.expiresAt
+    ? validateAuthorizationWindow(issuedAt, args.expiresAt)
+    : configuredExpiresAt;
 
   return buildAutomationGrantDraft({
     ownerEoa: state.ownerEoa,
@@ -343,8 +355,8 @@ export async function createAutomationGrantChallenge(
     agentSubject: args.agentSubject,
     policyVersion: args.policyVersion ?? String(state.config!.policy_version ?? "vault-v1"),
     allowedDomains: normalizeDomainList(args.allowedDomains),
-    expiresAt: args.expiresAt,
-    issuedAt: args.issuedAt,
+    expiresAt,
+    issuedAt,
     nonce: args.nonce,
   });
 }
@@ -764,6 +776,18 @@ export async function updateAgentPolicyFromScopedAccess(
   access: ScopedAutomationAccess,
   patch: Record<string, unknown>
 ) {
+  if (patch.authorizationDuration !== undefined && patch.authorizationTtlHours !== undefined) {
+    throw new Error("Provide authorizationDuration or authorizationTtlHours, not both.");
+  }
+  const authorizationDuration =
+    patch.authorizationDuration && typeof patch.authorizationDuration === "object"
+      ? authorizationDurationToHours(patch.authorizationDuration as {
+          months?: number;
+          days?: number;
+          hours?: number;
+        })
+      : undefined;
+
   return store.upsertAgentConfig({
     ownerEoa: access.ownerEoa,
     userId: access.userId,
@@ -788,6 +812,9 @@ export async function updateAgentPolicyFromScopedAccess(
     minSpreadOverTbillBps: typeof patch.minSpreadOverTbillBps === "number" ? patch.minSpreadOverTbillBps : undefined,
     requireManualAboveUsd: typeof patch.requireManualAboveUsd === "number" ? patch.requireManualAboveUsd : undefined,
     pauseOnRiskEvent: typeof patch.pauseOnRiskEvent === "boolean" ? patch.pauseOnRiskEvent : undefined,
+    authorizationTtlHours: typeof patch.authorizationTtlHours === "number"
+      ? normalizeAuthorizationTtlHours(patch.authorizationTtlHours)
+      : authorizationDuration,
     policyVersion: typeof patch.policyVersion === "string" ? patch.policyVersion : access.policyVersion,
   });
 }
@@ -810,7 +837,10 @@ export async function preparePolicyPublish(
   }
 
   const now = Math.floor(Date.now() / 1000);
-  const validUntil = now + 12 * 60 * 60;
+  const authorizationTtlHours = normalizeAuthorizationTtlHours(
+    Number(state.config?.authorization_ttl_hours ?? 12)
+  );
+  const validUntil = now + authorizationTtlHours * 60 * 60;
   const expectedPolicy = buildExpectedPublishedPolicy(access, env, state, now, validUntil);
 
   const data = encodeFunctionData({

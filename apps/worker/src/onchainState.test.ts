@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { deriveAutomationReady, readVaultBalances, resetVaultBalanceCacheForTests } from "./onchainState";
+import {
+  deriveAutomationReady,
+  derivePolicySyncStatus,
+  isPolicyActiveNow,
+  readVaultBalances,
+  resetVaultBalanceCacheForTests,
+} from "./onchainState";
 
 const vaultAddress = "0x1111111111111111111111111111111111111111";
 
@@ -180,6 +186,52 @@ test("deriveAutomationReady requires active execution scope, synced policy, and 
     ).ready,
     false,
   );
+});
+
+test("isPolicyActiveNow rejects expired and not-yet-active policies", () => {
+  const nowMs = Date.parse("2026-06-12T12:00:00.000Z");
+
+  assert.equal(
+    isPolicyActiveNow(
+      {
+        validAfter: Math.floor(Date.parse("2026-06-11T00:00:00.000Z") / 1000),
+        validUntil: Math.floor(Date.parse("2026-06-12T11:59:59.000Z") / 1000),
+      },
+      nowMs,
+    ),
+    false,
+  );
+  assert.equal(
+    isPolicyActiveNow(
+      {
+        validAfter: Math.floor(Date.parse("2026-06-12T12:00:01.000Z") / 1000),
+        validUntil: Math.floor(Date.parse("2026-06-13T00:00:00.000Z") / 1000),
+      },
+      nowMs,
+    ),
+    false,
+  );
+  assert.equal(
+    isPolicyActiveNow(
+      {
+        validAfter: Math.floor(Date.parse("2026-06-12T11:00:00.000Z") / 1000),
+        validUntil: Math.floor(Date.parse("2026-06-12T13:00:00.000Z") / 1000),
+      },
+      nowMs,
+    ),
+    true,
+  );
+});
+
+test("derivePolicySyncStatus republishes an expired policy even when policy fields still match", () => {
+  const nowMs = Date.parse("2026-06-12T12:00:00.000Z");
+  const expiredPolicy = {
+    validAfter: Math.floor(Date.parse("2026-06-11T00:00:00.000Z") / 1000),
+    validUntil: Math.floor(Date.parse("2026-06-12T11:59:59.000Z") / 1000),
+  };
+
+  assert.equal(derivePolicySyncStatus(true, expiredPolicy, nowMs), "pending_publish");
+  assert.equal(derivePolicySyncStatus(false, expiredPolicy, nowMs), "drifted");
 });
 
 test("readOnchain-style storage slot decoding keeps Safe fallback and module guard addresses", async () => {

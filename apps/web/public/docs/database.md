@@ -128,6 +128,7 @@ Key columns:
   - `min_spread_over_tbill_bps`
   - `require_manual_above_usd`
   - `pause_on_risk_event`
+  - `authorization_ttl_hours` (1-8640 hours; defaults to 12; UI/MCP may express it as hours, days, and 30-day months)
 - versioning
   - `policy_version`
 

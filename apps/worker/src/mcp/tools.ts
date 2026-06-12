@@ -146,6 +146,15 @@ export const updateAgentPolicySchema = {
   minSpreadOverTbillBps: z.number().optional(),
   requireManualAboveUsd: z.number().optional(),
   pauseOnRiskEvent: z.boolean().optional(),
+  authorizationDuration: z.object({
+    months: z.number().int().min(0).max(12).optional(),
+    days: z.number().int().min(0).optional(),
+    hours: z.number().int().min(0).optional(),
+  }).optional().describe(
+    "Duration for grants, scoped MCP sessions, and policy validity. Months are fixed at 30 days; total duration must be between 1 hour and 12 months."
+  ),
+  authorizationTtlHours: z.number().int().min(1).max(8640).optional()
+    .describe("Backward-compatible duration in hours. Do not combine with authorizationDuration"),
   policyVersion: z.string().optional(),
 };
 
@@ -330,7 +339,7 @@ export const prepareAutomationGrantSchema = {
   agentSubject: z.string().describe("Stable subject for the agent session, e.g. erc8004:49"),
   allowedDomains: z.array(z.enum(["state", "config", "benchmark", "execution"])).optional(),
   policyVersion: z.string().optional(),
-  expiresAt: z.string().optional(),
+  expiresAt: z.string().optional().describe("Optional one-time expiry override; must remain within 1-8640 hours of issuedAt"),
 };
 
 export const submitAutomationGrantSchema = {
@@ -338,7 +347,7 @@ export const submitAutomationGrantSchema = {
   allowedDomains: z.array(z.enum(["state", "config", "benchmark", "execution"])).optional(),
   policyVersion: z.string().optional(),
   issuedAt: z.string().optional(),
-  expiresAt: z.string().optional(),
+  expiresAt: z.string().optional().describe("Expiry returned by prepare_automation_grant"),
   nonce: z.string().optional(),
   signature: z.string().describe("Owner signature over the canonical grant message"),
   issuedVia: z.string().optional(),

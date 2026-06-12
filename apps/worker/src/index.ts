@@ -1650,6 +1650,7 @@ export default {
             minSpreadOverTbillBps: typeof body.minSpreadOverTbillBps === "number" ? body.minSpreadOverTbillBps : undefined,
             requireManualAboveUsd: typeof body.requireManualAboveUsd === "number" ? body.requireManualAboveUsd : undefined,
             pauseOnRiskEvent: typeof body.pauseOnRiskEvent === "boolean" ? body.pauseOnRiskEvent : undefined,
+            authorizationTtlHours: typeof body.authorizationTtlHours === "number" ? body.authorizationTtlHours : undefined,
             policyVersion: typeof body.policyVersion === "string" ? body.policyVersion : undefined,
           });
 

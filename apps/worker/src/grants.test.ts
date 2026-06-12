@@ -1,7 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { privateKeyToAccount } from "viem/accounts";
-import { buildAutomationGrantDraft, verifyAutomationGrantSignature } from "./grants";
+import {
+  authorizationDurationToHours,
+  buildAuthorizationExpiresAt,
+  buildAutomationGrantDraft,
+  normalizeAuthorizationTtlHours,
+  validateAuthorizationWindow,
+  verifyAutomationGrantSignature,
+} from "./grants";
 
 const futureWindow = () => {
   const issuedAt = new Date(Date.now() - 60_000).toISOString();
@@ -115,5 +122,24 @@ test("automation grant rejects expired payloads", async () => {
         signature,
       }),
     /already expired/
+  );
+});
+
+test("authorization duration is bounded and produces a deterministic expiry", () => {
+  const issuedAt = "2026-06-12T12:00:00.000Z";
+
+  assert.equal(normalizeAuthorizationTtlHours(undefined), 12);
+  assert.equal(normalizeAuthorizationTtlHours(72), 72);
+  assert.equal(authorizationDurationToHours({ days: 1, hours: 12 }), 36);
+  assert.equal(authorizationDurationToHours({ months: 1 }), 720);
+  assert.equal(buildAuthorizationExpiresAt(issuedAt, 72), "2026-06-15T12:00:00.000Z");
+  assert.equal(
+    validateAuthorizationWindow(issuedAt, "2026-06-19T12:00:00.000Z"),
+    "2026-06-19T12:00:00.000Z",
+  );
+  assert.throws(() => normalizeAuthorizationTtlHours(0), /between 1 and 8640 hours/);
+  assert.throws(
+    () => authorizationDurationToHours({ months: 12, hours: 1 }),
+    /between 1 and 8640 hours/,
   );
 });

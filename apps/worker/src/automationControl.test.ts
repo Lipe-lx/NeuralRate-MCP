@@ -2,11 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildPolicyPublishNextAction,
+  createAutomationGrantChallenge,
   isVaultRuntimeInstallReady,
   preparePolicyPublish,
   queueBenchmarkThroughExecutor,
   prepareVaultRuntimeEnable,
   submitPolicyPublish,
+  updateAgentPolicyFromScopedAccess,
 } from "./automationControl";
 
 const requirements = {
@@ -150,6 +152,7 @@ test("policy publish preparation includes changed per-action and daily limits", 
         max_daily_usd: 2200,
         max_automation_usd: 9000,
         max_slippage_bps: 45,
+        authorization_ttl_hours: 72,
         allowed_assets: ["USDC"],
         allowed_protocols: ["AAVE-V3"],
       },
@@ -171,7 +174,65 @@ test("policy publish preparation includes changed per-action and daily limits", 
   assert.equal(result.expectedPolicy.maxPerUse, 750);
   assert.equal(result.expectedPolicy.maxDaily, 2200);
   assert.equal(result.expectedPolicy.maxTotal, 9000);
+  assert.equal(result.expectedPolicy.validUntil - result.expectedPolicy.validAfter, 72 * 60 * 60);
   assert.equal(result.txRequest.to, "0x4444444444444444444444444444444444444444");
+});
+
+test("automation grant challenge uses the configured authorization duration", async () => {
+  const issuedAt = "2026-06-12T12:00:00.000Z";
+  const store = {
+    getAutomationState: async () => ({
+      ownerEoa: "0x1111111111111111111111111111111111111111",
+      userId: "user_1",
+      vault: {
+        vault_id: "vault_1",
+        vault_address: "0x2222222222222222222222222222222222222222",
+      },
+      config: {
+        policy_version: "vault-v1",
+        authorization_ttl_hours: 72,
+      },
+    }),
+  } as any;
+
+  const challenge = await createAutomationGrantChallenge(store, {
+    ownerEoa: "0x1111111111111111111111111111111111111111",
+    agentSubject: "erc8004:49",
+    issuedAt,
+  });
+
+  assert.equal(challenge.issuedAt, issuedAt);
+  assert.equal(challenge.expiresAt, "2026-06-15T12:00:00.000Z");
+});
+
+test("scoped MCP policy updates accept a composite authorization duration", async () => {
+  let saved: Record<string, unknown> | undefined;
+  const store = {
+    upsertAgentConfig: async (input: Record<string, unknown>) => {
+      saved = input;
+      return input;
+    },
+  } as any;
+
+  await updateAgentPolicyFromScopedAccess(
+    store,
+    {
+      ownerEoa: "0x1111111111111111111111111111111111111111",
+      userId: "user_1",
+      vaultId: "vault_1",
+      vaultAddress: "0x2222222222222222222222222222222222222222",
+      agentSubject: "agent",
+      policyVersion: "vault-v1",
+      sessionId: "session_1",
+      grantId: "grant_1",
+      allowedDomains: ["config"],
+      grantExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+      authMode: "session",
+    },
+    { authorizationDuration: { days: 1, hours: 12 } }
+  );
+
+  assert.equal(saved?.authorizationTtlHours, 36);
 });
 
 test("policy publish submission requires the prepared expected policy", async () => {

@@ -174,6 +174,8 @@ const VaultPanel: React.FC<Props> = ({
   ].filter((item): item is { key: string; label: string; done: boolean } => Boolean(item));
   const completedRuntimeSteps = runtimeChecklist.filter((item) => item.done).length;
   const runtimeStepCount = runtimeChecklist.length;
+  const runtimeInstallComplete = runtimeStepCount > 0 && completedRuntimeSteps === runtimeStepCount;
+  const authorizationRenewalPending = runtimePending && runtimeInstallComplete;
   const aaRuntimeStatus = state?.automationReady
     ? "Ready"
     : hasAutomation
@@ -695,13 +697,17 @@ const VaultPanel: React.FC<Props> = ({
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
                 <div>
-                  <div style={{ fontSize: "0.82rem", color: "var(--text-primary)", fontWeight: 700 }}>Runtime Setup Pending</div>
+                  <div style={{ fontSize: "0.82rem", color: "var(--text-primary)", fontWeight: 700 }}>
+                    {authorizationRenewalPending ? "Authorization Renewal Pending" : "Runtime Setup Pending"}
+                  </div>
                   <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)", marginTop: "0.18rem", lineHeight: 1.45 }}>
-                    The grant is active, but the vault still cannot execute. Finish these on-chain Safe actions to make the agent operational.
+                    {authorizationRenewalPending
+                      ? "The Safe runtime is installed. Renew the time-limited on-chain policy or MCP authorization to restore execution."
+                      : "The grant is active, but the vault still cannot execute. Finish these on-chain Safe actions to make the agent operational."}
                   </div>
                 </div>
                 <ActionButton
-                  label={busy ? "Finishing..." : "Finish Runtime Setup"}
+                  label={busy ? "Finishing..." : authorizationRenewalPending ? "Renew Authorization" : "Finish Runtime Setup"}
                   tone="primary"
                   onClick={onCompleteRuntimeSetup}
                   disabled={busy}
@@ -834,7 +840,7 @@ const VaultPanel: React.FC<Props> = ({
                 ) : runtimePending ? (
                   <>
                     <ActionButton
-                      label={busy ? "Finishing..." : "Finish Runtime Setup"}
+                      label={busy ? "Finishing..." : authorizationRenewalPending ? "Renew Authorization" : "Finish Runtime Setup"}
                       tone="primary"
                       onClick={onCompleteRuntimeSetup}
                       disabled={busy}
@@ -875,7 +881,9 @@ const VaultPanel: React.FC<Props> = ({
           )}
           {runtimePending && (
             <div style={{ fontSize: "0.76rem", color: "var(--color-warning)", lineHeight: 1.5 }}>
-              The grant is live, but the vault runtime is still pending. The agent should not be told to operate until the runtime checklist turns green.
+              {authorizationRenewalPending
+                ? "The Safe runtime remains installed, but the time-limited execution authorization must be renewed before the agent operates."
+                : "The grant is live, but the vault runtime is still pending. The agent should not be told to operate until the runtime checklist turns green."}
             </div>
           )}
 

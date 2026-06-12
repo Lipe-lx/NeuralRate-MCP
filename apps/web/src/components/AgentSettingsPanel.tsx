@@ -25,6 +25,27 @@ const parseCsv = (value: string) =>
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+const AUTHORIZATION_HOURS_PER_DAY = 24;
+const AUTHORIZATION_DAYS_PER_MONTH = 30;
+const MAX_AUTHORIZATION_TTL_HOURS = 12 * AUTHORIZATION_DAYS_PER_MONTH * AUTHORIZATION_HOURS_PER_DAY;
+
+const splitAuthorizationDuration = (totalHours: number) => {
+  const normalizedHours = Number.isInteger(totalHours) && totalHours > 0 ? totalHours : 12;
+  const hoursPerMonth = AUTHORIZATION_DAYS_PER_MONTH * AUTHORIZATION_HOURS_PER_DAY;
+  const months = Math.floor(normalizedHours / hoursPerMonth);
+  const remainingAfterMonths = normalizedHours % hoursPerMonth;
+  return {
+    authorizationMonths: months,
+    authorizationDays: Math.floor(remainingAfterMonths / AUTHORIZATION_HOURS_PER_DAY),
+    authorizationHours: remainingAfterMonths % AUTHORIZATION_HOURS_PER_DAY,
+  };
+};
+
+const authorizationDurationToHours = (months: number, days: number, hours: number) =>
+  months * AUTHORIZATION_DAYS_PER_MONTH * AUTHORIZATION_HOURS_PER_DAY +
+  days * AUTHORIZATION_HOURS_PER_DAY +
+  hours;
+
 const AgentSettingsPanel: React.FC<Props> = ({ config, busy, onSave, onPublishPolicy, policySyncStatus }) => {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -65,6 +86,7 @@ const AgentSettingsPanel: React.FC<Props> = ({ config, busy, onSave, onPublishPo
     minSpreadOverTbillBps: 0,
     requireManualAboveUsd: 2500,
     pauseOnRiskEvent: true,
+    ...splitAuthorizationDuration(12),
   });
 
   useEffect(() => {
@@ -92,6 +114,7 @@ const AgentSettingsPanel: React.FC<Props> = ({ config, busy, onSave, onPublishPo
       minSpreadOverTbillBps: config.min_spread_over_tbill_bps,
       requireManualAboveUsd: config.require_manual_above_usd,
       pauseOnRiskEvent: Boolean(config.pause_on_risk_event),
+      ...splitAuthorizationDuration(config.authorization_ttl_hours ?? 12),
     });
   }, [config]);
 
@@ -103,6 +126,24 @@ const AgentSettingsPanel: React.FC<Props> = ({ config, busy, onSave, onPublishPo
     });
     if (validationError) {
       setFormError(validationError);
+      return;
+    }
+    const authorizationParts = [
+      Number(form.authorizationMonths),
+      Number(form.authorizationDays),
+      Number(form.authorizationHours),
+    ];
+    const authorizationTtlHours = authorizationDurationToHours(
+      authorizationParts[0],
+      authorizationParts[1],
+      authorizationParts[2]
+    );
+    if (
+      authorizationParts.some((value) => !Number.isInteger(value) || value < 0) ||
+      authorizationTtlHours < 1 ||
+      authorizationTtlHours > MAX_AUTHORIZATION_TTL_HOURS
+    ) {
+      setFormError("Authorization duration must be between 1 hour and 12 months.");
       return;
     }
     setFormError(null);
@@ -126,6 +167,7 @@ const AgentSettingsPanel: React.FC<Props> = ({ config, busy, onSave, onPublishPo
       minSpreadOverTbillBps: Number(form.minSpreadOverTbillBps),
       requireManualAboveUsd: Number(form.requireManualAboveUsd),
       pauseOnRiskEvent: form.pauseOnRiskEvent,
+      authorizationTtlHours,
     });
   };
 
@@ -558,6 +600,52 @@ const AgentSettingsPanel: React.FC<Props> = ({ config, busy, onSave, onPublishPo
                 Daily Limit (USD)
                 <input type="number" min="0" value={form.maxDailyUsd} onChange={(event) => setForm((current) => ({ ...current, maxDailyUsd: Number(event.target.value) }))} style={{ width: "100%", marginTop: "0.25rem" }} />
               </label>
+              <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                <div>Authorization Duration</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "0.4rem", marginTop: "0.25rem" }}>
+                  <label>
+                    <span style={{ display: "block", fontSize: "0.68rem" }}>Months</span>
+                    <input
+                      aria-label="Authorization Months"
+                      type="number"
+                      min="0"
+                      max="12"
+                      step="1"
+                      value={form.authorizationMonths}
+                      onChange={(event) => setForm((current) => ({ ...current, authorizationMonths: Number(event.target.value) }))}
+                      style={{ width: "100%", marginTop: "0.2rem" }}
+                    />
+                  </label>
+                  <label>
+                    <span style={{ display: "block", fontSize: "0.68rem" }}>Days</span>
+                    <input
+                      aria-label="Authorization Days"
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={form.authorizationDays}
+                      onChange={(event) => setForm((current) => ({ ...current, authorizationDays: Number(event.target.value) }))}
+                      style={{ width: "100%", marginTop: "0.2rem" }}
+                    />
+                  </label>
+                  <label>
+                    <span style={{ display: "block", fontSize: "0.68rem" }}>Hours</span>
+                    <input
+                      aria-label="Authorization Hours"
+                      type="number"
+                      min="0"
+                      step="1"
+                      aria-describedby="authorization-duration-help"
+                      value={form.authorizationHours}
+                      onChange={(event) => setForm((current) => ({ ...current, authorizationHours: Number(event.target.value) }))}
+                      style={{ width: "100%", marginTop: "0.2rem" }}
+                    />
+                  </label>
+                </div>
+                <span id="authorization-duration-help" style={{ display: "block", marginTop: "0.25rem", fontSize: "0.68rem", lineHeight: 1.4 }}>
+                  1 month equals 30 days. Applies to the next authorization and policy publish.
+                </span>
+              </div>
             </div>
             {showPublishPolicy && (
               <button

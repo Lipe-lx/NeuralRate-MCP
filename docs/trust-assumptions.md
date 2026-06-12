@@ -135,6 +135,7 @@ This reduces anonymous scraping of per-user state while preserving signed owner 
 ### Grant Expiry
 
 - grant and session records carry explicit `expiresAt`
+- owners configure one bounded authorization duration (1 hour to 12 fixed 30-day months) shared by grants, scoped MCP sessions, and on-chain policy validity
 - scoped MCP catalog access is denied when session scope is invalid/expired
 - execution still requires policy-valid bounds at dispatch time
 

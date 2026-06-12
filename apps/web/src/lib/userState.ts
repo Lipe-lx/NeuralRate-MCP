@@ -59,6 +59,7 @@ export interface AgentConfig {
   min_spread_over_tbill_bps: number;
   require_manual_above_usd: number;
   pause_on_risk_event: number;
+  authorization_ttl_hours?: number;
   policy_version: string;
 }
 
