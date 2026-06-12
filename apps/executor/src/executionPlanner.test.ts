@@ -175,6 +175,109 @@ test("resolveExecutionPlan prepares a USDY wallet transfer through the Safe modu
   });
 });
 
+test("resolveExecutionPlan prepares a labeled Mock USDY Sepolia allocation through the Safe module", async () => {
+  await withConfiguredUsdYToken(async () => {
+    await withConfiguredVaultModuleProtocol(async () => {
+      const futureDeadline = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      const tokenAddress = tokenRegistry.USDY.address as Address;
+      const recipientAddress = "0x6666666666666666666666666666666666666666";
+      const plan = await resolveExecutionPlan(
+        {
+          async getCode() {
+            return "0x6001600055";
+          },
+          async readContract() {
+            return true;
+          },
+        },
+        "mock-usdy-sepolia-allocation",
+        {
+          targetAsset: "USDY",
+          amountUsd: 75,
+          recipientAddress,
+          slippageBps: 25,
+          snapshotHash: "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          deadline: futureDeadline,
+        },
+        makeContext({
+          maxActionUsd: 100,
+          maxDailyUsd: 100,
+          maxAutomationUsd: 1000,
+          maxSlippageBps: 50,
+          allowedAssets: ["USDY"],
+          allowedProtocols: [],
+          allowedTargets: [tokenAddress],
+          allowedSelectors: ["0xa9059cbb"],
+        }),
+      );
+
+      assert.equal(plan.validationStatus, "ready");
+      assert.equal(plan.strategyKey, "mock-usdy-sepolia-allocation");
+      assert.equal(plan.targetAsset, "USDY");
+      assert.equal(plan.targetContract, protocolRegistry["neuralrate-vault-module-v1"].address);
+      assert.equal(plan.targetSelector, "0xa9059cbb");
+      assert.equal(plan.intent.recipientAddress, recipientAddress);
+      assert.match(plan.executionSummary, /Mock USDY/i);
+      assert.equal(plan.riskFlags.includes("testnet-mock-usdy"), true);
+      assert.equal(
+        plan.policyChecks.find((check) => check.check === "mock-sepolia-usdy-venue-labeled")?.ok,
+        true,
+      );
+      assert.equal(
+        plan.policyChecks.find((check) => check.check === "policy-allowed-targets")?.ok,
+        true,
+      );
+    });
+  });
+});
+
+test("resolveExecutionPlan blocks Mock USDY Sepolia allocation when token address is missing", async () => {
+  await withConfiguredVaultModuleProtocol(async () => {
+    const originalAddress = tokenRegistry.USDY.address;
+    tokenRegistry.USDY.address = null;
+    try {
+      const futureDeadline = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      const plan = await resolveExecutionPlan(
+        {
+          async getCode() {
+            return "0x6001600055";
+          },
+          async readContract() {
+            return true;
+          },
+        },
+        "mock-usdy-sepolia-allocation",
+        {
+          targetAsset: "USDY",
+          amountUsd: 75,
+          recipientAddress: "0x6666666666666666666666666666666666666666",
+          slippageBps: 25,
+          snapshotHash: "0xabababababababababababababababababababababababababababababababab",
+          deadline: futureDeadline,
+        },
+        makeContext({
+          maxActionUsd: 100,
+          maxDailyUsd: 100,
+          maxAutomationUsd: 1000,
+          maxSlippageBps: 50,
+          allowedAssets: ["USDY"],
+          allowedProtocols: [],
+        }),
+      );
+
+      assert.equal(plan.validationStatus, "blocked");
+      assert.equal(
+        plan.policyChecks.find((check) => check.check === "mock-usdy-token-configured")?.ok,
+        false,
+      );
+      assert.match(plan.validationReason ?? "", /NEURALRATE_USDY_TOKEN_ADDRESS/);
+      assert.equal(plan.calldata, null);
+    } finally {
+      tokenRegistry.USDY.address = originalAddress;
+    }
+  });
+});
+
 test("resolveExecutionPlan prepares a USDY approval through the Safe module", async () => {
   await withConfiguredUsdYToken(async () => {
     await withConfiguredVaultModuleProtocol(async () => {

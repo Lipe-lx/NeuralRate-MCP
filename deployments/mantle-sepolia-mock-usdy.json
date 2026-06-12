@@ -1,0 +1,16 @@
+{
+  "network": "mantleSepolia",
+  "chainId": 5003,
+  "contractName": "MockERC20",
+  "address": "0xC63FB10deD215c6De6cDB438FB2Ce7944F6Af5bE",
+  "txHash": "0x038fdf31cacc73439b1b19eba1cb557f0f5cdef2efe7f45719874fc410aa6f20",
+  "expectedBytecodeHash": "0xa1825e5c98d56db90326288b8399e31c006768eb33635d45ea91de70799a5cfc",
+  "tokenName": "Mock USDY",
+  "symbol": "USDY",
+  "decimals": 18,
+  "deploymentPurpose": "testnet-demo-mock",
+  "initialMintRecipient": "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
+  "initialMintAmount": null,
+  "initialMintTxHash": null,
+  "updatedAt": "2026-06-12T01:49:32.169Z"
+}

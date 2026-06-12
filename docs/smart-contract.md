@@ -114,6 +114,19 @@ Current status in the codebase:
 - not the default strategy path
 - still blocked by the executor on Sepolia unless a canonical venue is configured
 
+### 7. `MockERC20.sol` as Mock USDY
+
+- file: `contracts/contracts/mocks/MockERC20.sol`
+- role: explicit Mantle Sepolia demo harness for USDY-shaped ERC-20 execution
+- deployment manifest after deploy: `deployments/mantle-sepolia-mock-usdy.json`
+
+Current status in the codebase:
+
+- used only through the labeled `mock-usdy-sepolia-allocation` strategy
+- minting is exposed as a UI faucet and as MCP `prepare_mock_usdy_mint`, both labeled testnet-only
+- not treated as a canonical Ondo venue
+- disclosed as a testnet substitute because Ondo has no canonical public Mantle Sepolia USDY deployment; mainnet uses Ondo's canonical USDY contract
+
 ## Sepolia Deployment Sync
 
 All deployed addresses are fully synchronized and validated via `npm run sync:deployments` across worker configs, env files, and executor parameters.
@@ -126,6 +139,7 @@ All deployed addresses are fully synchronized and validated via `npm run sync:de
 - **Policy anchoring and snapshot hashing:** implemented in code
 - **Receipt-registry target for new deployments:** implemented in code
 - **USDY path on Sepolia:** preserved but blocked without a canonical venue
+- **Mock USDY path on Sepolia:** explicit demo harness via `mock-usdy-sepolia-allocation`
 
 ## Pinned Deployment Behavior
 

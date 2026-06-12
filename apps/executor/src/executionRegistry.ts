@@ -76,6 +76,8 @@ const configuredUsdYRecipientAddress = runtimeAddress(runtimeEnv?.NEURALRATE_USD
 const configuredMntRecipientAddress = runtimeAddress(runtimeEnv?.NEURALRATE_MNT_STRATEGY_RECIPIENT_ADDRESS);
 export const CANONICAL_SEPOLIA_USDY_VENUE_REASON =
   "Canonical Sepolia venue for USDY is not configured. NeuralRate will not simulate an Ondo venue on testnet.";
+export const MOCK_SEPOLIA_USDY_VENUE_REASON =
+  "Mock USDY Sepolia allocation is a labeled testnet demo harness, not a canonical Ondo venue.";
 
 export type StrategyManifest = {
   strategyKey: string;
@@ -143,6 +145,7 @@ export const tokenRegistry: Record<string, TokenManifest> = {
 };
 
 const getUsdYTokenAddress = () => tokenRegistry.USDY.address ?? configuredUsdYTokenAddress;
+export const hasConfiguredUsdYStrategyRecipient = () => Boolean(configuredUsdYRecipientAddress);
 
 const usdyStableAllocationAbi = [{
   type: "function",
@@ -344,6 +347,36 @@ export const strategyRegistry: Record<string, StrategyManifest> = {
         intent.slippageBps !== 0
       ) {
         failures.push("slippageBps must be omitted or 0 for USDY transfers.");
+      }
+      return failures;
+    },
+  },
+  "mock-usdy-sepolia-allocation": {
+    strategyKey: "mock-usdy-sepolia-allocation",
+    label: "Mock USDY Sepolia Allocation",
+    chainId: MANTLE_SEPOLIA_CHAIN_ID,
+    supportedAssets: ["USDY"],
+    supportedProtocols: ["neuralrate-vault-module"],
+    defaultProtocolId: "neuralrate-vault-module-v1",
+    defaultActionId: "execute-vault-call",
+    maxSlippageBps: 100,
+    validateIntent: (intent) => {
+      const failures: string[] = [];
+      if (!Number.isFinite(intent.amountUsd) || intent.amountUsd <= 0) {
+        failures.push("amountUsd must be a positive number.");
+      } else if (!Number.isInteger(intent.amountUsd)) {
+        failures.push("amountUsd must be provided as a whole USD integer in v1.");
+      }
+      const normalizedAsset = intent.targetAsset.trim().toUpperCase();
+      if (normalizedAsset !== "USDY") {
+        failures.push("Mock USDY Sepolia allocation currently supports only the USDY asset.");
+      }
+      if (
+        intent.slippageBps !== null &&
+        intent.slippageBps !== undefined &&
+        (!Number.isInteger(intent.slippageBps) || intent.slippageBps < 0 || intent.slippageBps > 100)
+      ) {
+        failures.push("slippageBps must be an integer between 0 and 100.");
       }
       return failures;
     },

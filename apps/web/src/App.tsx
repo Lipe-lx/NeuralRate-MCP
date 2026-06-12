@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Header from './components/Header';
 import YieldScanner from './components/YieldScanner';
 import RiskPanel from './components/RiskPanel';
@@ -16,6 +16,7 @@ import { WalletProvider } from './context/WalletContext';
 import { useWalletContext } from './context/WalletContext';
 import { useNeuralRateUser } from './hooks/useNeuralRateUser';
 import { API_BASE_URL, ENV_PROFILE } from './config';
+import { mintMockUsdyToVault } from './lib/mockUsdy';
 
 export interface Pool {
   symbol: string;
@@ -89,6 +90,28 @@ function AppContent() {
     getEthereumProvider: wallet.getEthereumProvider,
     signMessage: wallet.signMessage,
   });
+  const handleMintMockUsdy = useCallback(async (amountToken: string) => {
+    if (!address) {
+      throw new Error('Connect a wallet before minting Mock USDY.');
+    }
+    if (!isCorrectChain) {
+      await switchToMantle();
+    }
+    const vaultAddress = neuralRateUser.state?.vault?.deposit_address ?? neuralRateUser.state?.vault?.vault_address;
+    if (!vaultAddress) {
+      throw new Error('Create a vault before minting Mock USDY.');
+    }
+
+    const provider = await wallet.getEthereumProvider();
+    const result = await mintMockUsdyToVault({
+      provider,
+      from: address,
+      vaultAddress,
+      amountToken,
+    });
+    await neuralRateUser.refresh();
+    return result;
+  }, [address, isCorrectChain, neuralRateUser, switchToMantle, wallet]);
 
   const vault = neuralRateUser.state?.vault;
   const hasAutomation = Boolean(neuralRateUser.state?.activeGrant && neuralRateUser.state.activeGrant.status === 'active');
@@ -384,6 +407,7 @@ function AppContent() {
                       onReviewOwnership={() => setIsOwnershipModalOpen(true)}
                       controlWalletLabel={controlWalletLabel}
                       onRefreshState={neuralRateUser.refresh}
+                      onMintMockUsdy={handleMintMockUsdy}
                     />
                   </div>
                 )}

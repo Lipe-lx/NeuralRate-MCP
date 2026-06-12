@@ -213,6 +213,27 @@ test("open_position maps USDY allocation to the pinned strategy", () => {
   assert.equal(plan.intent?.targetAsset, "USDY");
 });
 
+test("open_position maps mock USDY protocol hint to the labeled Sepolia strategy", () => {
+  const plan = planGovernedExecutionActionFromSnapshot(
+    makeSnapshot(),
+    makeAccess(),
+    "open_position",
+    {
+      asset: "USDY",
+      amountUsd: 100,
+      protocolHint: "mock-usdy-sepolia",
+      slippageBps: 25,
+      snapshotHash: "0xbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc",
+    }
+  );
+
+  assert.equal(plan.status, "ready");
+  assert.equal(plan.strategyKey, "mock-usdy-sepolia-allocation");
+  assert.equal(plan.intent?.protocolHint, "mock-usdy-sepolia");
+  assert.equal(plan.intent?.recipientAddress, makeAccess().ownerEoa);
+  assert.match(plan.summary, /Mock USDY Sepolia/i);
+});
+
 test("close_position closes a wallet-held USDY position through the governed transfer path", () => {
   const plan = planGovernedExecutionActionFromSnapshot(
     makeSnapshot(),

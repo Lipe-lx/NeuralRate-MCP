@@ -128,9 +128,12 @@ The governed execution tools always run an internal preflight before any queuein
   - `rebalance_to_target` into `USDY`
   - `approve_strategy_spender`
 - preflight-aware special cases:
+  - `prepare_mock_usdy_mint` returns a wallet-signable Mock USDY mint transaction for Mantle Sepolia demo funding; it does not submit the transaction server-side
+  - `open_position`, `increase_position`, `rebalance_to_target`, and `rotate_strategy` accept `protocolHint: "mock-usdy-sepolia"` to use the labeled Mock USDY Mantle Sepolia testnet harness
   - `claim_rewards` returns `noop` when the resolved position has no claimable rewards on the current state surface, and `blocked` when rewards exist but no pinned claim adapter exists yet
   - `rotate_strategy` returns `noop` when the source position already matches the requested target asset, aliases to `rebalance_to_target` when rotating into `USDY`, and returns `blocked` for unsupported unwind or conversion paths
 - still intentionally blocked until more adapters are pinned:
+  - canonical `usdy-stable-allocation` on Sepolia when no Ondo venue is configured
   - non-wallet position decrease and close flows
   - reward-claim adapters for protocols that expose claimable rewards
   - multi-venue rotation and unwind paths beyond the current one-sided USDY flow

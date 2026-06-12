@@ -72,6 +72,11 @@ NeuralRate supports two execution targets under testnet demo profiles:
     *   **Asset**: Ondo USDY Stablecoin
     *   **Mechanism**: Intended to swap stablecoins for USDY yields.
     *   **Sepolia Behavior**: Blocked with an explicit reason when no canonical venue is configured on testnet.
+3.  **`mock-usdy-sepolia-allocation` (Testnet Demo Harness)**
+    *   **Asset**: Mock USDY ERC-20 on Mantle Sepolia.
+    *   **Mechanism**: Moves wallet-held Mock USDY through the same Safe module ERC-20 routing path used by governed execution.
+    *   **Funding**: Use the Vault UI Mock USDY Faucet or MCP `prepare_mock_usdy_mint` to mint testnet balance to the Safe vault.
+    *   **Disclosure**: USDY is mocked on Mantle Sepolia because Ondo has no canonical public testnet USDY deployment; mainnet integration uses Ondo's canonical USDY contract.
 
 ---
 

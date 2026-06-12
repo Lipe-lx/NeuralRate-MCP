@@ -1,9 +1,11 @@
 import {
   buildVaultExecutionModuleCalldata,
   CANONICAL_SEPOLIA_USDY_VENUE_REASON,
+  MOCK_SEPOLIA_USDY_VENUE_REASON,
   buildUsdYStableAllocationCalldata,
   safeModuleStatusAbi,
   getApprovedExecutionPolicySurface,
+  hasConfiguredUsdYStrategyRecipient,
   makeIntentHash,
   protocolRegistry,
   resolveNativeMntVaultTransfer,
@@ -21,6 +23,11 @@ import { keccak256, parseUnits, type Address, type Hex } from "viem";
 const ERC20_TRANSFER_SELECTOR = "0xa9059cbb" as Hex;
 const ERC20_APPROVE_SELECTOR = "0x095ea7b3" as Hex;
 const NATIVE_TRANSFER_SELECTOR = "0x00000000" as Hex;
+const USDY_VAULT_TRANSFER_STRATEGIES = new Set([
+  "usdy-stable-allocation",
+  "usdy-vault-transfer",
+  "mock-usdy-sepolia-allocation",
+]);
 
 type ScopedExecutionContext = {
   ownerEoa: string;
@@ -258,6 +265,28 @@ export const resolveExecutionPlan = async (
           : "USDY token address is not configured for real vault execution.",
       ),
     );
+  } else if (strategy.strategyKey === "mock-usdy-sepolia-allocation") {
+    policyChecks.push(
+      makePolicyCheck(
+        "mock-sepolia-usdy-venue-labeled",
+        true,
+        MOCK_SEPOLIA_USDY_VENUE_REASON,
+      ),
+      makePolicyCheck(
+        "mock-usdy-token-configured",
+        Boolean(token.address),
+        token.address
+          ? `Mock USDY token address resolved to ${token.address}.`
+          : "NEURALRATE_USDY_TOKEN_ADDRESS must point to the labeled Mock USDY Sepolia token for this demo path.",
+      ),
+      makePolicyCheck(
+        "mock-usdy-recipient-configured",
+        Boolean(intent.recipientAddress || hasConfiguredUsdYStrategyRecipient()),
+        intent.recipientAddress || hasConfiguredUsdYStrategyRecipient()
+          ? "Mock USDY demo transfer has a recipient address."
+          : "Mock USDY demo transfer requires recipientAddress or NEURALRATE_USDY_STRATEGY_RECIPIENT_ADDRESS.",
+      ),
+    );
   }
 
   const bytecodeValidation = await validateProtocolDeployment(publicClient, protocol.protocolId, context.chainId);
@@ -301,7 +330,7 @@ export const resolveExecutionPlan = async (
   let calldata: Hex | null = null;
 
   if (!validationFailure && protocol.address) {
-    if (strategy.strategyKey === "usdy-stable-allocation" || strategy.strategyKey === "usdy-vault-transfer") {
+    if (USDY_VAULT_TRANSFER_STRATEGIES.has(strategy.strategyKey)) {
       const moduleEnabled = typeof publicClient.readContract === "function"
         ? Boolean(await publicClient.readContract({
             address: context.vaultAddress as Address,
@@ -360,11 +389,14 @@ export const resolveExecutionPlan = async (
         executionSummary =
           strategy.strategyKey === "usdy-stable-allocation"
             ? `Strategy ${strategy.label} is ready to move ${amountUsd} USDY from the Safe to the configured recipient through the enabled NeuralRate module.`
+            : strategy.strategyKey === "mock-usdy-sepolia-allocation"
+            ? `Strategy ${strategy.label} is ready to move ${amountUsd} Mock USDY from the Safe to the configured recipient through the enabled NeuralRate module.`
             : `Strategy ${strategy.label} is ready to move ${amountToken ?? amountUsd} USDY from the Safe to ${routedTransfer.recipientAddress}.`;
         riskFlags = [
           token.riskClass,
           bytecodeValidation.status,
           moduleEnabled ? "safe-module-enabled" : "safe-module-disabled",
+          ...(strategy.strategyKey === "mock-usdy-sepolia-allocation" ? ["testnet-mock-usdy"] : []),
         ];
       } else {
         executionSummary = `Strategy ${strategy.label} is blocked until the Safe module and vault routing checks pass.`;

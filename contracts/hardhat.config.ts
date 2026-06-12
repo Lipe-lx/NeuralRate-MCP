@@ -6,6 +6,10 @@ import path from "path";
 
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
+const hardhatForkUrl =
+  process.env.HARDHAT_FORK_RPC_URL ||
+  (process.env.HARDHAT_FORK === "true" ? process.env.MANTLE_SEPOLIA_RPC_URL || "https://rpc.sepolia.mantle.xyz" : "");
+
 const config: HardhatUserConfig = {
   solidity: {
     version: "0.8.20",
@@ -18,11 +22,7 @@ const config: HardhatUserConfig = {
     },
   },
   networks: {
-    hardhat: {
-      forking: {
-        url: process.env.MANTLE_SEPOLIA_RPC_URL || "https://rpc.sepolia.mantle.xyz",
-      }
-    },
+    hardhat: hardhatForkUrl ? { forking: { url: hardhatForkUrl } } : {},
     mantleSepolia: {
       url: process.env.MANTLE_SEPOLIA_RPC_URL || "https://rpc.sepolia.mantle.xyz",
       chainId: 5003,

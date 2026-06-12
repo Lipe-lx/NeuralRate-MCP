@@ -12,6 +12,7 @@
     "deploy:aa-stack:sepolia": "hardhat run scripts/deploy-aa-stack.ts --network mantleSepolia",
     "configure:vault-module:sepolia": "hardhat run scripts/configure-vault-module.ts --network mantleSepolia",
     "deploy:usdy-adapter:sepolia": "hardhat run scripts/deploy-usdy-adapter.ts --network mantleSepolia",
+    "deploy:mock-usdy:sepolia": "hardhat run scripts/deploy-mock-usdy.ts --network mantleSepolia",
     "deploy:vault-module:sepolia": "hardhat run scripts/deploy-vault-module.ts --network mantleSepolia",
     "verify:sepolia": "hardhat verify --network mantleSepolia",
     "register-agent:sepolia": "hardhat run scripts/register-agent.ts --network mantleSepolia",

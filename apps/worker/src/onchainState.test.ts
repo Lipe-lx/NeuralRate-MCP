@@ -93,6 +93,37 @@ test("readVaultBalances returns the last successful cached native balance when R
   assert.equal(second.sources.some((source) => source.id === "vault_balance_cache"), true);
 });
 
+test("readVaultBalances tracks configured Mock USDY token balances", async () => {
+  const env = {
+    MANTLE_SEPOLIA_RPC_URL: "https://primary.example",
+    NEURALRATE_USDY_TOKEN_ADDRESS: "0x2222222222222222222222222222222222222222",
+  };
+
+  const balances = await readVaultBalances(vaultAddress, env, {
+    retryDelayMs: 0,
+    createClient: () => ({
+      async getBalance() {
+        return 1n * 10n ** 18n;
+      },
+      async readContract(args: any) {
+        if (args.functionName === "balanceOf") {
+          return 25n * 10n ** 18n;
+        }
+        if (args.functionName === "decimals") {
+          return 18;
+        }
+        return "USDY";
+      },
+    }),
+  });
+
+  assert.equal(balances.tokenBalances.length, 1);
+  assert.equal(balances.tokenBalances[0]?.asset, "USDY");
+  assert.equal(balances.tokenBalances[0]?.address, "0x2222222222222222222222222222222222222222");
+  assert.equal(balances.tokenBalances[0]?.balanceFormatted, "25");
+  assert.equal(balances.tokenBalances[0]?.hasBalance, true);
+});
+
 test("deriveAutomationReady requires active execution scope, synced policy, and installed runtime", () => {
   const baseState = {
     vault: { vault_id: "vault_1" },

@@ -3,6 +3,7 @@ import {
   DELEGATE_VALIDATOR_ADDRESS,
   MANAGED_SIGNER_PROVIDER,
   MANTLE_EXPLORER_BASE_URL,
+  MOCK_USDY_TOKEN_ADDRESS,
   NEURALRATE_EXECUTION_GUARD_CONTRACT,
   ONBOARDING_PROVIDER,
   SAFE_7579_ADAPTER_ADDRESS,
@@ -29,6 +30,7 @@ type Props = {
   onReviewOwnership: () => void;
   controlWalletLabel: string;
   onRefreshState: () => Promise<unknown>;
+  onMintMockUsdy: (amountToken: string) => Promise<{ txHash: string; tokenAddress: string; amountToken: string }>;
 };
 
 const humanize = (value: string | null | undefined) =>
@@ -112,10 +114,15 @@ const VaultPanel: React.FC<Props> = ({
   onReviewOwnership,
   controlWalletLabel,
   onRefreshState,
+  onMintMockUsdy,
 }) => {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [showMcpAdvanced, setShowMcpAdvanced] = useState(false);
   const [showVaultAdvanced, setShowVaultAdvanced] = useState(false);
+  const [mockUsdyAmount, setMockUsdyAmount] = useState("100");
+  const [mockUsdyMinting, setMockUsdyMinting] = useState(false);
+  const [mockUsdyTxHash, setMockUsdyTxHash] = useState<string | null>(null);
+  const [mockUsdyError, setMockUsdyError] = useState<string | null>(null);
   const vault = state?.vault;
   const storedBundle = React.useMemo(() => state?.ownerEoa ? loadStoredMcpAccessBundle(state.ownerEoa) : null, [state?.ownerEoa]);
   const hasSession = Boolean(storedBundle?.sessionToken);
@@ -133,6 +140,7 @@ const VaultPanel: React.FC<Props> = ({
     "inactive",
   );
   const fundingStatus = hasOnchainDeposit ? "Deposit detected" : humanize(vault?.funding_status ?? "not-created");
+  const mockUsdyConfigured = Boolean(MOCK_USDY_TOKEN_ADDRESS);
   const consentRecordedAt = activeGrant?.issued_at ?? session?.consent_verified_at ?? null;
   const onchainPolicy = state?.onchainPolicy ?? null;
   const hasAutomation = Boolean(activeGrant && activeGrant.status === "active");
@@ -233,6 +241,20 @@ const VaultPanel: React.FC<Props> = ({
       }, 1500);
     } catch {
       // best-effort UX only
+    }
+  };
+
+  const handleMintMockUsdy = async () => {
+    setMockUsdyMinting(true);
+    setMockUsdyError(null);
+    setMockUsdyTxHash(null);
+    try {
+      const result = await onMintMockUsdy(mockUsdyAmount);
+      setMockUsdyTxHash(result.txHash);
+    } catch (mintError) {
+      setMockUsdyError(mintError instanceof Error ? mintError.message : "Mock USDY mint failed.");
+    } finally {
+      setMockUsdyMinting(false);
     }
   };
 
@@ -470,6 +492,73 @@ const VaultPanel: React.FC<Props> = ({
                 onClick={() => handleCopy(depositAddress, "deposit_address")}
                 disabled={!depositAddress}
               />
+            </div>
+          )}
+          {depositAddress && mockUsdyConfigured && (
+            <div
+              style={{
+                border: "1px solid rgba(111, 205, 255, 0.18)",
+                background: "rgba(111, 205, 255, 0.055)",
+                borderRadius: "12px",
+                padding: "0.85rem 0.95rem",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "0.85rem",
+                flexWrap: "wrap",
+              }}
+            >
+              <div style={{ minWidth: 0, flex: "1 1 270px" }}>
+                <div style={{ fontSize: "0.8rem", color: "var(--text-primary)", fontWeight: 700 }}>
+                  Mock USDY Faucet
+                </div>
+                <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)", lineHeight: 1.45, marginTop: "0.18rem" }}>
+                  Mints testnet Mock USDY directly to this vault for Sepolia demo execution.
+                </div>
+                <div style={{ fontSize: "0.74rem", color: "var(--text-primary)", marginTop: "0.42rem" }}>
+                  {renderCopyValue("mock_usdy_token", MOCK_USDY_TOKEN_ADDRESS, truncate(MOCK_USDY_TOKEN_ADDRESS), {
+                    href: `${MANTLE_EXPLORER_BASE_URL}/address/${MOCK_USDY_TOKEN_ADDRESS}`,
+                    accent: true,
+                  })}
+                </div>
+                {mockUsdyTxHash && (
+                  <div style={{ fontSize: "0.72rem", marginTop: "0.42rem" }}>
+                    {renderCopyValue("mock_usdy_mint_tx", mockUsdyTxHash, `Tx ${truncate(mockUsdyTxHash)}`, {
+                      href: `${MANTLE_EXPLORER_BASE_URL}/tx/${mockUsdyTxHash}`,
+                      accent: true,
+                    })}
+                  </div>
+                )}
+                {mockUsdyError && (
+                  <div style={{ fontSize: "0.72rem", color: "var(--color-danger)", marginTop: "0.42rem" }}>
+                    {mockUsdyError}
+                  </div>
+                )}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.55rem", flexWrap: "wrap" }}>
+                <input
+                  value={mockUsdyAmount}
+                  onChange={(event) => setMockUsdyAmount(event.target.value)}
+                  inputMode="decimal"
+                  aria-label="Mock USDY amount"
+                  style={{
+                    width: "7.5rem",
+                    minHeight: "2.15rem",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: "8px",
+                    background: "rgba(255,255,255,0.04)",
+                    color: "var(--text-primary)",
+                    padding: "0.45rem 0.55rem",
+                    fontSize: "0.8rem",
+                  }}
+                />
+                <ActionButton
+                  label={mockUsdyMinting ? "Minting..." : "Mint Mock USDY"}
+                  tone="primary"
+                  onClick={handleMintMockUsdy}
+                  disabled={!isConnected || !isCorrectChain || busy || mockUsdyMinting}
+                />
+              </div>
             </div>
           )}
           {runtimePending && (

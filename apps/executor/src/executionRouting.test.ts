@@ -10,6 +10,7 @@ import {
 test("VaultModule strategies stay on the canonical AA path without a paymaster", () => {
   assert.equal(isVaultModuleStrategy("mnt-native-transfer"), true);
   assert.equal(isVaultModuleStrategy("usdy-vault-transfer"), true);
+  assert.equal(isVaultModuleStrategy("mock-usdy-sepolia-allocation"), true);
   assert.equal(shouldUseAARuntimeForStrategy({
     runtimeCanUseAA: true,
     strategyKey: "mnt-native-transfer",

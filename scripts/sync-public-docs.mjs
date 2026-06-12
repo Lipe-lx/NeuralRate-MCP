@@ -49,6 +49,7 @@ const verificationBundle = {
     policyRegistry: deploymentMap["mantle-sepolia-policy-registry.json"] ?? null,
     executionGuard: deploymentMap["mantle-sepolia-execution-guard.json"] ?? null,
     vaultModule: deploymentMap["mantle-sepolia-vault-module.json"] ?? null,
+    mockUsdY: deploymentMap["mantle-sepolia-mock-usdy.json"] ?? null,
   },
 };
 

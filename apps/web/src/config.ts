@@ -130,3 +130,4 @@ export const DEMO_STRATEGY_KEY = publicDemoStrategyKey || 'mnt-native-transfer';
 export const DEMO_TARGET_ASSET = publicDemoTargetAsset || 'MNT';
 export const VAULT_MODULE_ADDRESS = normalizeAddress(publicVaultModuleAddress) || deploymentsJson.summary?.vaultModule?.address || '';
 export const VAULT_MODULE_ENABLED = Boolean(VAULT_MODULE_ADDRESS);
+export const MOCK_USDY_TOKEN_ADDRESS = deploymentsJson.summary?.mockUsdY?.address || deploymentsJson.deployments?.['mantle-sepolia-mock-usdy.json']?.address || '';

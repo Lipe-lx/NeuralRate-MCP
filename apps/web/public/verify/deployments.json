@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-11T07:47:52.571Z",
+  "generatedAt": "2026-06-12T02:49:30.715Z",
   "deployments": {
     "mantle-sepolia-delegate-validator.json": {
       "network": "mantleSepolia",
@@ -24,6 +24,22 @@
       "lastConfigTxHashes": {
         "setTrustedModule": "0xa184079bd6e0f30b99fd9229673be5e74d19e2af4b65a4c45e09b9cf9f4cca5a"
       }
+    },
+    "mantle-sepolia-mock-usdy.json": {
+      "network": "mantleSepolia",
+      "chainId": 5003,
+      "contractName": "MockERC20",
+      "address": "0xC63FB10deD215c6De6cDB438FB2Ce7944F6Af5bE",
+      "txHash": "0x038fdf31cacc73439b1b19eba1cb557f0f5cdef2efe7f45719874fc410aa6f20",
+      "expectedBytecodeHash": "0xa1825e5c98d56db90326288b8399e31c006768eb33635d45ea91de70799a5cfc",
+      "tokenName": "Mock USDY",
+      "symbol": "USDY",
+      "decimals": 18,
+      "deploymentPurpose": "testnet-demo-mock",
+      "initialMintRecipient": "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
+      "initialMintAmount": null,
+      "initialMintTxHash": null,
+      "updatedAt": "2026-06-12T01:49:32.169Z"
     },
     "mantle-sepolia-policy-registry.json": {
       "network": "mantleSepolia",
@@ -155,6 +171,22 @@
       "expectedBytecodeHash": "0x584c9850e175d9106bf285fbf57344d9a209ef2b161fc542891530f912efcdd4",
       "authorizedExecutor": "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
       "updatedAt": "2026-06-10T07:44:54.288Z"
+    },
+    "mockUsdY": {
+      "network": "mantleSepolia",
+      "chainId": 5003,
+      "contractName": "MockERC20",
+      "address": "0xC63FB10deD215c6De6cDB438FB2Ce7944F6Af5bE",
+      "txHash": "0x038fdf31cacc73439b1b19eba1cb557f0f5cdef2efe7f45719874fc410aa6f20",
+      "expectedBytecodeHash": "0xa1825e5c98d56db90326288b8399e31c006768eb33635d45ea91de70799a5cfc",
+      "tokenName": "Mock USDY",
+      "symbol": "USDY",
+      "decimals": 18,
+      "deploymentPurpose": "testnet-demo-mock",
+      "initialMintRecipient": "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
+      "initialMintAmount": null,
+      "initialMintTxHash": null,
+      "updatedAt": "2026-06-12T01:49:32.169Z"
     }
   }
 }

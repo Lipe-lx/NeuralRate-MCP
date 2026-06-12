@@ -22,6 +22,11 @@ const defaultProps = {
   onReviewOwnership: vi.fn(),
   controlWalletLabel: 'Smart Account',
   onRefreshState: vi.fn(() => Promise.resolve({})),
+  onMintMockUsdy: vi.fn(() => Promise.resolve({
+    txHash: '0xMintTx',
+    tokenAddress: '0xMockUsdY',
+    amountToken: '100',
+  })),
 };
 
 describe('VaultPanel', () => {
@@ -97,6 +102,7 @@ describe('VaultPanel', () => {
     expect(screen.getByText(/Vault Address/i)).toBeInTheDocument();
     expect(screen.getByText('0xVaultA...ddress')).toBeInTheDocument();
     expect(screen.getByText('Deposit to Vault')).toBeInTheDocument();
+    expect(screen.getByText('Mock USDY Faucet')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Copy Address/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Funding Intent/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Queue .* Demo/i })).not.toBeInTheDocument();

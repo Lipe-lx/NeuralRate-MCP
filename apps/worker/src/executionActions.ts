@@ -130,12 +130,15 @@ const normalizeLower = (value: string | undefined | null) => normalizeText(value
 
 const supportedUsdYProtocolHints = new Set([
   "",
+  "mock-usdy-sepolia",
+  "mock-usdy-sepolia-allocation",
   "usdy-stable-allocation",
   "neuralrate-vault-module",
   "neuralrate-vault-module-v1",
   "neuralrate-usdy-adapter",
   "neuralrate-usdy-adapter-v1",
 ]);
+const MOCK_USDY_SEPOLIA_HINTS = new Set(["mock-usdy-sepolia", "mock-usdy-sepolia-allocation"]);
 
 const isFinitePositive = (value: number | undefined) => typeof value === "number" && Number.isFinite(value) && value > 0;
 
@@ -164,6 +167,14 @@ const pushIfMissing = (target: string[], message: string) => {
     target.push(message);
   }
 };
+
+const resolveUsdYAllocationStrategyKey = (protocolHint: string) =>
+  MOCK_USDY_SEPOLIA_HINTS.has(protocolHint) ? "mock-usdy-sepolia-allocation" : "usdy-stable-allocation";
+
+const describeUsdYAllocationPath = (protocolHint: string) =>
+  MOCK_USDY_SEPOLIA_HINTS.has(protocolHint)
+    ? "labeled Mock USDY Sepolia testnet harness"
+    : "pinned vault-module execution path";
 
 const enforceCommonPolicyChecks = (
   snapshot: StateCatalogSnapshot,
@@ -363,6 +374,7 @@ export function planGovernedExecutionActionFromSnapshot(
     const protocolHint = normalizeLower(typedArgs.protocolHint);
     const blockedReasons = [...readinessBlocks];
     const candidateProtocols = ["NEURALRATE-VAULT-MODULE"];
+    const strategyKey = resolveUsdYAllocationStrategyKey(protocolHint);
 
     if (asset !== "USDY") {
       pushIfMissing(blockedReasons, `${action} currently supports only USDY allocation through the pinned vault-module strategy.`);
@@ -399,11 +411,12 @@ export function planGovernedExecutionActionFromSnapshot(
     return makeReadyPlan(
       snapshot,
       action,
-      `${action === "open_position" ? "Open" : "Increase"} a USDY position through the pinned vault-module execution path.`,
-      "usdy-stable-allocation",
+      `${action === "open_position" ? "Open" : "Increase"} a USDY position through the ${describeUsdYAllocationPath(protocolHint)}.`,
+      strategyKey,
       {
         targetAsset: "USDY",
         amountUsd: typedArgs.amountUsd,
+        recipientAddress: strategyKey === "mock-usdy-sepolia-allocation" ? access.ownerEoa : null,
         slippageBps: typedArgs.slippageBps ?? Math.min(snapshot.policySurface.limits.maxSlippageBps ?? 50, 50),
         protocolHint: protocolHint || null,
         positionId: typedArgs.positionId ?? null,
@@ -476,11 +489,12 @@ export function planGovernedExecutionActionFromSnapshot(
   if (action === "rebalance_to_target") {
     const typedArgs = args as RebalanceToTargetArgs;
     const targetAsset = normalizeUpper(typedArgs.targetAsset);
+    const protocolHint = normalizeLower(typedArgs.protocolHint);
     const blockedReasons = [...readinessBlocks];
     if (targetAsset !== "USDY") {
       pushIfMissing(blockedReasons, "rebalance_to_target currently supports only one-sided rebalance into USDY.");
     }
-    if (!supportedUsdYProtocolHints.has(normalizeLower(typedArgs.protocolHint))) {
+    if (!supportedUsdYProtocolHints.has(protocolHint)) {
       pushIfMissing(blockedReasons, `${typedArgs.protocolHint} is not a supported protocol hint for the current USDY rebalance path.`);
     }
     if (!isFinitePositive(typedArgs.amountUsd)) {
@@ -504,13 +518,14 @@ export function planGovernedExecutionActionFromSnapshot(
     return makeReadyPlan(
       snapshot,
       action,
-      "Rebalance idle vault capacity into the supported USDY target allocation path.",
-      "usdy-stable-allocation",
+      `Rebalance idle vault capacity into the supported USDY target allocation path through the ${describeUsdYAllocationPath(protocolHint)}.`,
+      resolveUsdYAllocationStrategyKey(protocolHint),
       {
         targetAsset: "USDY",
         amountUsd: typedArgs.amountUsd,
+        recipientAddress: resolveUsdYAllocationStrategyKey(protocolHint) === "mock-usdy-sepolia-allocation" ? access.ownerEoa : null,
         slippageBps: typedArgs.slippageBps ?? Math.min(snapshot.policySurface.limits.maxSlippageBps ?? 50, 50),
-        protocolHint: normalizeLower(typedArgs.protocolHint) || null,
+        protocolHint: protocolHint || null,
         snapshotHash: normalizeText(typedArgs.snapshotHash) || null,
         snapshotCid: normalizeText(typedArgs.snapshotCid) || null,
         deadline: normalizeText(typedArgs.deadline) || defaultDeadline,

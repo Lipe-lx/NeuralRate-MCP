@@ -189,6 +189,11 @@ export const executeStrategySchema = {
   payload: z.record(z.string(), z.unknown()).optional(),
 };
 
+export const prepareMockUsdYMintSchema = {
+  amountToken: z.number().optional().default(100).describe("Mock USDY amount to mint to the vault for Mantle Sepolia demo testing"),
+  recipientAddress: z.string().optional().describe("Optional recipient EVM address; defaults to the scoped Safe vault"),
+};
+
 const governedExecutionCommonSchema = {
   amountUsd: z.number().describe("Requested policy-accounted USD amount for this action"),
   amountToken: z.number().optional().describe("Optional token-denominated amount when the action supports exact token sizing"),
@@ -206,7 +211,7 @@ export const transferAssetSchema = {
 
 export const openPositionSchema = {
   asset: z.string().describe("Target asset to deploy, currently USDY only"),
-  protocolHint: z.string().optional().describe("Optional protocol hint, currently limited to the pinned NeuralRate vault module surface"),
+  protocolHint: z.string().optional().describe("Optional protocol hint; use mock-usdy-sepolia only for the labeled Mantle Sepolia testnet harness"),
   slippageBps: z.number().optional().describe("Optional slippage bound in basis points"),
   ...governedExecutionCommonSchema,
 };
@@ -214,7 +219,7 @@ export const openPositionSchema = {
 export const increasePositionSchema = {
   asset: z.string().describe("Target asset to increase, currently USDY only"),
   positionId: z.string().optional().describe("Optional normalized position identifier returned by get_open_positions"),
-  protocolHint: z.string().optional().describe("Optional protocol hint, currently limited to the pinned NeuralRate vault module surface"),
+  protocolHint: z.string().optional().describe("Optional protocol hint; use mock-usdy-sepolia only for the labeled Mantle Sepolia testnet harness"),
   slippageBps: z.number().optional().describe("Optional slippage bound in basis points"),
   ...governedExecutionCommonSchema,
 };
@@ -255,7 +260,7 @@ export const sweepIdleBalanceSchema = {
 
 export const rebalanceToTargetSchema = {
   targetAsset: z.string().describe("Target asset for the rebalance destination, currently USDY only"),
-  protocolHint: z.string().optional().describe("Optional protocol hint, currently limited to the pinned NeuralRate vault module surface"),
+  protocolHint: z.string().optional().describe("Optional protocol hint; use mock-usdy-sepolia only for the labeled Mantle Sepolia testnet harness"),
   slippageBps: z.number().optional().describe("Optional slippage bound in basis points"),
   ...governedExecutionCommonSchema,
 };
@@ -263,7 +268,7 @@ export const rebalanceToTargetSchema = {
 export const rotateStrategySchema = {
   fromPositionId: z.string().optional().describe("Optional source position identifier"),
   toAsset: z.string().describe("Target asset for the strategy rotation"),
-  protocolHint: z.string().optional().describe("Optional destination protocol hint"),
+  protocolHint: z.string().optional().describe("Optional destination protocol hint; use mock-usdy-sepolia only for the labeled Mantle Sepolia testnet harness"),
   slippageBps: z.number().optional().describe("Optional slippage bound in basis points"),
   ...governedExecutionCommonSchema,
 };

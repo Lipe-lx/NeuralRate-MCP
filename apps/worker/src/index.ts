@@ -66,6 +66,7 @@ import {
   prepareAutomationGrantSchema,
   preparePolicyPublishSchema,
   preparePolicyRevokeSchema,
+  prepareMockUsdYMintSchema,
   prepareVaultRuntimeDisableSchema,
   prepareVaultRuntimeEnableSchema,
   submitAutomationGrantSchema,
@@ -104,6 +105,7 @@ import {
 } from "./stateCatalog";
 import { planGovernedExecutionAction } from "./executionActions";
 import { sanitizeJobRecordForMcp } from "./mcp/sanitize";
+import { prepareMockUsdYMintTransaction } from "./mockUsdyMint";
 
 type ExecutorServiceBinding = {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
@@ -1265,6 +1267,24 @@ export class NeuralRateExecutionMcpAgent extends McpAgent<Env, Record<string, ne
       "Transfers a supported asset through the governed NeuralRate execution path with preflight and policy checks",
       transferAssetSchema,
       async (args) => runGovernedAction("transfer_asset", args as Record<string, unknown>)
+    );
+
+    this.server.tool(
+      "prepare_mock_usdy_mint",
+      "Prepares a wallet-signable Mock USDY mint transaction for Mantle Sepolia demo funding",
+      prepareMockUsdYMintSchema,
+      async (args) => {
+        const scoped = await getScoped();
+        const result = prepareMockUsdYMintTransaction(this.env, scoped, {
+          amountToken: args.amountToken,
+          recipientAddress: args.recipientAddress,
+        });
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          structuredContent: result as Record<string, unknown>,
+        };
+      }
     );
 
     this.server.tool(

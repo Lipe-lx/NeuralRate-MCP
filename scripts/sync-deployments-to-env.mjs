@@ -120,6 +120,7 @@ const policyRegistryManifest = readJson("deployments/mantle-sepolia-policy-regis
 const executionGuardManifest = readJson("deployments/mantle-sepolia-execution-guard.json");
 const vaultModuleManifest = readJson("deployments/mantle-sepolia-vault-module.json");
 const receiptRegistryManifest = readJson("deployments/mantle-sepolia.json");
+const mockUsdYManifest = readJson("deployments/mantle-sepolia-mock-usdy.json");
 const safe4337Manifest = readJson("deployments/mantle-sepolia-safe4337-module.json");
 const safe7579Manifest = readJson("deployments/mantle-sepolia-safe7579-adapter.json");
 const safe7579LaunchpadManifest = readJson("deployments/mantle-sepolia-safe7579-launchpad.json");
@@ -129,6 +130,7 @@ const policyRegistryAddress = policyRegistryManifest?.address || "";
 const executionGuardAddress = executionGuardManifest?.address || "";
 const vaultModuleAddress = vaultModuleManifest?.address || "";
 const benchmarkAddress = receiptRegistryManifest?.address || "";
+const mockUsdYAddress = mockUsdYManifest?.deploymentPurpose === "testnet-demo-mock" ? mockUsdYManifest?.address || "" : "";
 const safe4337ModuleAddress = safe4337Manifest?.address || readOptionalEnv("NEURALRATE_SAFE_4337_MODULE_ADDRESS");
 const safe7579AdapterAddress = safe7579Manifest?.address || readOptionalEnv("NEURALRATE_SAFE_7579_ADAPTER_ADDRESS");
 const safe7579LaunchpadAddress =
@@ -154,7 +156,9 @@ const sharedRuntimeEntries = [
   { key: "NEURALRATE_SAFE_7579_ADAPTER_ADDRESS", value: safe7579AdapterAddress, after: "NEURALRATE_SAFE_4337_MODULE_ADDRESS" },
   { key: "NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS", value: safe7579LaunchpadAddress, after: "NEURALRATE_SAFE_7579_ADAPTER_ADDRESS" },
   { key: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", value: delegateValidatorAddress, after: "NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS" },
-  { key: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", value: aaEntrypointAddress, after: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS" },
+  { key: "NEURALRATE_USDY_TOKEN_ADDRESS", value: mockUsdYAddress || readOptionalEnv("NEURALRATE_USDY_TOKEN_ADDRESS"), after: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS" },
+  { key: "NEURALRATE_USDY_STRATEGY_RECIPIENT_ADDRESS", value: readOptionalEnv("NEURALRATE_USDY_STRATEGY_RECIPIENT_ADDRESS"), after: "NEURALRATE_USDY_TOKEN_ADDRESS" },
+  { key: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", value: aaEntrypointAddress, after: "NEURALRATE_USDY_STRATEGY_RECIPIENT_ADDRESS" },
   { key: "NEURALRATE_ERC7484_REGISTRY_ADDRESS", value: erc7484RegistryAddress, after: "NEURALRATE_4337_ENTRYPOINT_ADDRESS" },
 ];
 
@@ -221,7 +225,9 @@ updateEnvFile("apps/worker/.dev.vars", [
   { key: "NEURALRATE_SAFE_7579_ADAPTER_ADDRESS", value: safe7579AdapterAddress, after: "NEURALRATE_SAFE_4337_MODULE_ADDRESS", style: "quoted" },
   { key: "NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS", value: safe7579LaunchpadAddress, after: "NEURALRATE_SAFE_7579_ADAPTER_ADDRESS", style: "quoted" },
   { key: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", value: delegateValidatorAddress, after: "NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS", style: "quoted" },
-  { key: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", value: aaEntrypointAddress, after: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", style: "quoted" },
+  { key: "NEURALRATE_USDY_TOKEN_ADDRESS", value: mockUsdYAddress || readOptionalEnv("NEURALRATE_USDY_TOKEN_ADDRESS"), after: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", style: "quoted" },
+  { key: "NEURALRATE_USDY_STRATEGY_RECIPIENT_ADDRESS", value: readOptionalEnv("NEURALRATE_USDY_STRATEGY_RECIPIENT_ADDRESS"), after: "NEURALRATE_USDY_TOKEN_ADDRESS", style: "quoted" },
+  { key: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", value: aaEntrypointAddress, after: "NEURALRATE_USDY_STRATEGY_RECIPIENT_ADDRESS", style: "quoted" },
   { key: "NEURALRATE_ERC7484_REGISTRY_ADDRESS", value: erc7484RegistryAddress, after: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", style: "quoted" },
   { key: "EXECUTOR_BASE_URL", value: readOptionalEnv("EXECUTOR_BASE_URL") || "http://127.0.0.1:8788", after: "INTERNAL_API_TOKEN", style: "quoted" },
 ]);
@@ -239,7 +245,9 @@ updateEnvFile("apps/worker/.dev.vars.example", [
   { key: "NEURALRATE_SAFE_7579_ADAPTER_ADDRESS", value: safe7579AdapterAddress || ZERO_ADDRESS, after: "NEURALRATE_SAFE_4337_MODULE_ADDRESS", style: "quoted" },
   { key: "NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS", value: safe7579LaunchpadAddress || ZERO_ADDRESS, after: "NEURALRATE_SAFE_7579_ADAPTER_ADDRESS", style: "quoted" },
   { key: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", value: delegateValidatorAddress || ZERO_ADDRESS, after: "NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS", style: "quoted" },
-  { key: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", value: aaEntrypointAddress || ZERO_ADDRESS, after: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", style: "quoted" },
+  { key: "NEURALRATE_USDY_TOKEN_ADDRESS", value: mockUsdYAddress || readOptionalEnv("NEURALRATE_USDY_TOKEN_ADDRESS") || ZERO_ADDRESS, after: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", style: "quoted" },
+  { key: "NEURALRATE_USDY_STRATEGY_RECIPIENT_ADDRESS", value: readOptionalEnv("NEURALRATE_USDY_STRATEGY_RECIPIENT_ADDRESS") || ZERO_ADDRESS, after: "NEURALRATE_USDY_TOKEN_ADDRESS", style: "quoted" },
+  { key: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", value: aaEntrypointAddress || ZERO_ADDRESS, after: "NEURALRATE_USDY_STRATEGY_RECIPIENT_ADDRESS", style: "quoted" },
   { key: "NEURALRATE_ERC7484_REGISTRY_ADDRESS", value: erc7484RegistryAddress || ZERO_ADDRESS, after: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", style: "quoted" },
   { key: "NEURALRATE_PAYMASTER_ENABLED", value: readOptionalEnv("NEURALRATE_PAYMASTER_ENABLED") || "true", after: "NEURALRATE_ERC7484_REGISTRY_ADDRESS", style: "quoted" },
   { key: "EXECUTOR_BASE_URL", value: readOptionalEnv("EXECUTOR_BASE_URL") || "http://127.0.0.1:8788", after: "INTERNAL_API_TOKEN", style: "quoted" },
@@ -259,7 +267,9 @@ updateEnvFile("apps/worker/wrangler.toml", [
   { key: "NEURALRATE_SAFE_7579_ADAPTER_ADDRESS", value: safe7579AdapterAddress || "", after: "NEURALRATE_SAFE_4337_MODULE_ADDRESS", style: "tomlQuoted" },
   { key: "NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS", value: safe7579LaunchpadAddress || "", after: "NEURALRATE_SAFE_7579_ADAPTER_ADDRESS", style: "tomlQuoted" },
   { key: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", value: delegateValidatorAddress || "", after: "NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS", style: "tomlQuoted" },
-  { key: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", value: aaEntrypointAddress || "", after: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", style: "tomlQuoted" },
+  { key: "NEURALRATE_USDY_TOKEN_ADDRESS", value: mockUsdYAddress || readOptionalEnv("NEURALRATE_USDY_TOKEN_ADDRESS") || "", after: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", style: "tomlQuoted" },
+  { key: "NEURALRATE_USDY_STRATEGY_RECIPIENT_ADDRESS", value: readOptionalEnv("NEURALRATE_USDY_STRATEGY_RECIPIENT_ADDRESS") || "", after: "NEURALRATE_USDY_TOKEN_ADDRESS", style: "tomlQuoted" },
+  { key: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", value: aaEntrypointAddress || "", after: "NEURALRATE_USDY_STRATEGY_RECIPIENT_ADDRESS", style: "tomlQuoted" },
   { key: "NEURALRATE_ERC7484_REGISTRY_ADDRESS", value: erc7484RegistryAddress || "", after: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", style: "tomlQuoted" },
   { key: "NEURALRATE_PAYMASTER_ENABLED", value: readOptionalEnv("NEURALRATE_PAYMASTER_ENABLED") || "true", after: "NEURALRATE_ERC7484_REGISTRY_ADDRESS", style: "tomlQuoted" },
 ]);
@@ -278,7 +288,9 @@ updateEnvFile("apps/executor/wrangler.toml", [
   { key: "NEURALRATE_SAFE_7579_ADAPTER_ADDRESS", value: safe7579AdapterAddress || "", after: "NEURALRATE_SAFE_4337_MODULE_ADDRESS", style: "tomlQuoted" },
   { key: "NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS", value: safe7579LaunchpadAddress || "", after: "NEURALRATE_SAFE_7579_ADAPTER_ADDRESS", style: "tomlQuoted" },
   { key: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", value: delegateValidatorAddress || "", after: "NEURALRATE_SAFE_7579_LAUNCHPAD_ADDRESS", style: "tomlQuoted" },
-  { key: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", value: aaEntrypointAddress || "", after: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", style: "tomlQuoted" },
+  { key: "NEURALRATE_USDY_TOKEN_ADDRESS", value: mockUsdYAddress || readOptionalEnv("NEURALRATE_USDY_TOKEN_ADDRESS") || "", after: "NEURALRATE_DELEGATE_VALIDATOR_ADDRESS", style: "tomlQuoted" },
+  { key: "NEURALRATE_USDY_STRATEGY_RECIPIENT_ADDRESS", value: readOptionalEnv("NEURALRATE_USDY_STRATEGY_RECIPIENT_ADDRESS") || "", after: "NEURALRATE_USDY_TOKEN_ADDRESS", style: "tomlQuoted" },
+  { key: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", value: aaEntrypointAddress || "", after: "NEURALRATE_USDY_STRATEGY_RECIPIENT_ADDRESS", style: "tomlQuoted" },
   { key: "NEURALRATE_ERC7484_REGISTRY_ADDRESS", value: erc7484RegistryAddress || "", after: "NEURALRATE_4337_ENTRYPOINT_ADDRESS", style: "tomlQuoted" },
   { key: "NEURALRATE_PAYMASTER_RPC_URL", value: readOptionalEnv("NEURALRATE_PAYMASTER_RPC_URL") || "", after: "NEURALRATE_ERC7484_REGISTRY_ADDRESS", style: "tomlQuoted" },
   { key: "NEURALRATE_PAYMASTER_CONTEXT_JSON", value: readOptionalEnv("NEURALRATE_PAYMASTER_CONTEXT_JSON") || "", after: "NEURALRATE_PAYMASTER_RPC_URL", style: "tomlQuoted" },

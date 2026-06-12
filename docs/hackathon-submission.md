@@ -65,6 +65,11 @@ Do not reuse stale failed or blocked jobs as the main evidence trail. If a live 
   - preserved in code
   - not the default demo
   - blocked on Sepolia when no canonical venue is configured
+- `mock-usdy-sepolia-allocation`
+  - explicit Mantle Sepolia demo harness
+  - routes wallet-held Mock USDY through the same Safe module ERC-20 execution path
+  - funding can be initiated from the Vault UI Mock USDY Faucet or prepared via MCP `prepare_mock_usdy_mint`
+  - disclosed as a testnet substitute because Ondo has no canonical public Mantle Sepolia USDY deployment; mainnet uses Ondo's canonical USDY contract
 
 ## Claims That Match the Current Code
 
@@ -75,6 +80,7 @@ Do not reuse stale failed or blocked jobs as the main evidence trail. If a live 
 - The worker stores the resulting receipt tx hash and on-chain identifiers.
 - The live Sepolia execution demo routes through a deployed Safe module.
 - Unsupported Sepolia venues fail closed with an explicit reason.
+- Mock USDY execution is labeled separately from canonical USDY execution.
 
 ## Claims This Repository Does Not Prove by Default
 
