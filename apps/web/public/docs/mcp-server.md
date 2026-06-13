@@ -2,6 +2,16 @@
 
 **Status:** Canonical doc
 
+NeuralRate MCP is the primary product interface for external AI models and agents. NeuralRate does not embed an LLM or make autonomous reasoning claims: the external model chooses which tool to request, while NeuralRate controls tool discovery, owner authorization, structured state, preflight, execution dispatch, and policy enforcement.
+
+The security model is capability-based:
+
+- the public endpoint is read-only and carries no vault authority
+- the owner grants narrow, time-bounded access to a specific scoped catalog
+- a scoped token never expands beyond its advertised domain
+- execution requests must still pass vault readiness and the active on-chain policy
+- the web application is the owner's configuration and audit panel, not the agent runtime
+
 The MCP server runs inside `apps/worker` and is split into one public read-only catalog plus four scoped catalogs:
 
 - `state` for read-only vault introspection bound to one scoped automation session

@@ -9,7 +9,9 @@ type DeploymentManifest = {
   address: string;
   txHash: string;
   expectedBytecodeHash: string;
+  owner: string;
   authorizedExecutor: string;
+  executionGuard: string;
   updatedAt: string;
 };
 
@@ -77,7 +79,9 @@ async function main() {
     address,
     txHash,
     expectedBytecodeHash,
+    owner: signer.address,
     authorizedExecutor: configuredExecutor,
+    executionGuard: configuredExecutionGuard,
     updatedAt: new Date().toISOString(),
   };
 

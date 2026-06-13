@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-13T01:11:46.932Z",
+  "generatedAt": "2026-06-13T04:31:25.019Z",
   "deployments": {
     "mantle-sepolia-delegate-validator.json": {
       "network": "mantleSepolia",
@@ -17,6 +17,8 @@
       "contractName": "NeuralRateExecutionGuard",
       "address": "0x666Bc822156824F40F2b70aAaAcBfe87467D79A5",
       "txHash": "0x984bc0f8daf9e59496aef8156e827011c6d96297a72b57d8e7e5c6fe9ec73f31",
+      "expectedBytecodeHash": "0x082eaf4aacc89abe2754d5800c4786c7c11ec4a4ce0612bca93b9ae0235920e4",
+      "owner": "0x54FCb49Cd7281140e17721f65f00e49a809400Bc",
       "policyRegistry": "0x86cD4f8c2528E71a473ED342aa73B8a00de906a4",
       "trustedModule": "0xACBB78DAB5D1404C9eeC1E90BCe569cD1acc91bF",
       "trustedSafeModule": "0x7ec994fD2F774Fb8AAe472C349ED3E64E0A15FEa",
@@ -47,6 +49,7 @@
       "contractName": "NeuralRatePolicyRegistry",
       "address": "0x86cD4f8c2528E71a473ED342aa73B8a00de906a4",
       "txHash": "0xe3d485f680dad824ce4bca957f2f86b69b04372f7330fa7eb67682d4e09700b6",
+      "expectedBytecodeHash": "0xa9dad2052693fe0afa7845b35fa529499b3728a9e5a0d5fc822ae203979b7fc7",
       "updatedAt": "2026-06-09T21:52:18.957Z"
     },
     "mantle-sepolia-safe-module-setup.json": {
@@ -100,7 +103,8 @@
       "contractName": "NeuralRateUsdYStrategyAdapter",
       "address": "0xFeE16FAd13789e9bBA4779D025186341e58799a3",
       "txHash": "0xee3a1caa73baaa8d3adcd103d44d9bf424b5612b660fc642bc40e11287a9e3c8",
-      "expectedBytecodeHash": "0xff271a4bc5ce13df570282786a51e964ce8c2fe29c9774ded51cf52a317b95de",
+      "expectedBytecodeHash": "0xcab588924aa9de2f775dcb7154530a43fbcc81305dbcbc77e3b60c92f74cf705",
+      "owner": "0x54FCb49Cd7281140e17721f65f00e49a809400Bc",
       "authorizedExecutor": "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
       "updatedAt": "2026-05-25T19:08:46.398Z"
     },
@@ -111,7 +115,9 @@
       "address": "0xACBB78DAB5D1404C9eeC1E90BCe569cD1acc91bF",
       "txHash": "0xeec210449b8b48c8745186e7c92ef8bac2cf1a7c4fe239141aa4b9c980eae031",
       "expectedBytecodeHash": "0x584c9850e175d9106bf285fbf57344d9a209ef2b161fc542891530f912efcdd4",
+      "owner": "0x54FCb49Cd7281140e17721f65f00e49a809400Bc",
       "authorizedExecutor": "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
+      "executionGuard": "0x666Bc822156824F40F2b70aAaAcBfe87467D79A5",
       "updatedAt": "2026-06-10T07:44:54.288Z"
     },
     "mantle-sepolia.json": {
@@ -120,6 +126,8 @@
       "contractName": "NeuralRateDecisionReceiptRegistry",
       "address": "0xC0C836A220D006398cdE4D5caf529196E63f81A8",
       "txHash": "0xb57c647181934f4834e7ae176c81bb24f235a1b5670cbb3644170b6c48975cf3",
+      "expectedBytecodeHash": "0x4545970f130db04e97d5a1cffa25c8ff2ee6d17029e7804a0fdf337f132f11ea",
+      "owner": "0x54FCb49Cd7281140e17721f65f00e49a809400Bc",
       "receiptWriter": "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
       "deploymentMode": "agent-smart-wallet",
       "agentId": "49",
@@ -134,6 +142,8 @@
       "contractName": "NeuralRateDecisionReceiptRegistry",
       "address": "0xC0C836A220D006398cdE4D5caf529196E63f81A8",
       "txHash": "0xb57c647181934f4834e7ae176c81bb24f235a1b5670cbb3644170b6c48975cf3",
+      "expectedBytecodeHash": "0x4545970f130db04e97d5a1cffa25c8ff2ee6d17029e7804a0fdf337f132f11ea",
+      "owner": "0x54FCb49Cd7281140e17721f65f00e49a809400Bc",
       "receiptWriter": "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
       "deploymentMode": "agent-smart-wallet",
       "agentId": "49",
@@ -146,6 +156,7 @@
       "contractName": "NeuralRatePolicyRegistry",
       "address": "0x86cD4f8c2528E71a473ED342aa73B8a00de906a4",
       "txHash": "0xe3d485f680dad824ce4bca957f2f86b69b04372f7330fa7eb67682d4e09700b6",
+      "expectedBytecodeHash": "0xa9dad2052693fe0afa7845b35fa529499b3728a9e5a0d5fc822ae203979b7fc7",
       "updatedAt": "2026-06-09T21:52:18.957Z"
     },
     "executionGuard": {
@@ -154,6 +165,8 @@
       "contractName": "NeuralRateExecutionGuard",
       "address": "0x666Bc822156824F40F2b70aAaAcBfe87467D79A5",
       "txHash": "0x984bc0f8daf9e59496aef8156e827011c6d96297a72b57d8e7e5c6fe9ec73f31",
+      "expectedBytecodeHash": "0x082eaf4aacc89abe2754d5800c4786c7c11ec4a4ce0612bca93b9ae0235920e4",
+      "owner": "0x54FCb49Cd7281140e17721f65f00e49a809400Bc",
       "policyRegistry": "0x86cD4f8c2528E71a473ED342aa73B8a00de906a4",
       "trustedModule": "0xACBB78DAB5D1404C9eeC1E90BCe569cD1acc91bF",
       "trustedSafeModule": "0x7ec994fD2F774Fb8AAe472C349ED3E64E0A15FEa",
@@ -169,7 +182,9 @@
       "address": "0xACBB78DAB5D1404C9eeC1E90BCe569cD1acc91bF",
       "txHash": "0xeec210449b8b48c8745186e7c92ef8bac2cf1a7c4fe239141aa4b9c980eae031",
       "expectedBytecodeHash": "0x584c9850e175d9106bf285fbf57344d9a209ef2b161fc542891530f912efcdd4",
+      "owner": "0x54FCb49Cd7281140e17721f65f00e49a809400Bc",
       "authorizedExecutor": "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
+      "executionGuard": "0x666Bc822156824F40F2b70aAaAcBfe87467D79A5",
       "updatedAt": "2026-06-10T07:44:54.288Z"
     },
     "mockUsdY": {

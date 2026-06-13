@@ -69,7 +69,7 @@ Important functions:
 
 - file: `contracts/contracts/NeuralRateVaultModule.sol`
 - role: Safe module used for real vault execution
-- live Sepolia module deployment: [`0xf7061501a464e893636a5BF8eB4ab7Ba2819154D`](https://sepolia.mantlescan.xyz/address/0xf7061501a464e893636a5BF8eB4ab7Ba2819154D)
+- live Sepolia module deployment: [`0xACBB78DAB5D1404C9eeC1E90BCe569cD1acc91bF`](https://sepolia.mantlescan.xyz/address/0xACBB78DAB5D1404C9eeC1E90BCe569cD1acc91bF)
 
 What it does:
 

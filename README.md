@@ -3,21 +3,23 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Mantle Sepolia](https://img.shields.io/badge/Network-Mantle_Sepolia_(5003)-5c6bc0.svg)](https://explorer.sepolia.mantle.xyz)
 
-NeuralRate MCP is a decentralized yield optimization and risk assessment terminal deployed on **Mantle Sepolia (`5003`)**. It enables AI agents and operator panels to securely scan yields, assess protocol risk, benchmark allocation decisions, and dispatch automated vault execution transactions within owner-defined, on-chain policy limits.
+NeuralRate MCP is a secure authorization and execution layer for external AI models and agents, deployed on **Mantle Sepolia (`5003`)**. Owners define the vault, capability scopes, limits, and expiry. External models connect through MCP and can discover or invoke only the tools exposed to their session; execution requests must also pass the active on-chain policy and Safe execution path.
 
-The project features a **Cloudflare Worker public control plane**, a **private Cloudflare Worker executor for transaction dispatch**, a **Vite React operator panel**, and a suite of **Solidity smart contracts** acting as the ultimate execution guards.
+NeuralRate does not provide or impersonate the AI model. The external model supplies reasoning and intent. NeuralRate supplies the MCP tool surface, authorization, structured vault state, fail-closed preflight, execution dispatch, and verifiable evidence.
+
+The web application is the owner's configuration and audit panel. The MCP server is the primary product interface for AI clients.
 
 ---
 
 ## Key Features & Capabilities
 
-1. **Deterministic Multi-Factor Risk Engine**: A deterministic scoring system evaluating TVL depth, volume utilization, APY volatility, yield composition (base vs. rewards), IL exposure, and institutional flow metrics to classify pool risk (Low, Medium, High, Critical).
-2. **Public Model Context Protocol (MCP) Server**: A read-only MCP catalog allowing LLMs to scan Mantle yields, check T-Bill spreads, retrieve token context, and request optimal asset allocations.
-3. **Session-Scoped Mutation Catalogs**: Scoped mutation routes (`/mcp/scoped/config`, `/mcp/scoped/benchmark`, `/mcp/scoped/execution`) that expose sensitive tools only to authorized agents holding a valid, owner-signed session token.
-4. **On-Chain Policy Enforcement**: Decentralized verification where all automation boundaries (spend caps, allowlisted assets, selectors, delegates, validity windows) are stored directly in `NeuralRatePolicyRegistry.sol` and enforced by `NeuralRateExecutionGuard.sol`.
-5. **On-Chain Decision Receipts**: Immutable logging of yield-allocation decisions to `NeuralRateDecisionReceiptRegistry.sol` with cryptographic data snapshots for third-party auditability and performance settlement.
-6. **Real Safe7579 Vault Execution**: Automated execution is dispatched from the user's Safe vault through the Safe7579/ERC-4337 runtime and `NeuralRateVaultModule.sol`, validating delegate authority and intent limits on-chain before transaction dispatch.
-7. **Mock USDY Testnet Harness**: Mantle Sepolia exposes an explicit `mock-usdy-sepolia-allocation` path for ERC-20 demo execution because Ondo has no canonical public USDY deployment on this testnet.
+1. **Public MCP Product Surface**: A read-only catalog allows external models to scan Mantle yields, check T-Bill spreads, retrieve token context, assess deterministic risk, and request allocations without receiving vault authority.
+2. **Owner-Scoped MCP Authorization**: Separate `state`, `config`, `benchmark`, and `execution` catalogs advertise sensitive tools only to sessions carrying the required owner-issued domain and validity window.
+3. **On-Chain Policy Enforcement**: Automation boundaries such as value limits, allowed assets, selectors, delegates, destinations, and validity windows are anchored through `NeuralRatePolicyRegistry.sol` and enforced in the execution path by `NeuralRateExecutionGuard.sol`.
+4. **Real Safe7579 Vault Execution**: Authorized execution is dispatched from the user's Safe through the Safe7579/ERC-4337 runtime and `NeuralRateVaultModule.sol`, with preflight and on-chain checks before settlement.
+5. **Auditable Decision Receipts**: Allocation decisions can be written to `NeuralRateDecisionReceiptRegistry.sol` with cryptographic snapshot references for third-party inspection.
+6. **Deterministic Advisory Engine**: The public `risk_assess` tool evaluates TVL depth, volume utilization, APY volatility, yield composition, IL exposure, and flow metrics without pretending to be an AI model.
+7. **Explicit Testnet Harness**: Mantle Sepolia exposes a labeled `mock-usdy-sepolia-allocation` path because Ondo has no canonical public USDY deployment on this testnet.
 
 ---
 
@@ -58,7 +60,7 @@ All production contracts are deployed on Mantle Sepolia (`5003`):
 | **`NeuralRateDecisionReceiptRegistry`** | Immutable decision receipt registry for benchmarking | [`0xC0C836A220D006398cdE4D5caf529196E63f81A8`](https://sepolia.mantlescan.xyz/address/0xC0C836A220D006398cdE4D5caf529196E63f81A8) |
 | **`NeuralRatePolicyRegistry`** | Anchors owner policy parameters & snapshot references | [`0x86cD4f8c2528E71a473ED342aa73B8a00de906a4`](https://sepolia.mantlescan.xyz/address/0x86cD4f8c2528E71a473ED342aa73B8a00de906a4) |
 | **`NeuralRateExecutionGuard`** | On-chain guard validating vault transaction limits | [`0x666Bc822156824F40F2b70aAaAcBfe87467D79A5`](https://sepolia.mantlescan.xyz/address/0x666Bc822156824F40F2b70aAaAcBfe87467D79A5) |
-| **`NeuralRateVaultModule`** | Safe Module executing automated transactions | [`0xf7061501a464e893636a5BF8eB4ab7Ba2819154D`](https://sepolia.mantlescan.xyz/address/0xf7061501a464e893636a5BF8eB4ab7Ba2819154D) |
+| **`NeuralRateVaultModule`** | Safe Module executing automated transactions | [`0xACBB78DAB5D1404C9eeC1E90BCe569cD1acc91bF`](https://sepolia.mantlescan.xyz/address/0xACBB78DAB5D1404C9eeC1E90BCe569cD1acc91bF) |
 | **`NeuralRateDelegateValidator`** | Safe7579 delegate validator for ERC-4337 UserOperations | [`0x0A03F7763d53757183aD86C393eEfF6D8177e4cE`](https://sepolia.mantlescan.xyz/address/0x0A03F7763d53757183aD86C393eEfF6D8177e4cE) |
 | **`NeuralRateUsdYStrategyAdapter`** | Preserved strategy adapter for USDY allocation | [`0xFeE16FAd13789e9bBA4779D025186341e58799a3`](https://sepolia.mantlescan.xyz/address/0xFeE16FAd13789e9bBA4779D025186341e58799a3) |
 | **`MockERC20` as Mock USDY** | Testnet-only USDY-shaped ERC-20 demo token | [`0xC63FB10deD215c6De6cDB438FB2Ce7944F6Af5bE`](https://sepolia.mantlescan.xyz/address/0xC63FB10deD215c6De6cDB438FB2Ce7944F6Af5bE) |
@@ -99,10 +101,9 @@ The Worker advertises the canonical read-only MCP endpoint in [agent-card.json](
 *   `nansen_context`: Fetches Smart Money flows for a specific token via Nansen API.
 *   `risk_assess`: Performs a deterministic 6-factor risk assessment.
 *   `optimal_allocation`: Computes an optimal allocation based on the user's risk profile and constraints.
-*   `get_decisions`: Fetches logged decisions from the database.
 
 #### Session-Locked Mutation Tools (Requires Authorization)
-*   `get_user_state` / `list_jobs`: Retrieves active configuration, session and background job logs (requires `sessionToken`).
+*   `get_user_state` / `get_decisions` / `list_jobs`: Retrieves active configuration, decision history, session, and background job logs (requires the scoped state session).
 *   `update_agent_policy` (Config Scope): Modifies the owner's off-chain configuration limits (requires config domain session).
 *   `queue_benchmark` (Benchmark Scope): Submits a transaction to anchor a decision receipt on-chain.
 *   `prepare_mock_usdy_mint` (Execution Scope): Prepares a wallet-signable Mock USDY mint transaction for the agent Safe vault.

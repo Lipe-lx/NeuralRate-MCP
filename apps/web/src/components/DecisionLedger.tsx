@@ -356,7 +356,7 @@ const DecisionLedger: React.FC<Props> = ({ state, busy, onRefreshAutomation }) =
             <div>
               <h2 style={{ margin: 0, fontSize: "1.1rem" }}>Benchmark History</h2>
               <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginTop: "0.2rem" }}>
-                Personalized decisions with a recommend-first flow and optional vault automation
+                Owner-scoped decisions with MCP authorization, policy checks, and auditable execution evidence
               </div>
             </div>
             <button

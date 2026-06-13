@@ -1,5 +1,13 @@
 import { ethers, network } from "hardhat";
 
+const requiredAddress = (name: string) => {
+  const value = process.env[name]?.trim();
+  if (!value || !ethers.isAddress(value)) {
+    throw new Error(`Set a valid ${name} before running this trace simulation.`);
+  }
+  return value;
+};
+
 async function main() {
   if (network.name !== "hardhat") {
     console.log("This trace simulation must be run on the local 'hardhat' network.");
@@ -22,8 +30,8 @@ async function main() {
 
   console.log("Forking Mantle Sepolia at block:", latestBlock?.number);
 
-  const registryAddress = "0x86cD4f8c2528E71a473ED342aa73B8a00de906a4";
-  const moduleAddress = "0xf7061501a464e893636a5BF8eB4ab7Ba2819154D";
+  const registryAddress = requiredAddress("NEURALRATE_POLICY_REGISTRY_CONTRACT");
+  const moduleAddress = requiredAddress("NEURALRATE_VAULT_MODULE_ADDRESS");
   const module = await ethers.getContractAt("NeuralRateVaultModule", moduleAddress);
 
   // Build anchorSnapshot calldata
@@ -59,8 +67,6 @@ async function main() {
   const safe7579Abi = [
     "function execute(bytes32 mode, bytes calldata executionCalldata) external"
   ];
-  const safe = await ethers.getContractAt(safe7579Abi, vaultAddress);
-
   // Single call mode
   const singleMode = "0x0000000000000000000000000000000000000000000000000000000000000000";
 
@@ -89,7 +95,7 @@ async function main() {
     "0x10000000000000000000",
   ]);
 
-  const safeWithEntrypoint = safe.connect(entrypointSigner);
+  const safeWithEntrypoint = new ethers.Contract(vaultAddress, safe7579Abi, entrypointSigner);
 
   console.log("\n1. Simulating Call 0 (anchorSnapshot) as single call on Safe...");
   try {

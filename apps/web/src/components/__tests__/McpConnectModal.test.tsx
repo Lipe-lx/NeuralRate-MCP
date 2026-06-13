@@ -12,9 +12,9 @@ describe('McpConnectModal', () => {
     const onClose = vi.fn();
     render(<McpConnectModal isOpen={true} onClose={onClose} />);
 
-    // Verify title and description exist
-    expect(screen.getByText('Agent Connection')).toBeInTheDocument();
-    expect(screen.getByText(/NeuralRate works as a yield terminal without MCP/)).toBeInTheDocument();
+    expect(screen.getByText('Connect Through MCP')).toBeInTheDocument();
+    expect(screen.getByText(/The public endpoint exposes read-only advisory tools/)).toBeInTheDocument();
+    expect(screen.getByText('Public Read-Only Endpoint')).toBeInTheDocument();
 
     // Check that onClose is triggered when clicking close button
     const closeButton = screen.getByText('×');

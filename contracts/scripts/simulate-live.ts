@@ -1,5 +1,13 @@
 import { ethers } from "hardhat";
 
+const requiredAddress = (name: string) => {
+  const value = process.env[name]?.trim();
+  if (!value || !ethers.isAddress(value)) {
+    throw new Error(`Set a valid ${name} before running this simulation.`);
+  }
+  return value;
+};
+
 async function main() {
   const vaultAddress = "0x94df9577f3ad55bc5c106a6e631bb2f3381f4ace";
   const ownerEoa = "0x053ddf34340b4f36f6ff71e723193e8321b6f393";
@@ -13,8 +21,8 @@ async function main() {
   const slippageBps = 0;
   const deadline = Math.floor(Date.now() / 1000) + 3600;
 
-  const moduleAddress = "0xf7061501a464e893636a5BF8eB4ab7Ba2819154D";
-  const guardAddress = "0x666Bc822156824F40F2b70aAaAcBfe87467D79A5";
+  const moduleAddress = requiredAddress("NEURALRATE_VAULT_MODULE_ADDRESS");
+  const guardAddress = requiredAddress("NEURALRATE_EXECUTION_GUARD_CONTRACT");
 
   const module = await ethers.getContractAt("NeuralRateVaultModule", moduleAddress);
   const guard = await ethers.getContractAt("NeuralRateExecutionGuard", guardAddress);
@@ -43,7 +51,7 @@ async function main() {
       "0x10000000000000000000",
     ]);
 
-    const registryAddress = "0x86cD4f8c2528E71a473ED342aa73B8a00de906a4";
+    const registryAddress = requiredAddress("NEURALRATE_POLICY_REGISTRY_CONTRACT");
     const registry = await ethers.getContractAt("NeuralRatePolicyRegistry", registryAddress, vaultSigner);
     
     console.log("Anchoring snapshot on local fork...");

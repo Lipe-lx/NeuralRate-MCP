@@ -6,7 +6,16 @@ This file is intentionally factual. It describes the current codebase behavior a
 
 ## One-Liner
 
-NeuralRate MCP is a Mantle Sepolia worker and MCP server that anchors per-user vault policy on-chain, records decision receipts on-chain, and dispatches real Safe7579 vault execution jobs under owner-approved automation scope.
+NeuralRate MCP is a secure authorization and execution layer for external AI models: owners define vault scopes and limits, agents receive only the MCP capabilities they are granted, and execution is constrained by policy enforced on-chain on Mantle.
+
+## Product Boundary
+
+- The external AI model supplies reasoning, planning, and tool selection.
+- NeuralRate is the MCP product surface that supplies tools, authorization, vault state, execution preflight, dispatch, and evidence.
+- The public MCP endpoint is read-only.
+- Vault-bound capabilities require an owner-issued, time-bounded scoped session.
+- Passing MCP authorization is necessary but not sufficient for execution; the request must also satisfy runtime readiness and the active on-chain policy.
+- The web app is the owner console for configuring, granting, revoking, and auditing agent access.
 
 ## What the Demo Actually Shows
 

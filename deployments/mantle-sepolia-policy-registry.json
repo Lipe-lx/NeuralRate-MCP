@@ -4,5 +4,6 @@
   "contractName": "NeuralRatePolicyRegistry",
   "address": "0x86cD4f8c2528E71a473ED342aa73B8a00de906a4",
   "txHash": "0xe3d485f680dad824ce4bca957f2f86b69b04372f7330fa7eb67682d4e09700b6",
+  "expectedBytecodeHash": "0xa9dad2052693fe0afa7845b35fa529499b3728a9e5a0d5fc822ae203979b7fc7",
   "updatedAt": "2026-06-09T21:52:18.957Z"
 }

@@ -40,8 +40,8 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
   // Interactive Bento Code State
   const [activeCodeTab, setActiveCodeTab] = useState<'mcp' | 'proof'>('mcp');
   const [mcpConsoleLines, setMcpConsoleLines] = useState<string[]>([
-    'Initializing WebMCP secure tunnel...',
-    '✓ Tunnel active via Mantle Sepolia Gateway.',
+    'Connecting to the NeuralRate MCP server...',
+    '✓ Public read-only catalog available over Streamable HTTP.',
   ]);
   const [isMcpRunning, setIsMcpRunning] = useState<boolean>(false);
 
@@ -55,11 +55,11 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
 
   const triggerFaqScan = () => {
     setIsFaqScanning(true);
-    setFaqScanResult('INITIALIZING QUANT DECRYPTOR...');
+    setFaqScanResult('CALLING PUBLIC MCP TOOL: risk_assess...');
     setTimeout(() => {
-      setFaqScanResult('CONNECTING WEBMCP YIELD GATEWAY...');
+      setFaqScanResult('EVALUATING THE 6-FACTOR INPUT SNAPSHOT...');
       setTimeout(() => {
-        setFaqScanResult('✓ SUCCESS: SCANNED 8.5% SUSTAINABLE YIELD [SAFETY: A+]');
+        setFaqScanResult('✓ RESULT: SCORE 92.4 / CLASSIFICATION LOW');
         setIsFaqScanning(false);
       }, 500);
     }, 500);
@@ -197,16 +197,16 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
   // Hero Terminal Simulation Effect
   useEffect(() => {
     const scripts = [
-      { type: 'cmd', text: 'mcp.call scan_yield_opportunities --network=mantle' },
-      { type: 'info', text: '  ↳ Scanning 42 pools across Mantle DEXs...' },
-      { type: 'success', text: '  ✓ Scan completed. Found 8 pools matching safety thresholds.' },
-      { type: 'cmd', text: 'mcp.call assess_pool_risk --pool="USDC-USDT-Mantle"' },
-      { type: 'info', text: '  ↳ Quantifying 6 security parameters in deterministic engine...' },
-      { type: 'res', text: '  { "score": 92.4, "rating": "A+", "safety": "LOW_RISK", "action": "AUTHORIZE" }' },
-      { type: 'cmd', text: 'mcp.call execute_safe_deposit --vault="0x94b4...1c2a"' },
-      { type: 'info', text: '  ↳ Bundling Safe Transaction with signed spending limit rule...' },
-      { type: 'success', text: '  ✓ Transaction anchored on Mantle Network: 0xf3a...8d2b' },
-      { type: 'success', text: '  ✓ Cryptographic Decision Receipt anchored to Proof Registry.' },
+      { type: 'cmd', text: 'mcp.connect https://neuralrate-worker.neuralrate.workers.dev/mcp' },
+      { type: 'success', text: '  ✓ Public catalog connected: 5 read-only tools.' },
+      { type: 'cmd', text: 'tools/call risk_assess' },
+      { type: 'res', text: '  { "score": 92.4, "classification": "LOW", "deterministic": true }' },
+      { type: 'cmd', text: 'mcp.connect /mcp/scoped/execution' },
+      { type: 'info', text: '  ↳ Owner-issued session token and execution domain required.' },
+      { type: 'cmd', text: 'tools/call open_position' },
+      { type: 'info', text: '  ↳ Checking vault, grant, runtime, asset, amount, and on-chain policy...' },
+      { type: 'success', text: '  ✓ Request accepted inside the owner-approved scope.' },
+      { type: 'success', text: '  ✓ Safe execution proof recorded on Mantle Sepolia.' },
     ];
 
     const timer = setInterval(() => {
@@ -226,26 +226,26 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
     return () => clearInterval(timer);
   }, []);
 
-  // WebMCP Sandbox code runner simulation
+  // MCP sandbox code runner simulation
   const runMcpSandbox = () => {
     if (isMcpRunning) return;
     setIsMcpRunning(true);
-    setMcpConsoleLines((prev) => [...prev, '▸ calling tool: assess_pool_risk { pool: "LEND-MNT" }']);
+    setMcpConsoleLines((prev) => [...prev, '▸ tools/call risk_assess { pool: "LEND-MNT" }']);
     
     setTimeout(() => {
       setMcpConsoleLines((prev) => [
         ...prev,
-        '  ↳ assessing TVL depth: $45.2M (Score: 17.8/20)',
-        '  ↳ checking volume utilization: 24% (Score: 15/15)',
-        '  ↳ evaluating APY deviation: 18.2% (Score: 11.2/20)',
+        '  ↳ public MCP catalog: read-only',
+        '  ↳ deterministic inputs accepted',
+        '  ↳ no vault authority requested',
       ]);
     }, 1000);
 
     setTimeout(() => {
       setMcpConsoleLines((prev) => [
         ...prev,
-        '  { "success": true, "safetyScore": 76.5, "classification": "MEDIUM_RISK" }',
-        '✓ Process terminated. Proof ledger synchronized.',
+        '  { "success": true, "score": 76.5, "classification": "MEDIUM" }',
+        '✓ Advisory result returned. No transaction was created.',
       ]);
       setIsMcpRunning(false);
     }, 2200);
@@ -294,22 +294,22 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
         </div>
 
         <h1 className="hero-headline hero-headline-gradient" style={{ zIndex: 10, fontSize: '3.75rem', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.15, marginTop: '1rem', textTransform: 'none' }}>
-          Risk Intelligence Layer
+          The MCP Safety Layer
         </h1>
         <div className="hero-headline-sub" style={{ zIndex: 10, fontSize: '1.75rem', fontWeight: 700, display: 'flex', gap: '0.65rem', justifyContent: 'center', alignItems: 'center', marginTop: '0.5rem', color: 'var(--text-primary)' }}>
           <span>for</span>
           <span className="word-cycle-container">
             <span className="word-cycle-track">
-              <span className="word-cycle-item">Autonomous AI Agents</span>
-              <span className="word-cycle-item">DeFi Risk Operators</span>
-              <span className="word-cycle-item">Risk-Aware Smart Vaults</span>
-              <span className="word-cycle-item">On-Chain Yield Verification</span>
+              <span className="word-cycle-item">External AI Models</span>
+              <span className="word-cycle-item">Agent Frameworks</span>
+              <span className="word-cycle-item">Owner-Controlled Vaults</span>
+              <span className="word-cycle-item">On-Chain Policy Enforcement</span>
             </span>
           </span>
         </div>
 
         <p className="hero-subhead" style={{ zIndex: 10, maxWidth: '640px', margin: '1.5rem auto 2rem', color: 'var(--text-secondary)', fontSize: '0.96rem', lineHeight: 1.6 }}>
-          NeuralRate grants AI agents mathematical risk profiling, Safe vault orchestration, and immutable receipt logs—delivered through a unified MCP endpoint on Mantle.
+          Connect any external AI model through MCP. The owner defines the vault, permissions, limits, and expiry. NeuralRate exposes only the authorized tools and enforces execution policy on-chain.
         </p>
 
 
@@ -321,7 +321,7 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
               <div className="terminal-dot yellow" style={{ width: '10px', height: '10px' }}></div>
               <div className="terminal-dot green" style={{ width: '10px', height: '10px' }}></div>
             </div>
-            <span className="terminal-title" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>neuralrate_mcp_daemon — safe_session_#092b</span>
+            <span className="terminal-title" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>neuralrate_mcp_session - owner_scope_#092b</span>
             <a href="#poc-simulator" onClick={(e) => handleSmoothScroll(e, 'poc-simulator')} style={{ color: 'var(--color-lime)', fontSize: '0.72rem', textDecoration: 'none', fontFamily: 'var(--font-mono)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
               <span>▸ Simulate</span>
             </a>
@@ -351,27 +351,23 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
           <div className="stats-counter-bar">
             <div className="stat-item">
               <span className="stat-value">
-                <CountUp end={6} suffix="" />
+                <CountUp end={5} suffix="" />
               </span>
-              <span className="stat-label">Risk Factors</span>
+              <span className="stat-label">Public MCP Tools</span>
             </div>
             <div className="stat-item">
               <span className="stat-value">
-                <CountUp end={42} suffix="+" />
+                <CountUp end={4} suffix="" />
               </span>
-              <span className="stat-label">Active Pools</span>
+              <span className="stat-label">Scoped Catalogs</span>
             </div>
             <div className="stat-item">
-              <span className="stat-value">
-                <CountUp end={100} suffix="%" />
-              </span>
-              <span className="stat-label">Non-Custodial</span>
+              <span className="stat-value">OWNER</span>
+              <span className="stat-label">Defines Every Limit</span>
             </div>
             <div className="stat-item">
-              <span className="stat-value">
-                &lt; <CountUp end={1} suffix="s" decimals={1} />
-              </span>
-              <span className="stat-label">Latency</span>
+              <span className="stat-value">ON-CHAIN</span>
+              <span className="stat-label">Execution Policy</span>
             </div>
           </div>
         </div>
@@ -382,10 +378,10 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
           ═══════════════════════════════════════════ */}
       <section className="home-section" id="poc-simulator" style={{ paddingTop: '8rem', paddingBottom: '6rem' }}>
         <div className="section-header-compact" style={{ textAlign: 'center', margin: '0 auto 3rem' }}>
-          <div className="section-kicker">Live scoring sandpit</div>
-          <h2 className="section-title" style={{ fontSize: '2.25rem', fontWeight: 800, letterSpacing: '-0.03em' }}>Verified Risk Simulation Engine</h2>
+          <div className="section-kicker">Public MCP advisory tool</div>
+          <h2 className="section-title" style={{ fontSize: '2.25rem', fontWeight: 800, letterSpacing: '-0.03em' }}>Deterministic Risk Assessment</h2>
           <p className="section-desc" style={{ maxWidth: '600px', margin: '0.75rem auto 0' }}>
-            Slide the sliders to mock DeFi protocol variations and watch our 6-factor assessment model and radar map adapt in real-time.
+            Explore the same deterministic 6-factor model exposed to external AI clients through the public read-only MCP catalog.
           </p>
         </div>
 
@@ -821,7 +817,7 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
           <div className="section-kicker">Unified Trust Architecture</div>
           <h2 className="section-title" style={{ fontSize: '2.25rem', fontWeight: 800, letterSpacing: '-0.03em' }}>The NeuralRate Security Protocol</h2>
           <p className="section-desc" style={{ maxWidth: '600px', margin: '0.75rem auto 0' }}>
-            A mathematically complete framework connecting ingestion scoring, cryptographic anchors, and non-custodial multi-sigs.
+            External models provide the reasoning. NeuralRate provides MCP tools, owner-scoped authorization, policy checks, Safe execution, and on-chain evidence.
           </p>
         </div>
 
@@ -841,8 +837,8 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
                 }}
               >
                 <span style={{ fontSize: '0.68rem', color: activeProtocolTab === 'pipeline' ? 'var(--color-lime)' : 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontWeight: 700, letterSpacing: '0.08em' }}>PHASE 01</span>
-                <h4 style={{ margin: 0, fontSize: '0.96rem', color: activeProtocolTab === 'pipeline' ? '#fff' : 'var(--text-secondary)', fontWeight: 700 }}>Ingestion & Scoring</h4>
-                <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>5-step mathematical risk indexing pipeline.</p>
+                <h4 style={{ margin: 0, fontSize: '0.96rem', color: activeProtocolTab === 'pipeline' ? '#fff' : 'var(--text-secondary)', fontWeight: 700 }}>MCP Discovery & Advice</h4>
+                <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>Read-only tools for external models and agent clients.</p>
               </button>
 
               <button 
@@ -856,8 +852,8 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
                 }}
               >
                 <span style={{ fontSize: '0.68rem', color: activeProtocolTab === 'ledger' ? 'var(--color-lime)' : 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontWeight: 700, letterSpacing: '0.08em' }}>PHASE 02</span>
-                <h4 style={{ margin: 0, fontSize: '0.96rem', color: activeProtocolTab === 'ledger' ? '#fff' : 'var(--text-secondary)', fontWeight: 700 }}>Cryptographic Anchor</h4>
-                <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>On-chain proof receipt synchronization.</p>
+                <h4 style={{ margin: 0, fontSize: '0.96rem', color: activeProtocolTab === 'ledger' ? '#fff' : 'var(--text-secondary)', fontWeight: 700 }}>Authorization & Evidence</h4>
+                <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>Owner grants, scoped sessions, and inspectable on-chain proof.</p>
               </button>
 
               <button 
@@ -871,8 +867,8 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
                 }}
               >
                 <span style={{ fontSize: '0.68rem', color: activeProtocolTab === 'sandbox' ? 'var(--color-lime)' : 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontWeight: 700, letterSpacing: '0.08em' }}>PHASE 03</span>
-                <h4 style={{ margin: 0, fontSize: '0.96rem', color: activeProtocolTab === 'sandbox' ? '#fff' : 'var(--text-secondary)', fontWeight: 700 }}>Safe Execution Guard</h4>
-                <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>Multi-sig spending limits and MCP sandbox.</p>
+                <h4 style={{ margin: 0, fontSize: '0.96rem', color: activeProtocolTab === 'sandbox' ? '#fff' : 'var(--text-secondary)', fontWeight: 700 }}>Policy-Gated Execution</h4>
+                <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>Safe execution only inside owner-approved on-chain limits.</p>
               </button>
             </div>
 
@@ -882,18 +878,18 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
               {/* Tab 1: Ingestion & Scoring */}
               {activeProtocolTab === 'pipeline' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', background: 'oklch(12% 0.01 240 / 0.4)', borderRadius: '24px', border: '1px solid oklch(100% 0 0 / 0.05)', padding: '2rem' }}>
-                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--color-lime)' }}>Ingestion & Scoring Timeline</h3>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--color-lime)' }}>From External Model to MCP Tool</h3>
                   <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.55 }}>
-                    NeuralRate indexes protocol metrics deterministically. Every trace step is verified before allocating capital.
+                    NeuralRate does not pretend to be the model. It gives external AI clients a precise, inspectable tool surface for discovery, state, authorization, and governed execution.
                   </p>
                   
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
                     {[
-                      { step: '01', title: 'Data Ingestion', desc: 'Secure WebMCP collectors index real-time pool metrics.' },
-                      { step: '02', title: '6-Factor Risk Calc', desc: 'Analyzes TVL depth, DEX volume ratios, volatility curves, and smart capital flows.' },
-                      { step: '03', title: 'Deterministic Verdict', desc: 'The scoring model yields a mathematical rating from A+ to F.' },
-                      { step: '04', title: 'Safe Spending Check', desc: 'Validates allocations against signed multi-sig allowance limits.' },
-                      { step: '05', title: 'On-Chain Sync', desc: 'Permanently anchors the cryptographic decision hash onto Mantle L2.' },
+                      { step: '01', title: 'Model Connects', desc: 'Any compatible external model or agent client connects over Streamable HTTP.' },
+                      { step: '02', title: 'Tools Are Discovered', desc: 'The public endpoint advertises advisory tools only; scoped endpoints require authorization.' },
+                      { step: '03', title: 'Owner Grants Scope', desc: 'A short-lived session grants only the selected state, config, benchmark, or execution domain.' },
+                      { step: '04', title: 'Request Is Preflighted', desc: 'Vault state, runtime, asset, amount, destination, grant, and policy are checked before queueing.' },
+                      { step: '05', title: 'Policy Is Enforced', desc: 'Allowed execution travels through the Safe7579 path and on-chain policy guard on Mantle.' },
                     ].map((s, i) => (
                       <div key={i} style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', padding: '0.75rem 1rem', borderRadius: '12px', background: 'oklch(100% 0 0 / 0.01)', border: '1px solid oklch(100% 0 0 / 0.02)', transition: 'all 0.2s' }} onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(223, 246, 81, 0.15)'; e.currentTarget.style.background = 'oklch(100% 0 0 / 0.015)'; }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'oklch(100% 0 0 / 0.02)'; e.currentTarget.style.background = 'oklch(100% 0 0 / 0.01)'; }}>
                         <span style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)', color: 'var(--color-lime)', fontWeight: 700 }}>{s.step}</span>
@@ -911,40 +907,40 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
               {activeProtocolTab === 'ledger' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', background: 'oklch(12% 0.01 240 / 0.4)', borderRadius: '24px', border: '1px solid oklch(100% 0 0 / 0.05)', padding: '2rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--color-lime)' }}>On-Chain Verification Receipt</h3>
+                    <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--color-lime)' }}>Live On-Chain Execution Proof</h3>
                     <span style={{ fontSize: '0.62rem', padding: '0.25rem 0.5rem', borderRadius: '4px', background: 'rgba(223,246,81,0.06)', border: '1px solid rgba(223,246,81,0.12)', color: 'var(--color-lime)', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>MANTLE_TESTNET</span>
                   </div>
                   <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.55 }}>
-                    NeuralRate creates a cryptographic proof log of inputs and results, registered dynamically in our public smart contract ledger.
+                    A successful scoped MCP request has already traversed the owner grant, policy checks, ERC-4337 runtime, Safe vault module, and Mantle Sepolia settlement.
                   </p>
 
                   {/* Glowing Contract Ticket Terminal (Non-generic, High-end) */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', padding: '1.25rem 1.5rem', borderRadius: '16px', background: 'oklch(8% 0.01 240 / 0.95)', border: '1px solid oklch(100% 0 0 / 0.06)', fontFamily: 'var(--font-mono)', fontSize: '0.74rem', textAlign: 'left', lineHeight: 1.6 }}>
                     <div style={{ borderBottom: '1px dashed oklch(100% 0 0 / 0.1)', paddingBottom: '0.75rem', marginBottom: '0.25rem', display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                      <span>PROOF ENTRY DETAILS</span>
-                      <span>INDEX_#00481</span>
+                      <span>LIVE PROOF DETAILS</span>
+                      <span>MANTLE SEPOLIA</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
                       <span style={{ color: 'var(--text-secondary)' }}>Registry Contract:</span>
-                      <span style={{ color: 'var(--color-lime)', wordBreak: 'break-all' }}>0x77E1EaBE93557F26E6d63CdB9441113bCd0742f1</span>
+                      <span style={{ color: 'var(--color-lime)', wordBreak: 'break-all' }}>0xC0C836A220D006398cdE4D5caf529196E63f81A8</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>Proof Payload Hash:</span>
-                      <span style={{ color: '#fff', wordBreak: 'break-all' }}>0x8a9cf2b821a008c2a8f8d2b99211c2a8</span>
+                      <span style={{ color: 'var(--text-secondary)' }}>Execution Transaction:</span>
+                      <span style={{ color: '#fff', wordBreak: 'break-all' }}>0x36281947f5fb3088c29e6926979f150eb10ee03e5be86e4973599bf8823409b6</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>State Anchor Root:</span>
-                      <span style={{ color: '#fff', wordBreak: 'break-all' }}>0xf3a2b772c88e9988ff636611f7c8d2b2</span>
+                      <span style={{ color: 'var(--text-secondary)' }}>Execution Path:</span>
+                      <span style={{ color: '#fff', wordBreak: 'break-all' }}>MCP / ERC-4337 / Safe7579 / Vault Module</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed oklch(100% 0 0 / 0.1)', paddingTop: '0.75rem', marginTop: '0.25rem' }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>Decentralized Audit State:</span>
-                      <span style={{ color: 'var(--color-success)', fontWeight: 700 }}>SECURED ON MANTLE L2</span>
+                      <span style={{ color: 'var(--text-secondary)' }}>Receipt Status:</span>
+                      <span style={{ color: 'var(--color-success)', fontWeight: 700 }}>CONFIRMED ON MANTLE SEPOLIA</span>
                     </div>
                   </div>
 
                   <div style={{ textAlign: 'left' }}>
                     <a 
-                      href="https://sepolia.mantlescan.info/address/0x77E1EaBE93557F26E6d63CdB9441113bCd0742f1" 
+                      href="https://sepolia.mantlescan.xyz/tx/0x36281947f5fb3088c29e6926979f150eb10ee03e5be86e4973599bf8823409b6"
                       target="_blank" 
                       rel="noreferrer" 
                       className="onchain-verify-btn"
@@ -955,7 +951,7 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
                         <polyline points="15 3 21 3 21 9"></polyline>
                         <line x1="10" y1="14" x2="21" y2="3"></line>
                       </svg>
-                      <span>Explore Proof Registry Contract</span>
+                      <span>Inspect Live Execution Proof</span>
                     </a>
                   </div>
                 </div>
@@ -964,9 +960,9 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
               {/* Tab 3: Safe Execution Sandbox */}
               {activeProtocolTab === 'sandbox' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', background: 'oklch(12% 0.01 240 / 0.4)', borderRadius: '24px', border: '1px solid oklch(100% 0 0 / 0.05)', padding: '2rem' }}>
-                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--color-lime)' }}>WebMCP & Safe Custody Sandbox</h3>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--color-lime)' }}>MCP Authorization & Safe Execution</h3>
                   <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.55 }}>
-                    Expose risk endpoints securely via WebMCP servers. All decisions execute within multi-sig constraints signed by you.
+                    Public tools are read-only. Vault state and mutations live in separate scoped catalogs, and execution requests must pass the owner's active grant and on-chain policy.
                   </p>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1.2fr', gap: '2rem', textAlign: 'left' }} className="responsive-timeline-grid">
@@ -976,31 +972,31 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
                           onClick={() => setActiveCodeTab('mcp')} 
                           style={{ padding: '0.35rem 0.65rem', fontSize: '0.7rem', borderRadius: '6px', border: '1px solid oklch(100% 0 0 / 0.08)', background: activeCodeTab === 'mcp' ? 'var(--color-lime)' : 'rgba(255,255,255,0.02)', color: activeCodeTab === 'mcp' ? 'var(--bg-deep)' : 'var(--text-secondary)', fontWeight: 600, cursor: 'pointer' }}
                         >
-                          WebMCP Daemon
+                          MCP Tool Call
                         </button>
                         <button 
                           onClick={() => setActiveCodeTab('proof')} 
                           style={{ padding: '0.35rem 0.65rem', fontSize: '0.7rem', borderRadius: '6px', border: '1px solid oklch(100% 0 0 / 0.08)', background: activeCodeTab === 'proof' ? 'var(--color-lime)' : 'rgba(255,255,255,0.02)', color: activeCodeTab === 'proof' ? 'var(--bg-deep)' : 'var(--text-secondary)', fontWeight: 600, cursor: 'pointer' }}
                         >
-                          Safe Multi-sig
+                          Owner Policy
                         </button>
                       </div>
                       <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
                         {activeCodeTab === 'mcp' 
-                          ? 'Simulate your AI agent making live WebMCP tool calls to assess DEX yields securely.' 
-                          : 'Define strict daily transaction spending boundaries that the agent can never exceed.'}
+                          ? 'Simulate an external AI client calling the real public risk_assess tool without vault authority.'
+                          : 'Define assets, destinations, selectors, delegates, value limits, and validity windows before execution.'}
                       </p>
                       <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
-                        <div style={{ fontSize: '0.68rem', padding: '0.25rem 0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.02)', border: '1px solid oklch(100% 0 0 / 0.05)', color: 'var(--text-secondary)', fontWeight: 600 }}>LangChain</div>
-                        <div style={{ fontSize: '0.68rem', padding: '0.25rem 0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.02)', border: '1px solid oklch(100% 0 0 / 0.05)', color: 'var(--text-secondary)', fontWeight: 600 }}>Eliza SDK</div>
-                        <div style={{ fontSize: '0.68rem', padding: '0.25rem 0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.02)', border: '1px solid oklch(100% 0 0 / 0.05)', color: 'var(--text-secondary)', fontWeight: 600 }}>AutoGPT</div>
+                        <div style={{ fontSize: '0.68rem', padding: '0.25rem 0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.02)', border: '1px solid oklch(100% 0 0 / 0.05)', color: 'var(--text-secondary)', fontWeight: 600 }}>Streamable HTTP</div>
+                        <div style={{ fontSize: '0.68rem', padding: '0.25rem 0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.02)', border: '1px solid oklch(100% 0 0 / 0.05)', color: 'var(--text-secondary)', fontWeight: 600 }}>Scoped Tokens</div>
+                        <div style={{ fontSize: '0.68rem', padding: '0.25rem 0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.02)', border: '1px solid oklch(100% 0 0 / 0.05)', color: 'var(--text-secondary)', fontWeight: 600 }}>Fail-Closed Preflight</div>
                       </div>
                     </div>
 
                     {/* Console Sandbox Terminal */}
                     <div style={{ display: 'flex', flexDirection: 'column', background: 'oklch(10% 0.01 240 / 0.95)', borderRadius: '12px', border: '1px solid oklch(100% 0 0 / 0.06)', overflow: 'hidden' }}>
                       <div style={{ padding: '0.5rem 0.75rem', background: 'oklch(12% 0.01 240 / 0.8)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid oklch(100% 0 0 / 0.05)' }}>
-                        <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>webmcp_sandbox.sh</span>
+                        <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>mcp_tool_call.json</span>
                         {activeCodeTab === 'mcp' && (
                           <button 
                             onClick={runMcpSandbox} 
@@ -1021,7 +1017,7 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
                         ) : (
                           <div style={{ color: 'rgba(255,255,255,0.7)' }}>
                             <span style={{ color: 'var(--color-lime)' }}>const</span> safeTx = &#123;<br />
-                            &nbsp;&nbsp;to: <span style={{ color: '#9d9eff' }}>"0x77E1..."</span>,<br />
+                            &nbsp;&nbsp;to: <span style={{ color: '#9d9eff' }}>"owner_allowlisted_target"</span>,<br />
                             &nbsp;&nbsp;value: <span style={{ color: '#fff' }}>"0"</span>,<br />
                             &nbsp;&nbsp;data: <span style={{ color: '#9d9eff' }}>"0xa9059cbb..."</span>,<br />
                             &nbsp;&nbsp;operation: <span style={{ color: '#fff' }}>0</span><br />
@@ -1068,12 +1064,12 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
               <span>Privy Embedded Auth</span>
             </div>
             <div className="marquee-badge">
-              <span className="marquee-badge-icon">W</span>
-              <span>WebMCP Protocol Daemon</span>
+              <span className="marquee-badge-icon">M</span>
+              <span>Model Context Protocol</span>
             </div>
             <div className="marquee-badge">
-              <span className="marquee-badge-icon">R</span>
-              <span>Reactive Smart Hooks</span>
+              <span className="marquee-badge-icon">4</span>
+              <span>ERC-4337 Execution</span>
             </div>
 
             {/* Round 2 (Duplicate for seamless loop) */}
@@ -1090,12 +1086,12 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
               <span>Privy Embedded Auth</span>
             </div>
             <div className="marquee-badge">
-              <span className="marquee-badge-icon">W</span>
-              <span>WebMCP Protocol Daemon</span>
+              <span className="marquee-badge-icon">M</span>
+              <span>Model Context Protocol</span>
             </div>
             <div className="marquee-badge">
-              <span className="marquee-badge-icon">R</span>
-              <span>Reactive Smart Hooks</span>
+              <span className="marquee-badge-icon">4</span>
+              <span>ERC-4337 Execution</span>
             </div>
           </div>
         </div>
@@ -1109,9 +1105,9 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
                 <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
               </svg>
             </div>
-            <span className="trust-metric-number" style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, color: 'var(--color-lime)', fontSize: '1.75rem' }}>0%</span>
-            <span className="trust-metric-label">Custodial Risk Profile</span>
-            <p className="trust-metric-desc" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>Capital deposits never leave your own Safe. Smart hooks prevent spending limit violations.</p>
+            <span className="trust-metric-number" style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, color: 'var(--color-lime)', fontSize: '1.75rem' }}>Owner</span>
+            <span className="trust-metric-label">Controls the Safe and Policy</span>
+            <p className="trust-metric-desc" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>The owner controls the vault, signs the automation grant, defines allowed actions, and can revoke access.</p>
           </div>
 
           <div className="trust-metric-item">
@@ -1120,9 +1116,9 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
               </svg>
             </div>
-            <span className="trust-metric-number" style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, color: 'var(--color-lime)', fontSize: '1.75rem' }}>100%</span>
-            <span className="trust-metric-label">Decentralized Audit Records</span>
-            <p className="trust-metric-desc" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>Decision outcomes are recorded permanently on L2 blockspace to create an auditable timeline.</p>
+            <span className="trust-metric-number" style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, color: 'var(--color-lime)', fontSize: '1.75rem' }}>Scoped</span>
+            <span className="trust-metric-label">MCP Capability Exposure</span>
+            <p className="trust-metric-desc" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>State, configuration, benchmark, and execution tools are advertised only to sessions authorized for that domain.</p>
           </div>
 
           <div className="trust-metric-item">
@@ -1134,9 +1130,9 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
                 <line x1="16" y1="17" x2="8" y2="17"></line>
               </svg>
             </div>
-            <span className="trust-metric-number" style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, color: 'var(--color-lime)', fontSize: '1.75rem' }}>Open</span>
-            <span className="trust-metric-label">Verifiable Specifications</span>
-            <p className="trust-metric-desc" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>The mathematical rules of the 6-factor model are published in open-source markdown specs.</p>
+            <span className="trust-metric-number" style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, color: 'var(--color-lime)', fontSize: '1.75rem' }}>On-Chain</span>
+            <span className="trust-metric-label">Execution Boundary</span>
+            <p className="trust-metric-desc" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>The active policy and execution guard constrain the Safe module path before an authorized transaction can settle.</p>
           </div>
         </div>
       </section>
@@ -1149,7 +1145,7 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
           <div className="section-kicker">Operator Answers</div>
           <h2 className="section-title" style={{ fontSize: '2.25rem', fontWeight: 800, letterSpacing: '-0.03em' }}>Frequently Asked Questions</h2>
           <p className="section-desc" style={{ maxWidth: '600px', margin: '0.75rem auto 0' }}>
-            Get instant decrypted advisory intelligence regarding custody, integration, and ecosystem dynamics.
+            Clear answers about what the external model controls, what NeuralRate controls, and where execution is enforced.
           </p>
         </div>
 
@@ -1158,11 +1154,11 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
           {/* Left Column: Question Index Selector */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', borderRight: '1px solid oklch(100% 0 0 / 0.05)', paddingRight: '2rem' }}>
             {[
-              { index: '01', title: 'Is NeuralRate custodial?', category: 'CUSTODY' },
-              { index: '02', title: 'What is recommend-only mode?', category: 'YIELD SCAN' },
-              { index: '03', title: 'How does the 6-factor model work?', category: 'MATHEMATICS' },
+              { index: '01', title: 'Who controls the vault?', category: 'OWNERSHIP' },
+              { index: '02', title: 'What can public MCP clients do?', category: 'PUBLIC MCP' },
+              { index: '03', title: 'Does NeuralRate provide the AI model?', category: 'MODEL ROLE' },
               { index: '04', title: 'Why is Mantle Network used?', category: 'ECOSYSTEM' },
-              { index: '05', title: 'How do I connect my AI agent?', category: 'INTEGRATION' }
+              { index: '05', title: 'How does an agent get execution access?', category: 'AUTHORIZATION' }
             ].map((q, idx) => {
               const isActive = activeFaqIndex === idx;
               return (
@@ -1257,20 +1253,20 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
                           <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                         </svg>
                       </div>
-                      <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#fff', fontWeight: 800 }}>Non-Custodial Safe Guard</h3>
+                      <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#fff', fontWeight: 800 }}>Owner-Controlled Safe Vault</h3>
                     </div>
                     <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                      No. Funds always reside securely in your own **Safe Smart Account**. The operator only executes allocation transactions that strictly match the mathematical safety parameters signed and allowed by you.
+                      The owner controls the Safe Smart Account and signs the policy and automation grant. NeuralRate can dispatch only requests that match the active authorization and policy; the owner can revoke that access.
                     </p>
 
                     {/* Safe Interactive Detail */}
                     <div style={{ padding: '1rem', borderRadius: '12px', background: 'oklch(8% 0.01 240 / 0.8)', border: '1px solid oklch(100% 0 0 / 0.05)', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', fontFamily: 'var(--font-mono)' }}>
-                        <span style={{ color: 'var(--text-secondary)' }}>SAFE MULTI-SIG ANCHOR:</span>
-                        <span style={{ color: 'var(--color-lime)' }}>ACTIVE [3/3 SIGNERS]</span>
+                        <span style={{ color: 'var(--text-secondary)' }}>OWNER AUTHORIZATION:</span>
+                        <span style={{ color: 'var(--color-lime)' }}>ACTIVE AND REVOCABLE</span>
                       </div>
                       <div style={{ display: 'flex', gap: '0.4rem' }}>
-                        {['Owner Signer 01', 'Owner Signer 02', 'Owner Signer 03'].map((s, i) => (
+                        {['Signed Grant', 'On-Chain Policy', 'Scoped Session'].map((s, i) => (
                           <div key={i} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', background: 'rgba(255,255,255,0.02)', border: '1px solid oklch(100% 0 0 / 0.04)', borderRadius: '6px', padding: '0.35rem 0', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
                             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" strokeWidth="3">
                               <polyline points="20 6 9 17 4 12"></polyline>
@@ -1280,8 +1276,8 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
                         ))}
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed oklch(100% 0 0 / 0.08)', paddingTop: '0.5rem', marginTop: '0.25rem', fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-                        <span>Safe Vault Allocation Limit:</span>
-                        <span style={{ color: '#fff', fontFamily: 'var(--font-mono)' }}>Max $10,000 / Day</span>
+                        <span>Execution rule:</span>
+                        <span style={{ color: '#fff', fontFamily: 'var(--font-mono)' }}>Must match every active limit</span>
                       </div>
                     </div>
                   </div>
@@ -1300,16 +1296,16 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
                           <line x1="12" y1="22" x2="12" y2="18"></line>
                         </svg>
                       </div>
-                      <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#fff', fontWeight: 800 }}>Non-Custodial Yield Radar</h3>
+                      <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#fff', fontWeight: 800 }}>Public Read-Only MCP Catalog</h3>
                     </div>
                     <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                      A free, non-custodial risk advisory layer. You can scan yield pools and evaluate real-time scoring parameters dynamically without deploying vaults, creating transactions, or signing anything.
+                      Any compatible client can discover five advisory tools for yields, T-Bill spreads, token context, deterministic risk, and allocation. This endpoint exposes no vault state and no mutation authority.
                     </p>
 
                     {/* Interactive Scan Simulator */}
                     <div style={{ padding: '1rem', borderRadius: '12px', background: 'oklch(8% 0.01 240 / 0.8)', border: '1px solid oklch(100% 0 0 / 0.05)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>SIMULATE WEBMCP RADAR SCAN:</span>
+                        <span style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>SIMULATE PUBLIC risk_assess CALL:</span>
                         <button
                           onClick={triggerFaqScan}
                           disabled={isFaqScanning}
@@ -1332,7 +1328,7 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
                         {faqScanResult ? (
                           <span style={{ color: faqScanResult.startsWith('✓') ? 'var(--color-success)' : 'var(--color-lime)' }}>{faqScanResult}</span>
                         ) : (
-                          <span>Click "RUN RADAR" to simulate an instant live pool risk scan...</span>
+                          <span>Click "RUN RADAR" to simulate a read-only MCP risk assessment...</span>
                         )}
                       </div>
                     </div>
@@ -1350,21 +1346,18 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
                           <line x1="2" y1="8.5" x2="22" y2="8.5"></line>
                         </svg>
                       </div>
-                      <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#fff', fontWeight: 800 }}>6-Factor Mathematical Weights</h3>
+                      <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#fff', fontWeight: 800 }}>Bring Your Own AI Model</h3>
                     </div>
                     <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                      Our deterministic model evaluates TVL depth, DEX volume ratios, APY sustainability, reward/fee composition, token price volatility, and Smart Money net flows dynamically.
+                      NeuralRate is not an embedded LLM and does not claim to replace agent reasoning. Your external model decides which MCP tool to request; NeuralRate validates authorization, returns structured state, and gates any execution.
                     </p>
 
-                    {/* Weight Breakdown Interactive Panel */}
                     <div style={{ padding: '1rem', borderRadius: '12px', background: 'oklch(8% 0.01 240 / 0.8)', border: '1px solid oklch(100% 0 0 / 0.05)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                       {[
-                        { name: 'TVL Depth', weight: '20%', width: '100%' },
-                        { name: 'DEX Volume Ratio', weight: '15%', width: '75%' },
-                        { name: 'APY Deviation', weight: '20%', width: '100%' },
-                        { name: 'Fee & Reward Ratio', weight: '15%', width: '75%' },
-                        { name: 'IL Exposure (Asset Vol)', weight: '15%', width: '75%' },
-                        { name: 'Net Capital Flows', weight: '15%', width: '75%' }
+                        { name: 'External Model', weight: 'Reasoning', width: '100%' },
+                        { name: 'MCP Server', weight: 'Tools', width: '100%' },
+                        { name: 'Owner Grant', weight: 'Authority', width: '100%' },
+                        { name: 'On-Chain Policy', weight: 'Limits', width: '100%' }
                       ].map((f, i) => (
                         <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', textAlign: 'left' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
@@ -1392,31 +1385,22 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
                       <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#fff', fontWeight: 800 }}>Mantle Ecosystem Synergy</h3>
                     </div>
                     <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                      Mantle L2 offers sub-second settlement times and sub-cent transaction fees. This high-efficiency blockspace makes continuous automated yield indexing and decentralized proof syncing extremely cheap and fast.
+                      Mantle provides an EVM execution environment for the policy registry, execution guard, receipts, and Safe7579 vault path used by the current testnet deployment.
                     </p>
 
-                    {/* Speed Comparison interactive stats */}
-                    <div style={{ padding: '1rem', borderRadius: '12px', background: 'oklch(8% 0.01 240 / 0.8)', border: '1px solid oklch(100% 0 0 / 0.05)', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                        <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>GAS TRANSACTION COST COMPARISON:</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <span style={{ fontSize: '0.65rem', fontFamily: 'var(--font-mono)', width: '90px', color: 'var(--text-muted)' }}>Ethereum L1:</span>
-                          <div style={{ flex: 1, height: '8px', background: 'rgba(255,255,255,0.02)', borderRadius: '4px', overflow: 'hidden' }}>
-                            <div style={{ width: '100%', height: '100%', background: 'var(--color-danger)' }}></div>
+                      <div style={{ padding: '1rem', borderRadius: '12px', background: 'oklch(8% 0.01 240 / 0.8)', border: '1px solid oklch(100% 0 0 / 0.05)', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                        <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>DEPLOYED ENFORCEMENT COMPONENTS:</span>
+                        {['Policy Registry', 'Execution Guard', 'Safe Vault Module', 'Decision Receipt Registry'].map((component) => (
+                          <div key={component} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', padding: '0.35rem 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                            <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{component}</span>
+                            <span style={{ fontSize: '0.65rem', color: 'var(--color-success)', fontFamily: 'var(--font-mono)' }}>MANTLE SEPOLIA</span>
                           </div>
-                          <span style={{ fontSize: '0.65rem', fontFamily: 'var(--font-mono)', color: 'var(--color-danger)' }}>~$4.50</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <span style={{ fontSize: '0.65rem', fontFamily: 'var(--font-mono)', width: '90px', color: 'var(--color-lime)' }}>Mantle L2:</span>
-                          <div style={{ flex: 1, height: '8px', background: 'rgba(255,255,255,0.02)', borderRadius: '4px', overflow: 'hidden' }}>
-                            <div style={{ width: '2%', height: '100%', background: 'var(--color-lime)', boxShadow: '0 0 6px var(--color-lime)' }}></div>
-                          </div>
-                          <span style={{ fontSize: '0.65rem', fontFamily: 'var(--font-mono)', color: 'var(--color-lime)' }}>&lt;$0.001</span>
-                        </div>
+                        ))}
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed oklch(100% 0 0 / 0.08)', paddingTop: '0.5rem', marginTop: '0.25rem', fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-                        <span>Average Proof State Settlement Time:</span>
-                        <span style={{ color: 'var(--color-success)', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>~0.08s</span>
+                        <span>Current network:</span>
+                        <span style={{ color: 'var(--color-success)', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>CHAIN ID 5003</span>
                       </div>
                     </div>
                   </div>
@@ -1434,20 +1418,20 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
                           <line x1="6" y1="18" x2="6.01" y2="18"></line>
                         </svg>
                       </div>
-                      <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#fff', fontWeight: 800 }}>WebMCP Agent Daemon Plug</h3>
+                      <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#fff', fontWeight: 800 }}>Owner-Scoped MCP Access</h3>
                     </div>
                     <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                      Expose the NeuralRate Model Context Protocol (MCP) Server directly to your autonomous agent framework (LangChain, AutoGPT, Eliza). Your agent can securely call tools to evaluate scores.
+                      Connect the external model to the public endpoint for read-only tools. Execution requires a separate owner-issued, time-bounded session token for the exact scoped catalog.
                     </p>
 
                     {/* Copyable MCP Command Box */}
                     <div style={{ padding: '1rem', borderRadius: '12px', background: 'oklch(8% 0.01 240 / 0.8)', border: '1px solid oklch(100% 0 0 / 0.05)', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                      <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>INSTALL WEBMCP NPM DAEMON:</span>
+                      <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>CANONICAL STREAMABLE HTTP ENDPOINT:</span>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'oklch(5% 0.01 240 / 0.95)', border: '1px solid oklch(100% 0 0 / 0.04)', borderRadius: '8px', padding: '0.5rem 0.75rem', fontSize: '0.72rem', fontFamily: 'var(--font-mono)' }}>
-                        <span style={{ color: 'var(--color-lime)' }}>npm i -g @neuralrate/mcp-server</span>
+                        <span style={{ color: 'var(--color-lime)' }}>https://neuralrate-worker.neuralrate.workers.dev/mcp</span>
                         <button
                           onClick={(e) => {
-                            navigator.clipboard.writeText('npm i -g @neuralrate/mcp-server');
+                            navigator.clipboard.writeText('https://neuralrate-worker.neuralrate.workers.dev/mcp');
                             const btn = e.currentTarget;
                             btn.innerText = 'COPIED!';
                             setTimeout(() => { btn.innerText = 'COPY'; }, 1000);
@@ -1468,10 +1452,10 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.35rem', fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
                         <span>AI Agent SDK</span>
-                        <span style={{ color: 'var(--color-lime)' }}>──(WebMCP)──&gt;</span>
-                        <span>NeuralRate Node</span>
-                        <span style={{ color: 'var(--color-lime)' }}>──(Safe)──&gt;</span>
-                        <span>Mantle Vault</span>
+                        <span style={{ color: 'var(--color-lime)' }}>--(MCP)--&gt;</span>
+                        <span>NeuralRate Policy Layer</span>
+                        <span style={{ color: 'var(--color-lime)' }}>--(Safe)--&gt;</span>
+                        <span>Owner Vault</span>
                       </div>
                     </div>
                   </div>
@@ -1500,20 +1484,20 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
           Your Vault. Your Rules. Verified On-Chain.
         </h2>
         <p style={{ fontSize: '0.96rem', color: 'var(--text-secondary)', maxWidth: '600px', margin: '0 auto 0.5rem', lineHeight: 1.65 }}>
-          Launch your intelligence workspace, connect autonomous agents via WebMCP, or audit the permanent cryptographic evidence ledger.
+          Connect an external AI model through MCP, define exactly what it may do, and audit the policy and execution evidence on Mantle.
         </p>
         <div className="hero-actions" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-          <button className="btn-premium btn-premium-wallet hero-btn shimmer-btn" onClick={() => onNavigate('/app')}>
-            <span>Launch Terminal</span>
-          </button>
-
-          <button 
-            className="btn-premium btn-premium-agent hero-btn" 
+          <button
+            className="btn-premium btn-premium-agent hero-btn shimmer-btn"
             onClick={() => setIsMcpModalOpen(true)}
-            title="Connect AI Agent to MCP"
+            title="Connect an external AI model through MCP"
           >
             <span className="agent-dot agent-dot-active"></span>
-            <span>AGENT ACCESS</span>
+            <span>Connect MCP</span>
+          </button>
+
+          <button className="btn-premium btn-premium-wallet hero-btn" onClick={() => onNavigate('/app')}>
+            <span>Open Owner Console</span>
           </button>
 
           <button className="btn-premium hero-btn" onClick={() => onNavigate('/verify')} style={{ padding: '0.75rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1549,7 +1533,7 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
               <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>NeuralRate</h3>
             </div>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0, maxWidth: '280px' }}>
-              Risk intelligence guardrails and secure multisig vault controls for autonomous on-chain AI operators on Mantle L2.
+              MCP authorization and execution infrastructure for external AI models, with owner-defined scopes and on-chain policy enforcement on Mantle.
             </p>
             <div className="hero-status-tag" style={{ margin: '0.25rem 0 0 0', padding: '0.25rem 0.65rem', fontSize: '0.65rem', alignSelf: 'flex-start' }}>
               <span className="pulse-dot"></span>
@@ -1573,7 +1557,7 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.85rem' }}>
               <a href="/docs/trust-assumptions.md" target="_blank" rel="noreferrer" style={{ color: 'var(--text-secondary)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-lime)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}>Trust Models</a>
               <a href="/docs/risk-model.md" target="_blank" rel="noreferrer" style={{ color: 'var(--text-secondary)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-lime)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}>6-Factor Score Spec</a>
-              <a href="/docs/mcp-server.md" target="_blank" rel="noreferrer" style={{ color: 'var(--text-secondary)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-lime)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}>WebMCP Protocol Spec</a>
+              <a href="/docs/mcp-server.md" target="_blank" rel="noreferrer" style={{ color: 'var(--text-secondary)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-lime)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}>MCP Server Spec</a>
               <a href="/docs/architecture.md" target="_blank" rel="noreferrer" style={{ color: 'var(--text-secondary)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-lime)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}>System Design</a>
             </div>
           </div>
@@ -1591,11 +1575,11 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
 
         {/* Lower section */}
         <div style={{ borderTop: '1px solid oklch(100% 0 0 / 0.04)', paddingTop: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.25rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-          <span>© {new Date().getFullYear()} NeuralRate. All audit receipts verifiable on-chain via Mantle.</span>
+          <span>© {new Date().getFullYear()} NeuralRate. Published receipts and execution transactions are inspectable on Mantle.</span>
           <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
             <a href="/docs/README.md" target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-lime)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}>Quick Start Guide</a>
             <span>•</span>
-            <a href="https://github.com" target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-lime)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}>Open Source Core</a>
+            <a href="https://github.com/Lipe-lx/NeuralRate-MCP" target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-lime)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}>Open Source Core</a>
           </div>
         </div>
       </footer>

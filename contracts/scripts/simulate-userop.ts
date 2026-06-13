@@ -1,5 +1,13 @@
 import { ethers, network } from "hardhat";
 
+const requiredAddress = (name: string) => {
+  const value = process.env[name]?.trim();
+  if (!value || !ethers.isAddress(value)) {
+    throw new Error(`Set a valid ${name} before running this simulation.`);
+  }
+  return value;
+};
+
 async function main() {
   if (network.name !== "hardhat") {
     console.log("This simulation must be run on the local 'hardhat' network with forking enabled.");
@@ -7,10 +15,10 @@ async function main() {
     return;
   }
 
-  const registryAddress = "0x86cD4f8c2528E71a473ED342aa73B8a00de906a4";
+  const registryAddress = requiredAddress("NEURALRATE_POLICY_REGISTRY_CONTRACT");
   const vaultAddress = "0xd9afd65e5361d9a098e0fe30b914883f7c82f743";
-  const moduleAddress = "0xf7061501a464e893636a5BF8eB4ab7Ba2819154D";
-  const guardAddress = "0x666Bc822156824F40F2b70aAaAcBfe87467D79A5";
+  const moduleAddress = requiredAddress("NEURALRATE_VAULT_MODULE_ADDRESS");
+  const guardAddress = requiredAddress("NEURALRATE_EXECUTION_GUARD_CONTRACT");
 
   const ownerEoa = "0xac82ef541d55637eb749bb9123e0244668ca0990";
   const delegateAddress = "0xc57130F28f3d670cA75AD9a78784966B767E55e3";

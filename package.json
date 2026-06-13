@@ -18,6 +18,7 @@
     "cf:prod:publish": "node scripts/publish-prod-from-env.mjs",
     "env:sync:runtime": "node scripts/sync-runtime-envs.mjs",
     "env:sync:web": "node scripts/sync-web-public-env.mjs",
+    "verify:contracts": "node scripts/verify-contract-deployments.mjs",
     "preflight:release": "node scripts/preflight-release.mjs",
     "preflight:public": "node scripts/preflight-public-proof.mjs",
     "release:audit": "node scripts/generate-release-audit.mjs",

@@ -4,6 +4,8 @@
   "contractName": "NeuralRateDecisionReceiptRegistry",
   "address": "0xC0C836A220D006398cdE4D5caf529196E63f81A8",
   "txHash": "0xb57c647181934f4834e7ae176c81bb24f235a1b5670cbb3644170b6c48975cf3",
+  "expectedBytecodeHash": "0x4545970f130db04e97d5a1cffa25c8ff2ee6d17029e7804a0fdf337f132f11ea",
+  "owner": "0x54FCb49Cd7281140e17721f65f00e49a809400Bc",
   "receiptWriter": "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
   "deploymentMode": "agent-smart-wallet",
   "agentId": "49",

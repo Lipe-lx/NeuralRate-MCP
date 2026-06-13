@@ -245,7 +245,7 @@ function AppContent() {
   };
 
   const pageTitle = useMemo(() => {
-    if (route === 'home') return 'Risk Intelligence Layer With Optional Vault Automation';
+    if (route === 'home') return 'MCP Authorization and Execution for External AI Agents';
     if (route === 'docs') return 'Technical Documentation';
     if (route === 'verify') return 'Public Verification';
     return 'Operator Workspace';
@@ -352,7 +352,7 @@ function AppContent() {
               onClick={() => setIsAgentAccessModalOpen(true)}
               title="Connect an AI agent to NeuralRate MCP"
             >
-              <span>Agent Access</span>
+              <span>MCP Access</span>
             </button>
           </nav>
 
@@ -370,7 +370,7 @@ function AppContent() {
           onVaultTabChange={setActiveVaultTab}
           showAgentAccess={false}
           mcpAccessBundle={neuralRateUser.mcpAccessBundle}
-          subtitle={activeTab === 'terminal' ? 'Risk Intelligence Terminal' : undefined}
+          subtitle={activeTab === 'terminal' ? 'MCP Advisory Tools' : undefined}
         />
 
         <main style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
@@ -450,7 +450,7 @@ function AppContent() {
         </main>
 
         <footer style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '0.75rem', borderTop: '1px solid var(--border-subtle)', fontSize: '0.75rem', color: 'var(--text-secondary)', flexShrink: 0, marginTop: '1rem' }}>
-          NeuralRate MCP • Risk Intelligence Terminal + Optional Vault Automation • Mantle Sepolia
+          NeuralRate MCP • Owner-Scoped Authorization • On-Chain Policy Enforcement • Mantle Sepolia
         </footer>
       </div>
 

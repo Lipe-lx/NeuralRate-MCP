@@ -5,6 +5,8 @@
   "address": "0xACBB78DAB5D1404C9eeC1E90BCe569cD1acc91bF",
   "txHash": "0xeec210449b8b48c8745186e7c92ef8bac2cf1a7c4fe239141aa4b9c980eae031",
   "expectedBytecodeHash": "0x584c9850e175d9106bf285fbf57344d9a209ef2b161fc542891530f912efcdd4",
+  "owner": "0x54FCb49Cd7281140e17721f65f00e49a809400Bc",
   "authorizedExecutor": "0xc57130F28f3d670cA75AD9a78784966B767E55e3",
+  "executionGuard": "0x666Bc822156824F40F2b70aAaAcBfe87467D79A5",
   "updatedAt": "2026-06-10T07:44:54.288Z"
 }

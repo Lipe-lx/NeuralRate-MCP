@@ -90,13 +90,13 @@ const McpConnectModal: React.FC<Props> = ({ isOpen, onClose, mcpAccessBundle }) 
             </svg>
           </div>
           <div>
-            <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Agent Connection</h2>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Optional MCP access for operator automation</div>
+            <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Connect Through MCP</h2>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Primary interface for external AI models and agents</div>
           </div>
         </div>
 
         <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '1.5rem' }}>
-          NeuralRate works as a yield terminal without MCP. Use this only if you want an external agent to run grant-scoped actions against your vault policy.
+          The public endpoint exposes read-only advisory tools. Vault state and execution require an owner-issued, time-bounded token for the exact scoped catalog, and every execution remains subject to the active on-chain policy.
         </p>
 
         {mcpAccessBundle && (
@@ -105,7 +105,7 @@ const McpConnectModal: React.FC<Props> = ({ isOpen, onClose, mcpAccessBundle }) 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '0.55rem' }}>
                 <div>
                   <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-lime)', fontWeight: 700 }}>Session Token</div>
-                  <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>Active authorization for the external agent</div>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>Owner-issued authorization for this external client</div>
                 </div>
                 <button
                   onClick={() => handleCopy('session-token', sessionToken!)}
@@ -125,8 +125,8 @@ const McpConnectModal: React.FC<Props> = ({ isOpen, onClose, mcpAccessBundle }) 
           <div style={{ padding: '0.9rem', background: 'var(--bg-surface)', borderRadius: '10px', border: '1px solid rgba(223,246,81,0.18)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '0.55rem' }}>
               <div>
-                <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-lime)', fontWeight: 700 }}>Recommended Endpoint</div>
-                <div style={{ fontSize: '0.88rem', color: 'var(--text-primary)', fontWeight: 600, marginTop: '0.2rem' }}>Streamable HTTP on `/mcp`</div>
+                <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-lime)', fontWeight: 700 }}>{mcpAccessBundle ? 'Authorized Scoped Endpoint' : 'Public Read-Only Endpoint'}</div>
+                <div style={{ fontSize: '0.88rem', color: 'var(--text-primary)', fontWeight: 600, marginTop: '0.2rem' }}>Streamable HTTP MCP server</div>
               </div>
               <button
                 onClick={() => handleCopy('http-url', mcpUrl)}
@@ -139,7 +139,9 @@ const McpConnectModal: React.FC<Props> = ({ isOpen, onClose, mcpAccessBundle }) 
               {mcpUrl}
             </pre>
             <p style={{ margin: '0.65rem 0 0', fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-              Prefer this URL in modern MCP clients. Current best practice is to connect agents directly to the canonical HTTP endpoint rather than relying on a custom `mcp+sse://` app handler.
+              {mcpAccessBundle
+                ? 'This URL advertises only the capabilities granted to the current session. Keep the token private and issue a new grant when the scope or expiry changes.'
+                : 'Use this endpoint for public discovery and advisory calls. It does not expose vault-bound state or mutation tools.'}
             </p>
           </div>
         </div>

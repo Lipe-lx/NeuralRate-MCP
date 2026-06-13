@@ -1,7 +1,7 @@
 {
   "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
   "name": "NeuralRate MCP Agent",
-  "description": "Yield intelligence terminal for Mantle with optional grant-scoped vault automation, signed user policy controls, benchmark receipts, and MCP integration",
+  "description": "MCP authorization and execution layer for external AI models, with public read-only tools, owner-scoped sessions, Safe vault execution, and on-chain policy enforcement on Mantle",
   "image": "ipfs://QmQGKMZUpYJSJjzU1kiVrpMZ9jqTTW3aPoQBsunUShcTqC",
   "services": [
     {

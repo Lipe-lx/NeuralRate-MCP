@@ -8,11 +8,30 @@ type DeploymentManifest = {
   contractName: string;
   address: string;
   txHash: string;
+  expectedBytecodeHash: string;
+  owner: string;
   receiptWriter?: string;
   deploymentMode?: string;
   agentId: string;
   agentURI: string;
   updatedAt: string;
+};
+
+const EMPTY_CODE_HASH = ethers.keccak256("0x");
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const waitForRuntimeCode = async (address: string, attempts = 12, delayMs = 2000) => {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const runtimeCode = await ethers.provider.getCode(address);
+    if (runtimeCode && runtimeCode !== "0x") {
+      return runtimeCode;
+    }
+    if (attempt < attempts) {
+      console.log(`Runtime bytecode not available yet at ${address}. Retrying (${attempt}/${attempts})...`);
+      await sleep(delayMs);
+    }
+  }
+  throw new Error(`No runtime bytecode found at ${address} after ${attempts} attempts.`);
 };
 
 async function main() {
@@ -48,6 +67,11 @@ async function main() {
   await contract.waitForDeployment();
   const address = await contract.getAddress();
   const txHash = contract.deploymentTransaction()?.hash ?? "";
+  const runtimeCode = await waitForRuntimeCode(address);
+  const expectedBytecodeHash = ethers.keccak256(runtimeCode);
+  if (expectedBytecodeHash === EMPTY_CODE_HASH) {
+    throw new Error(`No runtime bytecode found at ${address}. Refusing to write the deployment manifest.`);
+  }
   const manifestPath = path.resolve(__dirname, "../../deployments/mantle-sepolia.json");
 
   let manifest: DeploymentManifest = {
@@ -56,6 +80,8 @@ async function main() {
     contractName: "NeuralRateDecisionReceiptRegistry",
     address,
     txHash,
+    expectedBytecodeHash,
+    owner: signer.address,
     receiptWriter: initialBenchmarkWriter,
     deploymentMode: "agent-smart-wallet",
     agentId: "",

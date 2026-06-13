@@ -1,7 +1,11 @@
 # NeuralRate MCP
-> Risk intelligence layer and non-custodial vault automation for autonomous AI agents on the Mantle Network.
+> Secure MCP authorization and execution for external AI models and agents on Mantle.
 
-NeuralRate MCP integrates decentralized finance (DeFi) yields, Nansen on-chain data, and macroeconomic indicators into a unified intelligence layer. It exposes its capabilities directly to AI agents via the Model Context Protocol (MCP) and provides a premium operator-facing benchmark terminal.
+NeuralRate MCP is the product interface between an external AI model and an owner-controlled Safe vault. The external model supplies reasoning and tool selection. NeuralRate supplies MCP tools, owner-scoped authorization, structured vault state, execution preflight, Safe7579 dispatch, on-chain policy enforcement, and auditable evidence.
+
+The public `/mcp` endpoint is read-only. Vault state and mutations are separated into `state`, `config`, `benchmark`, and `execution` catalogs that require an owner-issued, time-bounded session token for the relevant domain. MCP authorization does not bypass policy: execution must also pass runtime readiness and the active on-chain limits.
+
+The web application is the owner's configuration and audit console. It is not the AI runtime and NeuralRate does not claim to provide an embedded LLM.
 
 ## Core Documentation
 *   [System Architecture](/docs/architecture.md): High-level system structure, micro-services data flow, and caching strategies.

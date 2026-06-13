@@ -175,7 +175,7 @@ const Header: React.FC<HeaderProps> = ({
                 style={{ width: '100%', justifyContent: 'center' }}
               >
                 <span className="agent-dot"></span>
-                <span>AGENT ACCESS</span>
+                <span>CONNECT MCP</span>
               </button>
               <button 
                 onClick={() => navigateTo('/app')}
@@ -197,11 +197,11 @@ const Header: React.FC<HeaderProps> = ({
             <button 
               onClick={() => setIsModalOpen(true)}
               className="btn-premium btn-premium-agent"
-              title="Connect AI Agent to MCP"
+              title="Connect an external AI model through MCP"
               style={{ padding: '0.55rem 1.1rem', fontSize: '0.75rem' }}
             >
               <span className="agent-dot agent-dot-active"></span>
-              <span style={{ letterSpacing: '0.5px' }}>AGENT ACCESS</span>
+              <span style={{ letterSpacing: '0.5px' }}>CONNECT MCP</span>
             </button>
             
             <button 
@@ -219,10 +219,10 @@ const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={() => setIsModalOpen(true)}
                 className="btn-premium btn-premium-agent"
-                title="Connect AI Agent to MCP"
+                title="Connect an external AI model through MCP"
               >
                 <span className="agent-dot"></span>
-                <span style={{ fontSize: '0.8rem', fontWeight: 600, letterSpacing: '0.5px' }}>AGENT ACCESS</span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 600, letterSpacing: '0.5px' }}>CONNECT MCP</span>
               </button>
             )}
 
