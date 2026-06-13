@@ -1,5 +1,5 @@
 # NeuralRate MCP
-> Verifiable RWA yield intelligence infrastructure and non-custodial vault automation for autonomous agents on the Mantle Network.
+> Risk intelligence layer and non-custodial vault automation for autonomous AI agents on the Mantle Network.
 
 NeuralRate MCP integrates decentralized finance (DeFi) yields, Nansen on-chain data, and macroeconomic indicators into a unified intelligence layer. It exposes its capabilities directly to AI agents via the Model Context Protocol (MCP) and provides a premium operator-facing benchmark terminal.
 
