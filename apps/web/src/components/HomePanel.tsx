@@ -68,6 +68,8 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
   // Hero Terminal Live Simulation State
   const [terminalLines, setTerminalLines] = useState<{ type: 'cmd' | 'info' | 'success' | 'res'; text: string }[]>([]);
   const terminalStepRef = useRef<number>(0);
+  const terminalBodyRef = useRef<HTMLDivElement>(null);
+  const terminalResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Simulator calculation logic
   const scoreBreakdown = useMemo(() => {
@@ -194,6 +196,20 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
   const organicPercent = organicRatio;
   const netFlowPercent = ((netFlow + 250000) / 1000000) * 100;
 
+  useEffect(() => {
+    const terminalBody = terminalBodyRef.current;
+    if (!terminalBody) return;
+
+    const animationFrame = window.requestAnimationFrame(() => {
+      terminalBody.scrollTo({
+        top: terminalLines.length > 0 ? terminalBody.scrollHeight : 0,
+        behavior: terminalLines.length > 0 ? 'smooth' : 'auto',
+      });
+    });
+
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [terminalLines]);
+
   // Hero Terminal Simulation Effect
   useEffect(() => {
     const scripts = [
@@ -212,18 +228,26 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
     const timer = setInterval(() => {
       const next = terminalStepRef.current + 1;
       if (next > scripts.length) {
-        // Loop terminal simulation after brief pause
-        setTimeout(() => {
-          setTerminalLines([]);
-          terminalStepRef.current = 0;
-        }, 3000);
+        if (!terminalResetTimeoutRef.current) {
+          terminalResetTimeoutRef.current = setTimeout(() => {
+            setTerminalLines([]);
+            terminalStepRef.current = 0;
+            terminalResetTimeoutRef.current = null;
+          }, 3000);
+        }
         return;
       }
       setTerminalLines((lines) => [...lines, scripts[next - 1] as any]);
       terminalStepRef.current = next;
     }, 1800);
 
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      if (terminalResetTimeoutRef.current) {
+        clearTimeout(terminalResetTimeoutRef.current);
+        terminalResetTimeoutRef.current = null;
+      }
+    };
   }, []);
 
   // MCP sandbox code runner simulation
@@ -293,10 +317,10 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
           </span>
         </div>
 
-        <h1 className="hero-headline hero-headline-gradient" style={{ zIndex: 10, fontSize: '3.75rem', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.15, marginTop: '1rem', textTransform: 'none' }}>
+        <h1 className="hero-headline hero-headline-gradient" style={{ zIndex: 10, fontSize: '3.75rem', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.15, marginTop: '0.5rem', marginBottom: '0.1rem', textTransform: 'none' }}>
           The MCP Safety Layer
         </h1>
-        <div className="hero-headline-sub" style={{ zIndex: 10, fontSize: '1.75rem', fontWeight: 700, display: 'flex', gap: '0.65rem', justifyContent: 'center', alignItems: 'center', marginTop: '0.5rem', color: 'var(--text-primary)' }}>
+        <div className="hero-headline-sub" style={{ zIndex: 10, fontSize: '1.75rem', fontWeight: 700, color: 'var(--text-primary)' }}>
           <span>for</span>
           <span className="word-cycle-container">
             <span className="word-cycle-track">
@@ -308,7 +332,7 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
           </span>
         </div>
 
-        <p className="hero-subhead" style={{ zIndex: 10, maxWidth: '640px', margin: '1.5rem auto 2rem', color: 'var(--text-secondary)', fontSize: '0.96rem', lineHeight: 1.6 }}>
+        <p className="hero-subhead" style={{ zIndex: 10, maxWidth: '640px', margin: '1.6rem auto 1.5rem', color: 'var(--text-secondary)', fontSize: '0.96rem', lineHeight: 1.5 }}>
           Connect any external AI model through MCP. The owner defines the vault, permissions, limits, and expiry. NeuralRate exposes only the authorized tools and enforces execution policy on-chain.
         </p>
 
@@ -326,7 +350,7 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
               <span>▸ Simulate</span>
             </a>
           </div>
-          <div className="terminal-body" style={{ padding: '1.25rem 1.5rem', minHeight: '210px', display: 'flex', flexDirection: 'column', gap: '0.4rem', textAlign: 'left', fontSize: '0.75rem', lineHeight: 1.55 }}>
+          <div ref={terminalBodyRef} className="terminal-body" style={{ padding: '1.25rem 1.5rem', height: '210px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '0.4rem', overflowY: 'hidden', scrollBehavior: 'smooth', textAlign: 'left', fontSize: '0.75rem', lineHeight: 1.55 }}>
             {terminalLines.map((line, idx) => (
               <div key={idx} className={`terminal-line ${line.type === 'success' ? 'terminal-success' : ''}`}>
                 {line.type === 'cmd' && <span className="terminal-prompt" style={{ color: 'var(--color-lime)' }}>▸ </span>}
