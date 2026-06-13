@@ -332,7 +332,7 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
           </span>
         </div>
 
-        <p className="hero-subhead" style={{ zIndex: 10, maxWidth: '640px', margin: '1.6rem auto 1.5rem', color: 'var(--text-secondary)', fontSize: '0.96rem', lineHeight: 1.5 }}>
+        <p className="hero-subhead" style={{ zIndex: 10, maxWidth: '640px', margin: '3rem auto 3rem', color: 'var(--text-secondary)', fontSize: '0.96rem', lineHeight: 1.5 }}>
           Connect any external AI model through MCP. The owner defines the vault, permissions, limits, and expiry. NeuralRate exposes only the authorized tools and enforces execution policy on-chain.
         </p>
 
