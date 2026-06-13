@@ -1516,17 +1516,17 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
             {
               phase: 'Foundation',
               status: 'LIVE',
-              title: 'MCP Safety Layer',
-              description: 'Public and scoped MCP catalogs, owner-issued sessions, Safe vault execution, on-chain policy enforcement, and verifiable receipts.',
-              items: ['Mantle Sepolia', 'Safe7579 + ERC-4337', 'Owner-defined limits'],
+              title: 'Live Agent Execution & Safety Layer',
+              description: 'AI agents are already executing real on-chain allocations (e.g., Treasury/USDY) using scoped MCP catalogs, Safe vaults, and on-chain policy enforcement.',
+              items: ['Ondo Finance (USDY)', 'Mantle Network', 'Safe7579 + ERC-4337'],
               current: true,
             },
             {
               phase: 'Expansion',
               status: 'NEXT',
               title: 'More Governed Web3 Tools',
-              description: 'Extend the same authorization envelope to purpose-built adapters for swaps, staking, lending, treasury operations, and other protocol actions.',
-              items: ['Tool-specific schemas', 'Protocol adapters', 'Fail-closed preflight'],
+              description: 'With base allocations live, we will extend the same authorization envelope to purpose-built adapters for swaps, staking, lending, and other protocol actions.',
+              items: ['Swap adapters', 'Staking integrations', 'Lending markets'],
             },
             {
               phase: 'Network',
