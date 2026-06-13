@@ -21,7 +21,8 @@ const YieldScanner: React.FC<Props> = ({ pools, loading, onSelectPool, selectedP
           </svg>
           Yield Scanner
         </h2>
-        <div style={{ fontSize: '0.875rem', color: 'var(--color-lime)', background: 'var(--color-lime-glow)', padding: '0.2rem 0.6rem', borderRadius: '4px' }}>
+        <div style={{ fontSize: '0.75rem', color: 'var(--text-primary)', background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.1)', padding: '0.25rem 0.65rem', borderRadius: '6px', fontWeight: 600, letterSpacing: '0.02em', display: 'flex', alignItems: 'center' }}>
+          <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: 'var(--color-lime)', marginRight: '6px', boxShadow: '0 0 8px rgba(223,246,81,0.6)' }}></span>
           Live on {MANTLE_CHAIN_NAME}
         </div>
       </div>
