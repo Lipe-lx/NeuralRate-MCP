@@ -301,9 +301,9 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
           <span className="word-cycle-container">
             <span className="word-cycle-track">
               <span className="word-cycle-item">Autonomous AI Agents</span>
-              <span className="word-cycle-item">DeFi Yield Operators</span>
-              <span className="word-cycle-item">Safe Smart Vaults</span>
-              <span className="word-cycle-item">On-Chain Verifiability</span>
+              <span className="word-cycle-item">DeFi Risk Operators</span>
+              <span className="word-cycle-item">Risk-Aware Smart Vaults</span>
+              <span className="word-cycle-item">On-Chain Yield Verification</span>
             </span>
           </span>
         </div>
