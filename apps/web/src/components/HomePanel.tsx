@@ -1500,7 +1500,72 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
       </section>
 
       {/* ═══════════════════════════════════════════
-          6. FINAL CALL TO ACTION
+          6. PRODUCT ROADMAP
+          ═══════════════════════════════════════════ */}
+      <section className="home-section roadmap-section scroll-reveal" id="roadmap">
+        <div className="section-header-compact roadmap-header">
+          <div className="section-kicker">Product Roadmap</div>
+          <h2 className="section-title">A Solid Safety Core, Built to Expand.</h2>
+          <p className="section-subtitle roadmap-intro">
+            NeuralRate starts with governed vault execution on Mantle. The same MCP authorization model can secure more Web3 tools as each integration gains explicit schemas, preflight checks, and enforceable policy limits.
+          </p>
+        </div>
+
+        <div className="roadmap-grid">
+          {[
+            {
+              phase: 'Foundation',
+              status: 'LIVE',
+              title: 'MCP Safety Layer',
+              description: 'Public and scoped MCP catalogs, owner-issued sessions, Safe vault execution, on-chain policy enforcement, and verifiable receipts.',
+              items: ['Mantle Sepolia', 'Safe7579 + ERC-4337', 'Owner-defined limits'],
+              current: true,
+            },
+            {
+              phase: 'Expansion',
+              status: 'NEXT',
+              title: 'More Governed Web3 Tools',
+              description: 'Extend the same authorization envelope to purpose-built adapters for swaps, staking, lending, treasury operations, and other protocol actions.',
+              items: ['Tool-specific schemas', 'Protocol adapters', 'Fail-closed preflight'],
+            },
+            {
+              phase: 'Network',
+              status: 'PLANNED',
+              title: 'Multi-Chain Policy Runtime',
+              description: 'Carry consistent owner permissions and audit evidence across additional EVM networks without weakening chain-specific execution checks.',
+              items: ['Chain-aware policies', 'Unified audit trail', 'Runtime verification'],
+            },
+            {
+              phase: 'Ecosystem',
+              status: 'VISION',
+              title: 'Open Safety Infrastructure',
+              description: 'Give builders reusable components to publish governed MCP tools that external AI models can discover and use inside explicit authority boundaries.',
+              items: ['Integration SDK', 'Verified tool registry', 'Composable policies'],
+            },
+          ].map((milestone) => (
+            <article className={`roadmap-card${milestone.current ? ' roadmap-card-current' : ''}`} key={milestone.phase}>
+              <div className="roadmap-card-topline">
+                <span className="roadmap-phase">{milestone.phase}</span>
+                <span className={`roadmap-status${milestone.current ? ' roadmap-status-live' : ''}`}>{milestone.status}</span>
+              </div>
+              <h3>{milestone.title}</h3>
+              <p>{milestone.description}</p>
+              <div className="roadmap-tags">
+                {milestone.items.map((item) => (
+                  <span key={item}>{item}</span>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+
+        <p className="roadmap-disclaimer">
+          Current live surface: MCP authorization and governed execution on Mantle Sepolia. Later milestones describe product direction, not currently available capabilities.
+        </p>
+      </section>
+
+      {/* ═══════════════════════════════════════════
+          7. FINAL CALL TO ACTION
           ═══════════════════════════════════════════ */}
       <section className="home-section glass-card-premium scroll-reveal" style={{ textAlign: 'center', padding: '5rem 2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem', marginTop: '2rem', background: 'oklch(100% 0 0 / 0.015)', border: '1px solid oklch(100% 0 0 / 0.06)', borderRadius: '32px' }}>
         <div className="section-kicker">Verify & Audit</div>
@@ -1542,7 +1607,7 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
       </section>
 
       {/* ═══════════════════════════════════════════
-          7. PREMIUM MINIMAL FOOTER
+          8. PREMIUM MINIMAL FOOTER
           ═══════════════════════════════════════════ */}
       <footer className="home-footer-brand" style={{ paddingTop: '5rem', paddingBottom: '3rem', borderTop: '1px solid oklch(100% 0 0 / 0.04)', marginTop: '6rem' }}>
         <div className="footer-sitemap-grid" style={{ display: 'grid', gridTemplateColumns: '2fr repeat(3, 1fr)', gap: '4rem', textAlign: 'left', marginBottom: '3rem' }}>
@@ -1570,6 +1635,7 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) =>
             <h4 style={{ fontSize: '0.85rem', fontWeight: 700, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#fff' }}>Platform</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.85rem' }}>
               <a href="#" onClick={(e) => { e.preventDefault(); onNavigate('/app'); }} style={{ color: 'var(--text-secondary)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-lime)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}>Operator Terminal</a>
+              <a href="#roadmap" style={{ color: 'var(--text-secondary)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-lime)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}>Product Roadmap</a>
               <a href="#" onClick={(e) => { e.preventDefault(); onNavigate('/verify'); }} style={{ color: 'var(--text-secondary)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-lime)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}>Verify Proof Ledger</a>
               <a href="#" onClick={(e) => { e.preventDefault(); onNavigate('/docs'); }} style={{ color: 'var(--text-secondary)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-lime)'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}>Documentation Hub</a>
             </div>

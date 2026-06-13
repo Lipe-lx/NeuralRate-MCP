@@ -35,7 +35,7 @@ const Header: React.FC<HeaderProps> = ({
   useEffect(() => {
     if (!compact) return;
 
-    const sectionIds = ['hero-section', 'poc-simulator', 'how-it-works', 'faq'];
+    const sectionIds = ['hero-section', 'poc-simulator', 'how-it-works', 'faq', 'roadmap'];
     const observers: IntersectionObserver[] = [];
 
     sectionIds.forEach((id) => {
@@ -165,6 +165,7 @@ const Header: React.FC<HeaderProps> = ({
           <a href="#poc-simulator" onClick={(e) => handleAnchorClick(e, 'poc-simulator')} className={`nav-link-item ${activeSection === 'poc-simulator' ? 'active' : ''}`}>Risk Simulator</a>
           <a href="#how-it-works" onClick={(e) => handleAnchorClick(e, 'how-it-works')} className={`nav-link-item ${activeSection === 'how-it-works' ? 'active' : ''}`}>Security Protocol</a>
           <a href="#faq" onClick={(e) => handleAnchorClick(e, 'faq')} className={`nav-link-item ${activeSection === 'faq' ? 'active' : ''}`}>FAQ</a>
+          <a href="#roadmap" onClick={(e) => handleAnchorClick(e, 'roadmap')} className={`nav-link-item ${activeSection === 'roadmap' ? 'active' : ''}`}>Roadmap</a>
 
           {/* MOBILE ACTIONS */}
           {isMobileMenuOpen && (
