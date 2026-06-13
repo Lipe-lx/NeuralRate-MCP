@@ -130,12 +130,12 @@ const McpConnectModal: React.FC<Props> = ({ isOpen, onClose, mcpAccessBundle }) 
               </div>
               <button
                 onClick={() => handleCopy('http-url', mcpUrl)}
-                style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: copiedKey === 'http-url' ? 'var(--color-lime)' : 'var(--text-secondary)', padding: '0.3rem 0.55rem', borderRadius: '6px', fontSize: '0.7rem', cursor: 'pointer' }}
+                style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: copiedKey === 'http-url' ? 'var(--color-lime)' : 'var(--text-secondary)', padding: '0.3rem 0.55rem', borderRadius: '6px', fontSize: '0.7rem', cursor: 'pointer', flexShrink: 0 }}
               >
                 {copiedKey === 'http-url' ? 'Copied URL' : 'Copy URL'}
               </button>
             </div>
-            <pre style={{ margin: 0, padding: '0.85rem', background: 'rgba(0,0,0,0.18)', borderRadius: '8px', border: '1px solid var(--border-subtle)', fontSize: '0.74rem', color: 'var(--color-lime)', overflowX: 'auto', fontFamily: 'monospace' }}>
+            <pre style={{ margin: 0, padding: '0.85rem', background: 'rgba(0,0,0,0.18)', borderRadius: '8px', border: '1px solid var(--border-subtle)', fontSize: '0.74rem', color: 'var(--color-lime)', overflowX: 'auto', fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
               {mcpUrl}
             </pre>
             <p style={{ margin: '0.65rem 0 0', fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
