@@ -24,13 +24,13 @@ The project features a **Cloudflare Worker public control plane**, a **private C
 ## System Architecture & Topology
 
 ```mermaid
-graph TD
-    User[Operator Wallet + Web Panel] -->|REST + EIP-712 Signatures| Worker[Cloudflare Worker]
+flowchart TD
+    User[Operator Wallet and Web Panel] -->|REST and EIP-712 Signatures| Worker[Cloudflare Worker]
     Agent[AI Agent / LLM] -->|Read-only MCP /mcp| Worker
     Worker -->|D1 Storage| D1[(Cloudflare D1)]
     Worker -->|KV Cache| KV[(Cloudflare KV)]
-    Worker -->|Service Binding + Internal API Token| Executor[Private Executor Worker]
-    Worker -->|Policy & Session Discovery| PolicyRegistry[NeuralRatePolicyRegistry]
+    Worker -->|Service Binding and Internal API Token| Executor[Private Executor Worker]
+    Worker -->|Policy and Session Discovery| PolicyRegistry[NeuralRatePolicyRegistry]
     Executor -->|Anchor Snapshot / Read Policy| PolicyRegistry
     Executor -->|Anchor Receipt Tx| ReceiptRegistry[NeuralRateDecisionReceiptRegistry]
     Executor -->|Safe7579 UserOperation| EntryPoint[ERC-4337 EntryPoint]
