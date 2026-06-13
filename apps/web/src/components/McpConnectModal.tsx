@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { MCP_HTTP_URL, SSE_URL } from '../config';
+import { MCP_HTTP_URL } from '../config';
 
 interface Props {
   isOpen: boolean;
@@ -10,7 +10,6 @@ interface Props {
 const McpConnectModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [configMode, setConfigMode] = useState<'http' | 'sse'>('http');
 
   useEffect(() => {
     setMounted(true);
@@ -19,8 +18,7 @@ const McpConnectModal: React.FC<Props> = ({ isOpen, onClose }) => {
   if (!isOpen || !mounted) return null;
 
   const mcpUrl = MCP_HTTP_URL;
-  const sseUrl = SSE_URL;
-  const streamableHttpConfig = `{
+  const mcpConfig = `{
   "mcpServers": {
     "neuralrate": {
       "type": "http",
@@ -28,15 +26,6 @@ const McpConnectModal: React.FC<Props> = ({ isOpen, onClose }) => {
     }
   }
 }`;
-  const legacySseConfig = `{
-  "mcpServers": {
-    "neuralrate": {
-      "type": "sse",
-      "url": "${sseUrl}"
-    }
-  }
-}`;
-  const activeConfig = configMode === 'http' ? streamableHttpConfig : legacySseConfig;
 
   const handleCopy = (key: string, value: string) => {
     navigator.clipboard.writeText(value);
@@ -118,27 +107,6 @@ const McpConnectModal: React.FC<Props> = ({ isOpen, onClose }) => {
               Prefer this URL in modern MCP clients. Current best practice is to connect agents directly to the canonical HTTP endpoint rather than relying on a custom `mcp+sse://` app handler.
             </p>
           </div>
-
-          <div style={{ padding: '0.9rem', background: 'var(--bg-surface)', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '0.55rem' }}>
-              <div>
-                <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', fontWeight: 700 }}>Compatibility Fallback</div>
-                <div style={{ fontSize: '0.88rem', color: 'var(--text-primary)', fontWeight: 600, marginTop: '0.2rem' }}>Legacy SSE on `/sse`</div>
-              </div>
-              <button
-                onClick={() => handleCopy('sse-url', sseUrl)}
-                style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: copiedKey === 'sse-url' ? 'var(--color-lime)' : 'var(--text-secondary)', padding: '0.3rem 0.55rem', borderRadius: '6px', fontSize: '0.7rem', cursor: 'pointer' }}
-              >
-                {copiedKey === 'sse-url' ? 'Copied URL' : 'Copy URL'}
-              </button>
-            </div>
-            <pre style={{ margin: 0, padding: '0.85rem', background: 'rgba(0,0,0,0.18)', borderRadius: '8px', border: '1px solid var(--border-subtle)', fontSize: '0.74rem', color: 'var(--text-secondary)', overflowX: 'auto', fontFamily: 'monospace' }}>
-              {sseUrl}
-            </pre>
-            <p style={{ margin: '0.65rem 0 0', fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-              Use this only for older clients that still require SSE transport. NeuralRate keeps it available as a compatibility alias.
-            </p>
-          </div>
         </div>
 
         <div>
@@ -150,46 +118,14 @@ const McpConnectModal: React.FC<Props> = ({ isOpen, onClose }) => {
               </div>
             </div>
             <button 
-              onClick={() => handleCopy('json', activeConfig)}
+              onClick={() => handleCopy('json', mcpConfig)}
               style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: copiedKey === 'json' ? 'var(--color-lime)' : 'var(--text-secondary)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.7rem', cursor: 'pointer', transition: 'all 0.2s' }}
             >
               {copiedKey === 'json' ? '✓ Copied!' : 'Copy JSON'}
             </button>
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.65rem', flexWrap: 'wrap' }}>
-            <button
-              onClick={() => setConfigMode('http')}
-              style={{
-                background: configMode === 'http' ? 'rgba(223,246,81,0.14)' : 'transparent',
-                border: `1px solid ${configMode === 'http' ? 'rgba(223,246,81,0.35)' : 'var(--border-subtle)'}`,
-                color: configMode === 'http' ? 'var(--color-lime)' : 'var(--text-secondary)',
-                padding: '0.35rem 0.65rem',
-                borderRadius: '999px',
-                fontSize: '0.72rem',
-                cursor: 'pointer',
-                fontWeight: 600
-              }}
-            >
-              Streamable HTTP (Recommended)
-            </button>
-            <button
-              onClick={() => setConfigMode('sse')}
-              style={{
-                background: configMode === 'sse' ? 'rgba(223,246,81,0.08)' : 'transparent',
-                border: `1px solid ${configMode === 'sse' ? 'rgba(223,246,81,0.24)' : 'var(--border-subtle)'}`,
-                color: configMode === 'sse' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                padding: '0.35rem 0.65rem',
-                borderRadius: '999px',
-                fontSize: '0.72rem',
-                cursor: 'pointer',
-                fontWeight: 600
-              }}
-            >
-              Legacy SSE
-            </button>
-          </div>
           <pre style={{ margin: 0, padding: '1rem', background: 'var(--bg-surface)', borderRadius: '8px', border: '1px solid var(--border-subtle)', fontSize: '0.75rem', color: 'var(--color-lime)', overflowX: 'auto', fontFamily: 'monospace' }}>
-            {activeConfig}
+            {mcpConfig}
           </pre>
         </div>
 
