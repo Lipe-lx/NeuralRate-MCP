@@ -13,6 +13,7 @@ type HeaderProps = {
   compact?: boolean;
   showAgentAccess?: boolean;
   mcpAccessBundle?: McpAccessBundle | null;
+  subtitle?: string;
 };
 
 const Header: React.FC<HeaderProps> = ({
@@ -22,6 +23,7 @@ const Header: React.FC<HeaderProps> = ({
   compact = false,
   showAgentAccess = true,
   mcpAccessBundle,
+  subtitle,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -139,19 +141,13 @@ const Header: React.FC<HeaderProps> = ({
         <div style={{ width: '0px' }} />
       ) : (
         <div 
-          style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer', zIndex: 1010 }} 
-          onClick={() => navigateTo('/')}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', zIndex: 1010 }} 
         >
-          <div style={{
-            width: '32px',
-            height: '32px',
-            backgroundImage: 'url(/logo.png)',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            borderRadius: '8px',
-            boxShadow: '0 0 10px rgba(223, 246, 81, 0.15)'
-          }} />
-          <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>NeuralRate</span>
+          {subtitle && (
+            <span style={{ fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+              {subtitle}
+            </span>
+          )}
         </div>
       )}
 

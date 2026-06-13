@@ -212,8 +212,8 @@ const AgentSettingsPanel: React.FC<Props> = ({ config, busy, onSave, onPublishPo
                   style={{
                     width: "100%",
                     padding: "0.45rem 0.65rem",
-                    borderRadius: "8px",
-                    background: "var(--bg-surface-elevated)",
+                    borderRadius: "10px",
+                    background: "rgba(255, 255, 255, 0.02)",
                     border: "1px solid oklch(100% 0 0 / 0.08)",
                     color: "#fff",
                     fontSize: "0.8rem",
@@ -299,8 +299,8 @@ const AgentSettingsPanel: React.FC<Props> = ({ config, busy, onSave, onPublishPo
                   style={{
                     width: "100%",
                     padding: "0.45rem 0.65rem",
-                    borderRadius: "8px",
-                    background: "var(--bg-surface-elevated)",
+                    borderRadius: "10px",
+                    background: "rgba(255, 255, 255, 0.02)",
                     border: "1px solid oklch(100% 0 0 / 0.08)",
                     color: "#fff",
                     fontSize: "0.8rem",
@@ -390,8 +390,8 @@ const AgentSettingsPanel: React.FC<Props> = ({ config, busy, onSave, onPublishPo
                   style={{
                     width: "100%",
                     padding: "0.45rem 0.65rem",
-                    borderRadius: "8px",
-                    background: "var(--bg-surface-elevated)",
+                    borderRadius: "10px",
+                    background: "rgba(255, 255, 255, 0.02)",
                     border: "1px solid oklch(100% 0 0 / 0.08)",
                     color: "#fff",
                     fontSize: "0.8rem",
@@ -477,8 +477,8 @@ const AgentSettingsPanel: React.FC<Props> = ({ config, busy, onSave, onPublishPo
                   style={{
                     width: "100%",
                     padding: "0.45rem 0.65rem",
-                    borderRadius: "8px",
-                    background: "var(--bg-surface-elevated)",
+                    borderRadius: "10px",
+                    background: "rgba(255, 255, 255, 0.02)",
                     border: "1px solid oklch(100% 0 0 / 0.08)",
                     color: "#fff",
                     fontSize: "0.8rem",
@@ -561,10 +561,10 @@ const AgentSettingsPanel: React.FC<Props> = ({ config, busy, onSave, onPublishPo
 
           <div
             style={{
-              border: "1px solid var(--border-subtle)",
-              borderRadius: "8px",
+              border: "1px solid rgba(255, 255, 255, 0.075)",
+              borderRadius: "12px",
               padding: "0.85rem",
-              background: "oklch(100% 0 0 / 0.025)",
+              background: "transparent",
               display: "grid",
               gap: "0.75rem",
             }}

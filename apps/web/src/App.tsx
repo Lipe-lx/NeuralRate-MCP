@@ -325,24 +325,19 @@ function AppContent() {
 
   return (
     <div className="container" style={{ height: '100vh', display: 'flex', flexDirection: 'row', gap: '1.5rem', overflow: 'hidden', padding: '1rem' }}>
-      <aside className="opacity-100" style={{ width: '240px', flexShrink: 0, height: '100%' }}>
+      <aside className="opacity-100" style={{ width: '200px', flexShrink: 0, height: '100%' }}>
         <div className="sidebar-floating">
-          <div className="sidebar-brand">
+          <div className="sidebar-brand" style={{ flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', padding: '1rem 0' }}>
             <div style={{
-              width: '40px',
-              height: '40px',
+              width: '52px',
+              height: '52px',
               backgroundImage: 'url(/logo.png)',
               backgroundSize: 'cover',
               backgroundPosition: 'center',
-              borderRadius: '10px',
+              borderRadius: '12px',
               boxShadow: '0 0 12px var(--color-lime-glow)'
             }} />
-            <div>
-              <h2 style={{ fontSize: '1.15rem', margin: 0, fontWeight: 700, color: 'var(--text-primary)' }}>NeuralRate</h2>
-              <span style={{ fontSize: '0.58rem', color: 'var(--color-lime)', opacity: 0.85, fontWeight: 600, display: 'block', marginTop: '0.1rem', lineHeight: '1.2' }}>
-                Yield operator terminal with optional automation
-              </span>
-            </div>
+            <h2 style={{ fontSize: '1.15rem', margin: 0, fontWeight: 700, color: 'var(--text-primary)' }}>NeuralRate</h2>
           </div>
 
           <nav className="sidebar-nav">
@@ -375,6 +370,7 @@ function AppContent() {
           onVaultTabChange={setActiveVaultTab}
           showAgentAccess={false}
           mcpAccessBundle={neuralRateUser.mcpAccessBundle}
+          subtitle={activeTab === 'terminal' ? 'Yield Intelligence Terminal' : undefined}
         />
 
         <main style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
