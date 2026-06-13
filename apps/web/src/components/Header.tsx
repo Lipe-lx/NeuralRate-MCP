@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import McpConnectModal from './McpConnectModal';
 import { useWalletContext } from '../context/WalletContext';
 
+import { type McpAccessBundle } from '../lib/mcpAccess';
+
 type VaultHeaderTab = 'vault' | 'telemetry' | 'settings' | 'history';
 
 type HeaderProps = {
@@ -10,6 +12,7 @@ type HeaderProps = {
   onVaultTabChange?: (tab: VaultHeaderTab) => void;
   compact?: boolean;
   showAgentAccess?: boolean;
+  mcpAccessBundle?: McpAccessBundle | null;
 };
 
 const Header: React.FC<HeaderProps> = ({
@@ -18,6 +21,7 @@ const Header: React.FC<HeaderProps> = ({
   onVaultTabChange,
   compact = false,
   showAgentAccess = true,
+  mcpAccessBundle,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -308,7 +312,7 @@ const Header: React.FC<HeaderProps> = ({
         </div>
       )}
 
-      <McpConnectModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <McpConnectModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} mcpAccessBundle={mcpAccessBundle} />
     </header>
   );
 };

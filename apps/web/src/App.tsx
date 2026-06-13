@@ -254,8 +254,8 @@ function AppContent() {
   if (route === 'home') {
     return (
       <div className="container" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <Header compact />
-        <HomePanel onNavigate={navigateTo} />
+        <Header compact mcpAccessBundle={neuralRateUser.mcpAccessBundle} />
+        <HomePanel onNavigate={navigateTo} mcpAccessBundle={neuralRateUser.mcpAccessBundle} />
       </div>
     );
   }
@@ -264,7 +264,7 @@ function AppContent() {
     return (
       <div className="container" style={{ minHeight: '100vh', padding: '1.25rem', display: 'flex', justifyContent: 'center' }}>
         <div style={{ width: '100%', maxWidth: '1080px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <Header compact />
+          <Header compact mcpAccessBundle={neuralRateUser.mcpAccessBundle} />
           <section className="glass-panel animate-enter">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginBottom: '0.9rem' }}>
               <h1 style={{ margin: 0, fontSize: '1.45rem' }}>{pageTitle}</h1>
@@ -307,7 +307,7 @@ function AppContent() {
     return (
       <div className="container" style={{ minHeight: '100vh', padding: '1.25rem', display: 'flex', justifyContent: 'center' }}>
         <div style={{ width: '100%', maxWidth: '1200px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <Header compact />
+          <Header compact mcpAccessBundle={neuralRateUser.mcpAccessBundle} />
           <section className="glass-panel animate-enter">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginBottom: '0.8rem' }}>
               <h1 style={{ margin: 0, fontSize: '1.45rem' }}>{pageTitle}</h1>
@@ -374,6 +374,7 @@ function AppContent() {
           activeVaultTab={activeVaultTab}
           onVaultTabChange={setActiveVaultTab}
           showAgentAccess={false}
+          mcpAccessBundle={neuralRateUser.mcpAccessBundle}
         />
 
         <main style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
@@ -500,6 +501,7 @@ function AppContent() {
       <McpConnectModal
         isOpen={isAgentAccessModalOpen}
         onClose={() => setIsAgentAccessModalOpen(false)}
+        mcpAccessBundle={neuralRateUser.mcpAccessBundle}
       />
     </div>
   );

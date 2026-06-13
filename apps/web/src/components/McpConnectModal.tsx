@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { MCP_HTTP_URL } from '../config';
+import { type McpAccessBundle } from '../lib/mcpAccess';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  mcpAccessBundle?: McpAccessBundle | null;
 }
 
-const McpConnectModal: React.FC<Props> = ({ isOpen, onClose }) => {
+const McpConnectModal: React.FC<Props> = ({ isOpen, onClose, mcpAccessBundle }) => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
@@ -17,8 +19,19 @@ const McpConnectModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
   if (!isOpen || !mounted) return null;
 
-  const mcpUrl = MCP_HTTP_URL;
-  const mcpConfig = `{
+  const mcpUrl = mcpAccessBundle ? mcpAccessBundle.recommendedTransport.url : MCP_HTTP_URL;
+  const sessionToken = mcpAccessBundle?.sessionToken;
+  const mcpConfig = mcpAccessBundle ? `{
+  "mcpServers": {
+    "neuralrate": {
+      "type": "http",
+      "url": "${mcpUrl}",
+      "headers": {
+        "x-neuralrate-session-token": "${sessionToken}"
+      }
+    }
+  }
+}` : `{
   "mcpServers": {
     "neuralrate": {
       "type": "http",
@@ -85,6 +98,28 @@ const McpConnectModal: React.FC<Props> = ({ isOpen, onClose }) => {
         <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '1.5rem' }}>
           NeuralRate works as a yield terminal without MCP. Use this only if you want an external agent to run grant-scoped actions against your vault policy.
         </p>
+
+        {mcpAccessBundle && (
+          <div style={{ display: 'grid', gap: '0.85rem', marginBottom: '1.5rem' }}>
+            <div style={{ padding: '0.9rem', background: 'var(--bg-surface)', borderRadius: '10px', border: '1px solid rgba(223,246,81,0.18)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '0.55rem' }}>
+                <div>
+                  <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-lime)', fontWeight: 700 }}>Session Token</div>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>Active authorization for the external agent</div>
+                </div>
+                <button
+                  onClick={() => handleCopy('session-token', sessionToken!)}
+                  style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: copiedKey === 'session-token' ? 'var(--color-lime)' : 'var(--text-secondary)', padding: '0.3rem 0.55rem', borderRadius: '6px', fontSize: '0.7rem', cursor: 'pointer', flexShrink: 0 }}
+                >
+                  {copiedKey === 'session-token' ? 'Copied Token' : 'Copy Token'}
+                </button>
+              </div>
+              <pre style={{ margin: 0, padding: '0.85rem', background: 'rgba(0,0,0,0.18)', borderRadius: '8px', border: '1px solid var(--border-subtle)', fontSize: '0.74rem', color: 'var(--color-lime)', overflowX: 'auto', fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                {sessionToken}
+              </pre>
+            </div>
+          </div>
+        )}
 
         <div style={{ display: 'grid', gap: '0.85rem', marginBottom: '1.5rem' }}>
           <div style={{ padding: '0.9rem', background: 'var(--bg-surface)', borderRadius: '10px', border: '1px solid rgba(223,246,81,0.18)' }}>

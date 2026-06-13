@@ -4,11 +4,14 @@ import ParticleCanvas from './ParticleCanvas';
 import CountUp from './CountUp';
 import SpiderChart from './SpiderChart';
 
+import { type McpAccessBundle } from '../lib/mcpAccess';
+
 interface HomePanelProps {
   onNavigate: (path: string) => void;
+  mcpAccessBundle?: McpAccessBundle | null;
 }
 
-const HomePanel: React.FC<HomePanelProps> = ({ onNavigate }) => {
+const HomePanel: React.FC<HomePanelProps> = ({ onNavigate, mcpAccessBundle }) => {
   const [isMcpModalOpen, setIsMcpModalOpen] = useState<boolean>(false);
 
   // Simulator State
@@ -1597,7 +1600,7 @@ const HomePanel: React.FC<HomePanelProps> = ({ onNavigate }) => {
         </div>
       </footer>
 
-      <McpConnectModal isOpen={isMcpModalOpen} onClose={() => setIsMcpModalOpen(false)} />
+      <McpConnectModal isOpen={isMcpModalOpen} onClose={() => setIsMcpModalOpen(false)} mcpAccessBundle={mcpAccessBundle} />
     </div>
     </>
   );

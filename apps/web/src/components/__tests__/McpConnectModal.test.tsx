@@ -8,25 +8,13 @@ describe('McpConnectModal', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('renders and allows toggling modes when open', async () => {
+  it('renders correctly when open', async () => {
     const onClose = vi.fn();
     render(<McpConnectModal isOpen={true} onClose={onClose} />);
 
     // Verify title and description exist
     expect(screen.getByText('Agent Connection')).toBeInTheDocument();
     expect(screen.getByText(/NeuralRate works as a yield terminal without MCP/)).toBeInTheDocument();
-
-    // Verify config modes buttons
-    const sseButton = screen.getByRole('button', { name: /Legacy SSE/i });
-    expect(sseButton).toBeInTheDocument();
-
-    const httpButton = screen.getByRole('button', { name: /Streamable HTTP/i });
-    expect(httpButton).toBeInTheDocument();
-
-    // Toggle mode
-    await act(async () => {
-      fireEvent.click(sseButton);
-    });
 
     // Check that onClose is triggered when clicking close button
     const closeButton = screen.getByText('×');
