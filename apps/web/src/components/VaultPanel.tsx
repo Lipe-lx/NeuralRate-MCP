@@ -359,6 +359,85 @@ const VaultPanel: React.FC<Props> = ({
     );
   };
 
+  const renderGuidedOnboarding = (styleOverride?: React.CSSProperties) => (
+    <div
+      className="vault-frameless-card"
+      style={{
+        border: "var(--border-subtle)",
+        borderRadius: "12px",
+        padding: "0.9rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.6rem",
+        ...styleOverride,
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem" }}>
+        <div style={{ fontSize: "0.82rem", color: "var(--text-primary)", fontWeight: 700 }}>Guided Onboarding</div>
+        <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)" }}>
+          {completedSteps}/{onboardingSteps.length} complete
+        </div>
+      </div>
+      {nextStep?.blockedBy && (
+        <div style={{ fontSize: "0.74rem", color: "var(--color-warning)", lineHeight: 1.45 }}>
+          Next unblock: {nextStep.blockedBy}
+        </div>
+      )}
+      <div style={{ display: "grid", gap: "0.5rem" }}>
+        {nextStep ? (
+          <div
+            key={nextStep.key}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "24px 1fr",
+              gap: "0.55rem",
+              alignItems: "start",
+              opacity: 1,
+            }}
+          >
+            <div
+              style={{
+                width: "20px",
+                height: "20px",
+                borderRadius: "999px",
+                display: "grid",
+                placeItems: "center",
+                fontSize: "0.7rem",
+                fontWeight: 700,
+                background: "rgba(255, 255, 255, 0.06)",
+                color: "var(--text-secondary)",
+                border: "var(--border-subtle)",
+              }}
+            >
+              {onboardingSteps.indexOf(nextStep) + 1}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
+              <div style={{ fontSize: "0.76rem", color: "var(--text-primary)", fontWeight: 600 }}>{nextStep.label}</div>
+              {nextStep.blockedBy && (
+                <div style={{ fontSize: "0.71rem", color: "var(--text-secondary)", lineHeight: 1.4 }}>{nextStep.blockedBy}</div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div style={{ fontSize: "0.78rem", color: "var(--color-lime)", fontWeight: 600 }}>
+            ✓ All onboarding steps completed! Vault automation is active.
+          </div>
+        )}
+      </div>
+      {(!isConnected || !isCorrectChain || !vault) && (
+        <div style={{ marginTop: "0.4rem" }}>
+          {!isConnected ? (
+            <ActionButton label="Connect Wallet" tone="primary" onClick={onConnect} disabled={busy} />
+          ) : !isCorrectChain ? (
+            <ActionButton label="Switch to Mantle" tone="primary" onClick={onSwitchChain} disabled={busy} />
+          ) : !vault ? (
+            <ActionButton label={busy ? "Bootstrapping..." : "Create User Vault"} tone="primary" onClick={onBootstrap} disabled={busy} />
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <section className="glass-panel animate-enter vault-panel">
       <div className="vault-panel-main">
@@ -746,6 +825,7 @@ const VaultPanel: React.FC<Props> = ({
               )}
             </div>
           )}
+          {!isConnected && renderGuidedOnboarding({ gridColumn: 1, gridRow: 1 })}
         </div>
           {runtimePending && (
             <div
@@ -796,70 +876,7 @@ const VaultPanel: React.FC<Props> = ({
               </div>
             </div>
           )}
-          <div
-            className="vault-frameless-card"
-            style={{
-              border: "var(--border-subtle)",
-              borderRadius: "12px",
-              padding: "0.9rem",
-              display: "flex",
-              flexDirection: "column",
-              gap: "0.6rem",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem" }}>
-              <div style={{ fontSize: "0.82rem", color: "var(--text-primary)", fontWeight: 700 }}>Guided Onboarding</div>
-              <div style={{ fontSize: "0.72rem", color: "var(--text-secondary)" }}>
-                {completedSteps}/{onboardingSteps.length} complete
-              </div>
-            </div>
-            {nextStep?.blockedBy && (
-              <div style={{ fontSize: "0.74rem", color: "var(--color-warning)", lineHeight: 1.45 }}>
-                Next unblock: {nextStep.blockedBy}
-              </div>
-            )}
-             <div style={{ display: "grid", gap: "0.5rem" }}>
-               {nextStep ? (
-                 <div
-                   key={nextStep.key}
-                   style={{
-                     display: "grid",
-                     gridTemplateColumns: "24px 1fr",
-                     gap: "0.55rem",
-                     alignItems: "start",
-                     opacity: 1,
-                   }}
-                 >
-                   <div
-                     style={{
-                       width: "20px",
-                       height: "20px",
-                       borderRadius: "999px",
-                       display: "grid",
-                       placeItems: "center",
-                       fontSize: "0.7rem",
-                       fontWeight: 700,
-                       background: "rgba(255, 255, 255, 0.06)",
-                       color: "var(--text-secondary)",
-                       border: "var(--border-subtle)",
-                     }}
-                   >
-                     {onboardingSteps.indexOf(nextStep) + 1}
-                   </div>
-                   <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
-                     <div style={{ fontSize: "0.76rem", color: "var(--text-primary)", fontWeight: 600 }}>{nextStep.label}</div>
-                     {nextStep.blockedBy && (
-                       <div style={{ fontSize: "0.71rem", color: "var(--text-secondary)", lineHeight: 1.4 }}>{nextStep.blockedBy}</div>
-                     )}
-                   </div>
-                 </div>
-               ) : (
-                 <div style={{ fontSize: "0.78rem", color: "var(--color-lime)", fontWeight: 600 }}>
-                   ✓ All onboarding steps completed! Vault automation is active.
-                 </div>
-               )}
-             </div>
-          </div>
+          {isConnected && renderGuidedOnboarding()}
 
           {vault && !ownershipAcknowledged && (
             <div
@@ -886,13 +903,7 @@ const VaultPanel: React.FC<Props> = ({
           )}
 
           <div className="vault-actions-grid">
-            {!isConnected ? (
-              <ActionButton label="Connect Wallet" tone="primary" onClick={onConnect} disabled={busy} />
-            ) : !isCorrectChain ? (
-              <ActionButton label="Switch to Mantle" tone="primary" onClick={onSwitchChain} disabled={busy} />
-            ) : !vault ? (
-              <ActionButton label={busy ? "Bootstrapping..." : "Create User Vault"} tone="primary" onClick={onBootstrap} disabled={busy} />
-            ) : (
+            {vault && (
               <>
                 {!activeGrant || activeGrant.status === "revoked" ? (
                   <ActionButton
