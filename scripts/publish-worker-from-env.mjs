@@ -61,4 +61,5 @@ run("node", ["scripts/preflight-release.mjs"]);
 run("node", ["scripts/sync-deployments-to-env.mjs"]);
 run("node", ["scripts/sync-runtime-envs.mjs"]);
 run("node", ["scripts/push-cloudflare-secrets.mjs"]);
+run("npx", ["wrangler", "d1", "migrations", "apply", "DECISIONS_DB", "--remote"], workerDir);
 run("npx", ["wrangler", "deploy", ...process.argv.slice(2)], workerDir);
